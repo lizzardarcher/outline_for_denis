@@ -1,0 +1,5 @@
+$ sudo apt-get install sshpass
+sshpass -p your_password ssh -o "StrictHostKeyChecking no" user@hostname
+
+sudo bash -c "$(wget -qO- https://raw.githubusercontent.com/Jigsaw-Code/outline-server/master/src/server_manager/install_scripts/install_server.sh)"
+

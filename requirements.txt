@@ -1,0 +1,9 @@
+requests~=2.32.3
+paramiko~=3.5.0
+Django~=4.2.16
+pytelegrambotapi~=4.23.0
+watchdog~=4.0.2
+urllib3~=2.2.3
+setuptools~=68.2.0
+pytest~=8.3.3
+python-dotenv~=1.0.1
