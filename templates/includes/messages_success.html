@@ -1,0 +1,15 @@
+{% if messages %}
+    <div class="container">
+        <div class="col-sm-12 col-8">
+            {% for message in messages %}
+                <div class="mt-5 alert alert-success alert-dismissible text-dark" role="alert">
+                    {{ message|safe }}
+                    <button type="button" class="btn-close text-lg py-3 opacity-10" data-bs-dismiss="alert"
+                            aria-label="Close">
+                    </button>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+{% endif %}
+

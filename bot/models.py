@@ -1,21 +1,5 @@
-import os
 from datetime import datetime
-
-from django.contrib.auth.models import AbstractUser
 from django.db import models
-from django.template.defaultfilters import default
-
-
-class AuthTelegramUser(AbstractUser):
-    telegram_id = models.BigIntegerField(null=True, blank=True, unique=True)
-    telegram_username = models.CharField(max_length=255, blank=True)
-    telegram_first_name = models.CharField(max_length=255, blank=True)
-    telegram_last_name = models.CharField(max_length=255, blank=True)
-    telegram_photo_url = models.URLField(blank=True)
-    is_telegram_auth = models.BooleanField(default=False)
-
-    def __str__(self):
-        return self.username
 
 
 class TelegramUser(models.Model):

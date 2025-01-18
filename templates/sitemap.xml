@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+
+    <!-- Главная страница -->
+    <url>
+        <loc>https://yourdomain.com/</loc>
+        <lastmod>2024-01-26</lastmod>  <!-- Замените на дату последнего изменения -->
+        <changefreq>weekly</changefreq>
+        <priority>1.0</priority>
+    </url>
+
+    <!-- Аутентификация -->
+    <url>
+        <loc>https://yourdomain.com/auth/login/</loc>
+        <lastmod>2024-01-26</lastmod>
+        <changefreq>monthly</changefreq>
+        <priority>0.8</priority>
+    </url>
+
+    <!-- Бригады -->
+    <url>
+        <loc>https://yourdomain.com/brigades/</loc>
+        <lastmod>2024-01-26</lastmod>
+        <changefreq>weekly</changefreq>
+        <priority>0.9</priority>
+    </url>
+    <url>
+        <loc>https://yourdomain.com/brigades/create/</loc>
+        <lastmod>2024-01-26</lastmod>
+        <changefreq>monthly</changefreq>
+        <priority>0.7</priority>
+    </url>
+    <!-- Пример для одной бригады (динамические URL требуют генерации) -->
+     <!--     <url>
+           <loc>https://yourdomain.com/brigades/1/</loc>
+           <lastmod>2024-01-26</lastmod>
+            <changefreq>weekly</changefreq>
+            <priority>0.8</priority>
+        </url>
+    -->
+
+
+    <!-- Категории оборудования -->
+    <url>
+        <loc>https://yourdomain.com/categories/</loc>
+        <lastmod>2024-01-26</lastmod>
+        <changefreq>weekly</changefreq>
+        <priority>0.9</priority>
+    </url>
+     <url>
+        <loc>https://yourdomain.com/categories/create/</loc>
+         <lastmod>2024-01-26</lastmod>
+         <changefreq>monthly</changefreq>
+         <priority>0.7</priority>
+     </url>
+
+
+    <!-- Оборудование -->
+    <url>
+        <loc>https://yourdomain.com/equipment/</loc>
+        <lastmod>2024-01-26</lastmod>
+        <changefreq>weekly</changefreq>
+        <priority>0.9</priority>
+    </url>
+     <url>
+       <loc>https://yourdomain.com/equipment/create/</loc>
+        <lastmod>2024-01-26</lastmod>
+       <changefreq>monthly</changefreq>
+       <priority>0.7</priority>
+     </url>
+    <!-- Пример для одного оборудования (динамические URL) -->
+    <!--  <url>
+        <loc>https://yourdomain.com/equipment/1/</loc>
+         <lastmod>2024-01-26</lastmod>
+         <changefreq>weekly</changefreq>
+         <priority>0.8</priority>
+     </url>
+    -->
+
+    <!-- Перемещения оборудования -->
+    <url>
+        <loc>https://yourdomain.com/transfers/create/</loc>
+        <lastmod>2024-01-26</lastmod>
+        <changefreq>monthly</changefreq>
+        <priority>0.8</priority>
+    </url>
+     <url>
+        <loc>https://yourdomain.com/transfers/history/</loc>
+        <lastmod>2024-01-26</lastmod>
+        <changefreq>weekly</changefreq>
+         <priority>0.7</priority>
+    </url>
+
+
+     <!-- Пользователи -->
+     <url>
+        <loc>https://yourdomain.com/users/</loc>
+        <lastmod>2024-01-26</lastmod>
+        <changefreq>weekly</changefreq>
+         <priority>0.9</priority>
+    </url>
+    <url>
+        <loc>https://yourdomain.com/users/create/</loc>
+       <lastmod>2024-01-26</lastmod>
+        <changefreq>monthly</changefreq>
+       <priority>0.7</priority>
+   </url>
+
+    <!-- Отчеты -->
+    <url>
+        <loc>https://yourdomain.com/reports/</loc>
+        <lastmod>2024-01-26</lastmod>
+        <changefreq>weekly</changefreq>
+         <priority>0.8</priority>
+    </url>
+    <url>
+        <loc>https://yourdomain.com/reports/summary/</loc>
+         <lastmod>2024-01-26</lastmod>
+        <changefreq>weekly</changefreq>
+         <priority>0.7</priority>
+    </url>
+    <url>
+      <loc>https://yourdomain.com/reports/brigades/</loc>
+        <lastmod>2024-01-26</lastmod>
+        <changefreq>weekly</changefreq>
+        <priority>0.7</priority>
+    </url>
+
+</urlset>

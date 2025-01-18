@@ -1,0 +1,74 @@
+{% load static %}
+
+<!DOCTYPE html>
+<html lang="{{ LANGUAGE_CODE|default:"ru-ru" }}">
+
+<head>
+    <title>
+        DomVPN {% block title %}{% endblock %}
+    </title>
+    <link rel="canonical" href="https://my21812140site.ru{{ request.path }}">
+
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+    <meta name="robots" content="index, follow">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+
+    {% block extrahead %}{% endblock extrahead %}
+
+    <link rel="apple-touch-icon" sizes="76x76" href="{% static 'img/favicon.png' %}">
+    <link rel="icon" type="image/png" href="{% static 'img/favicon.png' %}">
+    <link href="{% static 'css/fonts-googleapis.css' %}" rel="stylesheet"/>
+
+    <!-- CSS Bootstrap -->
+    <link href="{% static 'css/bootstrap.css' %}" rel="stylesheet"/>
+    <link href="{% static 'css/bootstrap-grid.css' %}" rel="stylesheet"/>
+    <link href="{% static 'css/bootstrap-reboot.css' %}" rel="stylesheet"/>
+    <link href="{% static 'css/bootstrap-utilities.css' %}" rel="stylesheet"/>
+
+    <!-- Fontawesomefree -->
+    <link href="{% static 'fontawesomefree/css/fontawesome.css' %}" rel="stylesheet" type="text/css">
+    <link href="{% static 'fontawesomefree/css/brands.css' %}" rel="stylesheet" type="text/css">
+    <link href="{% static 'fontawesomefree/css/solid.css' %}" rel="stylesheet" type="text/css">
+
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        .content-wrapper {
+            flex: 1 0 auto;
+        }
+
+        footer {
+            flex-shrink: 0;
+        }
+    </style>
+
+    {% block extrastyle %}{% endblock extrastyle %}
+</head>
+
+<body class="g-sidenav-show bg-gray-100">
+
+<!-- navigation -->
+{% if request.user.is_authenticated %}
+    {% include "includes/navigation.html" %}
+{% endif %}
+
+<div class="content-wrapper">
+    {% include 'includes/messages_success.html' %}
+    {% include 'includes/messages_error.html' %}
+    {% block content %}{% endblock content %}
+</div>
+<!-- footer -->
+{% include "includes/footer.html" %}
+
+
+<!--   Core JS Files   -->
+{% include 'includes/scripts.html' %}
+
+{% block extrascript %}{% endblock extrascript %}
+
+</body>
+</html>
