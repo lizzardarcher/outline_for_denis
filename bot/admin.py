@@ -8,7 +8,7 @@ from django.conf import settings
 from bot.models import *
 
 DEBUG = settings.DEBUG
-admin.site.site_url = ''
+# admin.site.site_url = ''
 admin.site.site_header = "Outline VPN BOT Админ Панель"
 admin.site.site_title = "Outline VPN BOT"
 admin.site.index_title = "Добро пожаловать в Outline VPN BOT Админ Панель"
