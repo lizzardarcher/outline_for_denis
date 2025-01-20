@@ -51,17 +51,14 @@
 
 <body class="g-sidenav-show bg-gray-100">
 
-<!-- navigation -->
-{% if request.user.is_authenticated %}
-    {% include "includes/navigation.html" %}
-{% endif %}
+{% include "includes/navigation.html" %}
 
 <div class="content-wrapper">
     {% include 'includes/messages_success.html' %}
     {% include 'includes/messages_error.html' %}
     {% block content %}{% endblock content %}
 </div>
-<!-- footer -->
+
 {% include "includes/footer.html" %}
 
 
