@@ -2,16 +2,11 @@
 {% load static %}
 {% block title %}Контакты{% endblock title %}
 {% block content %}
-    <div class="hero_area">
-        <div class="hero_bg_box">
-            <div class="bg_img_box">
-                <img src="{% static 'images/hero-bg.png' %}" alt="">
-            </div>
-        </div>
-
+    <div class="mb-5" style="background:#00204a;">
         {% include 'includes/sections/header.html' %}
+    </div>
+        {% include 'includes/sections/contacts_body.html' %}
         {% include 'includes/sections/about.html' %}
         {% include 'includes/sections/info.html' %}
         {% include 'includes/sections/footer.html' %}
-    </div>
 {% endblock content %}
