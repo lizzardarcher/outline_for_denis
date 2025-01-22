@@ -2,6 +2,7 @@ import logging
 import random
 import sys
 import traceback
+from datetime import datetime
 from logging.handlers import TimedRotatingFileHandler
 from pathlib import Path
 
@@ -9,7 +10,7 @@ from django.conf import settings
 
 from outline_vpn.outline_vpn import OutlineVPN
 import django_orm
-from bot.models import VpnKey
+from bot.models import VpnKey, Logging
 from bot.models import Server
 from bot.models import TelegramUser
 
@@ -111,7 +112,6 @@ async def delete_user_keys(user: TelegramUser) -> bool:
     if DEBUG: print('deleting all vpn-keys for user', user.id)
     try:
         servers = [x.server.script_out for x in VpnKey.objects.filter(user=user)]
-        # servers = [data.script_out for data in Server.objects.all()]
         if DEBUG: print('server data', servers)
         keys = [key.key_id for key in VpnKey.objects.filter(user=user)]
         used_bytes = VpnKey.objects.filter(user=user).first().used_bytes
@@ -138,6 +138,8 @@ async def delete_user_keys(user: TelegramUser) -> bool:
                 except:
                     ...
         VpnKey.objects.filter(user=user).delete()
+        Logging.objects.create(log_level='WARNING', message='[Недействительный Ключ Удалён]', datetime=datetime.now(),
+                               user=user)
         return True
     except Exception as e:
         logger.error(traceback.format_exc())

@@ -76,8 +76,7 @@ async def update_user_subscription_status():
                         except:
                             pass
                         await delete_user_keys(user=user)
-                        lg.objects.create(log_level='WARNING', message='[Закончилась подписка у пользователя]',
-                                          datetime=datetime.now(), user=user)
+                        lg.objects.create(log_level='WARNING', message='[Закончилась подписка у пользователя]', datetime=datetime.now(), user=user)
         except Exception as e:
             logger.error(traceback.format_exc())
             lg.objects.create(log_level='FATAL',
