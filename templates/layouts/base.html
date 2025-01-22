@@ -9,60 +9,62 @@
     </title>
     <link rel="canonical" href="https://my21812140site.ru{{ request.path }}">
 
+
+    <meta charset="utf-8"/>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+    <!-- Mobile Metas -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no"/>
+    <!-- Site Metas -->
+    <meta name="keywords" content=""/>
+    <meta name="description" content=""/>
+    <meta name="author" content=""/>
+    <link rel="shortcut icon" href="{% static 'img/favicon.png' %}" type="">
+
+    <title> DomVPN </title>
+
+    <!-- bootstrap core css -->
+    <link rel="stylesheet" type="text/css" href="{% static 'css/bootstrap.css' %}"/>
+
+    <!-- fonts style -->
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;900&display=swap" rel="stylesheet">
+
+    <!--owl slider stylesheet -->
+    <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/OwlCarousel2/2.3.4/assets/owl.carousel.min.css"/>
+
+    <!-- font awesome style -->
+    <link href="{% static 'css/font-awesome.min.css' %}" rel="stylesheet"/>
+
+    <!-- Custom styles for this template -->
+    <link href="{% static 'css/style.css' %}" rel="stylesheet"/>
+    <!-- responsive style -->
+    <link href="{% static 'css/responsive.css' %}" rel="stylesheet"/>
+
+
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
     <meta name="robots" content="index, follow">
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-
-    {% block extrahead %}{% endblock extrahead %}
 
     <link rel="apple-touch-icon" sizes="76x76" href="{% static 'img/favicon.png' %}">
     <link rel="icon" type="image/png" href="{% static 'img/favicon.png' %}">
     <link href="{% static 'css/fonts-googleapis.css' %}" rel="stylesheet"/>
 
     <!-- CSS Bootstrap -->
-    <link href="{% static 'css/bootstrap.css' %}" rel="stylesheet"/>
-    <link href="{% static 'css/bootstrap-grid.css' %}" rel="stylesheet"/>
-    <link href="{% static 'css/bootstrap-reboot.css' %}" rel="stylesheet"/>
-    <link href="{% static 'css/bootstrap-utilities.css' %}" rel="stylesheet"/>
+{#    <link href="{% static 'css/bootstrap.css' %}" rel="stylesheet"/>#}
+{#    <link href="{% static 'css/bootstrap-grid.css' %}" rel="stylesheet"/>#}
+{#    <link href="{% static 'css/bootstrap-reboot.css' %}" rel="stylesheet"/>#}
+{#    <link href="{% static 'css/bootstrap-utilities.css' %}" rel="stylesheet"/>#}
 
     <!-- Fontawesomefree -->
-    <link href="{% static 'fontawesomefree/css/fontawesome.css' %}" rel="stylesheet" type="text/css">
-    <link href="{% static 'fontawesomefree/css/brands.css' %}" rel="stylesheet" type="text/css">
-    <link href="{% static 'fontawesomefree/css/solid.css' %}" rel="stylesheet" type="text/css">
+{#    <link href="{% static 'fontawesomefree/css/fontawesome.css' %}" rel="stylesheet" type="text/css">#}
+{#    <link href="{% static 'fontawesomefree/css/brands.css' %}" rel="stylesheet" type="text/css">#}
+{#    <link href="{% static 'fontawesomefree/css/solid.css' %}" rel="stylesheet" type="text/css">#}
 
-    <style>
-        body {
-            display: flex;
-            flex-direction: column;
-            min-height: 100vh;
-        }
-
-        .content-wrapper {
-            flex: 1 0 auto;
-        }
-
-        footer {
-            flex-shrink: 0;
-        }
-    </style>
-
+    {% block extrahead %}{% endblock extrahead %}
     {% block extrastyle %}{% endblock extrastyle %}
 </head>
 
-<body class="g-sidenav-show bg-gray-100">
+{% block content %}{% endblock content %}
 
-{% include "includes/navigation.html" %}
-
-<div class="content-wrapper">
-    {% include 'includes/messages_success.html' %}
-    {% include 'includes/messages_error.html' %}
-    {% block content %}{% endblock content %}
-</div>
-
-{% include "includes/footer.html" %}
-
-
-<!--   Core JS Files   -->
 {% include 'includes/scripts.html' %}
 
 {% block extrascript %}{% endblock extrascript %}

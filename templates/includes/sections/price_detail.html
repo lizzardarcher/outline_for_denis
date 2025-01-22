@@ -1,0 +1,147 @@
+{% load static %}
+<style>
+    body {
+        background-color: #f8f9fa;
+    }
+
+    .pricing-card {
+        border: none;
+        border-radius: 15px;
+        transition: all 0.3s ease;
+    }
+
+    .pricing-card:hover {
+        transform: translateY(-10px);
+        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+    }
+
+    .pricing-header {
+        border-radius: 15px 15px 0 0;
+        color: white;
+    }
+
+    .price-1-header {
+        background: linear-gradient(45deg, #afc3d5, #129e9e);
+    }
+
+    .price-2-header {
+        background: linear-gradient(45deg, #bf8975, #ec4c0a);
+    }
+
+    .price-3-header {
+        background: linear-gradient(45deg, #7b30cf, #516395);
+    }
+
+    .price-4-header {
+        background: linear-gradient(45deg, #1D976C, #93F9B9);
+    }
+
+    .btn-custom {
+        border-radius: 50px;
+        padding: 10px 30px;
+        font-weight: bold;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+
+    .feature-list {
+        list-style-type: none;
+        padding-left: 0;
+    }
+
+    .feature-list li {
+        padding: 8px 0;
+        border-bottom: 1px solid #e9ecef;
+    }
+
+    .feature-list li:last-child {
+        border-bottom: none;
+    }
+</style>
+<div class="container py-5">
+    <div class="heading_container heading_center">
+        <h2 class="text-center text-light mb-5 ">Выбери подходящий <span>план</span></h2>
+    </div>
+    <div class="row row-cols-1 row-cols-md-4 g-4">
+
+        <div class="col">
+            <div class="card pricing-card h-100">
+                <div class="card-header pricing-header price-1-header p-4">
+                    <h3 class="card-title text-center mb-0">1 месяц</h3>
+                </div>
+                <div class="card-body p-4">
+                    <h2 class="card-title text-center mb-4">{{ prices.price_1 }} ₽</h2>
+                    <ul class="feature-list text-center mb-4">
+                        <li>Ключ на 1 месяц</li>
+                        <li>Безлимитный трафик</li>
+                        <li>Поддержка</li>
+                        <li>Бесплатная замена ключа</li>
+                    </ul>
+                    <div class="text-center">
+                        <a href="#" class="btn btn-outline-primary btn-custom">Подробнее</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col">
+            <div class="card pricing-card h-100">
+                <div class="card-header pricing-header price-2-header p-4">
+                    <h3 class="card-title text-center mb-0">3 месяца</h3>
+                </div>
+                <div class="card-body p-4">
+                    <h2 class="card-title text-center mb-4">{{ prices.price_2 }} ₽</h2>
+                    <ul class="feature-list text-center mb-4">
+                        <li>Ключ на 3 месяца</li>
+                        <li>Безлимитный трафик</li>
+                        <li>Поддержка</li>
+                        <li>Бесплатная замена ключа</li>
+                    </ul>
+                    <div class="text-center">
+                        <a href="#" class="btn btn-primary btn-custom">Подробнее</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col">
+            <div class="card pricing-card h-100">
+                <div class="card-header pricing-header price-3-header p-4">
+                    <h3 class="card-title text-center mb-0">6 месяцев</h3>
+                </div>
+                <div class="card-body p-4">
+                    <h2 class="card-title text-center mb-4">{{ prices.price_3 }} ₽</h2>
+                    <ul class="feature-list text-center mb-4">
+                        <li>Ключ на 6 месяцев</li>
+                        <li>Безлимитный трафик</li>
+                        <li>Поддержка</li>
+                        <li>Бесплатная замена ключа</li>
+                    </ul>
+                    <div class="text-center">
+                        <a href="#" class="btn btn-primary btn-custom">Подробнее</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col">
+            <div class="card pricing-card h-100">
+                <div class="card-header pricing-header price-4-header p-4">
+                    <h3 class="card-title text-center mb-0">1 Год</h3>
+                </div>
+                <div class="card-body p-4">
+                    <h2 class="card-title text-center mb-4">{{ prices.price_4 }} ₽</h2>
+                    <ul class="feature-list text-center mb-4">
+                        <li>Ключ на 1 год</li>
+                        <li>Безлимитный трафик</li>
+                        <li>Приоритетная Поддержка</li>
+                        <li>Бесплатная замена ключа</li>
+                    </ul>
+                    <div class="text-center">
+                        <a href="#" class="btn btn-success btn-custom">Подробнее</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

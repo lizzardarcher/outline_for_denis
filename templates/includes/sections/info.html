@@ -5,69 +5,62 @@
         <div class="row">
             <div class="col-md-6 col-lg-3 info_col">
                 <div class="info_contact">
-                    <h4>
-                        Контакты
-                    </h4>
+                    <h4>Контакты</h4>
                     <div class="contact_link_box">
                         <a href="">
                             <i class="fa fa-map-marker" aria-hidden="true"></i>
-                            <span>
-                  Москва
-                </span>
+                            <span>Москва</span>
                         </a>
                         <a href="">
                             <i class="fa fa-phone" aria-hidden="true"></i>
-                            <span>
-                  Тел +7 1234567890
-                </span>
+                            <span>Тел +7 1234567890</span>
                         </a>
                         <a href="">
                             <i class="fa fa-envelope" aria-hidden="true"></i>
-                            <span>
-                  example@gmail.com
-                </span>
+                            <span>example@gmail.com</span>
                         </a>
                     </div>
                 </div>
                 <div class="info_social">
-                    <a href="">
-                        <i class="fa fa-telegram" aria-hidden="true"></i>
-                    </a>
+                    <a href=""><i class="fa fa-telegram" aria-hidden="true"></i></a>
+                    <a href=""><i class="fa fa-whatsapp" aria-hidden="true"></i></a>
                 </div>
             </div>
             <div class="col-md-6 col-lg-3 info_col">
                 <div class="info_detail">
-                    <h4>
-                        Информация
-                    </h4>
+                    <h4>Информация</h4>
                     <p>
-                        Мы в Dom VPN гордимся тем, что предлагаем передовые технологии защиты и шифрования данных. 
-                        Наш сервис построен на основе надежных протоколов и обеспечивает максимальную анонимность в 
+                        Мы в Dom VPN гордимся тем, что предлагаем передовые технологии защиты и шифрования данных.
+                        Наш сервис построен на основе надежных протоколов и обеспечивает максимальную анонимность в
                         сети. Выбирайте Dom VPN, если вам важна ваша цифровая безопасность.
                     </p>
                 </div>
             </div>
             <div class="col-md-6 col-lg-2 mx-auto info_col">
                 <div class="info_link_box">
-                    <h4>
-                        Ссылки
-                    </h4>
+                    <h4>Ссылки</h4>
                     <div class="info_links">
-                        <a class="active" href="#">
-                            Главная
-                        </a>
-                        <a class="" href="#">
-                            О нас
-                        </a>
-                        <a class="" href="#">
-                            Цены
-                        </a>
-                        <a class="" href="#">
-                            Преимущества
-                        </a>
-                        <a class="" href="#">
-                            Карта сайта
-                        </a>
+                        <a class="active" href="#">Главная</a>
+                        <a class="" href="{% url 'about' %}">О нас</a>
+                        <a class="" href="{% url 'price' %}">Цены</a>
+                        <a class="" href="{% url 'advantages' %}">Преимущества</a>
+                        <a class="" href="{% url 'oferta' %}">Договор оферты</a>
+                        <a class="" href="{% url 'policy' %}">Политика в отношении персональных данных</a>
+                        <a class="" href="{% url 'site_map' %}">Карта сайта</a>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6 col-lg-4 mx-auto info_col">
+                <div class="info_detail">
+                    <div class="col-md-4">
+                        <h4>Принимаем платежи</h4>
+                        <div>
+                            <img class="m-1" src="{% static 'images/visa.png' %}" alt="Visa" width="45">
+                            <img class="m-1" src="{% static 'images/mastercard.png' %}" alt="Mastercard" width="25">
+                            <img class="m-1" src="{% static 'images/мир.png' %}" alt="Мир" width="45">
+                            <img class="m-1" src="{% static 'images/сбп.png' %}" alt="СБП" width="45">
+                            <img class="m-1" src="https://yookassa.ru/files/Guide_files/logo-white.svg" alt="ЮКасса" width="60">
+                        </div>
                     </div>
                 </div>
             </div>

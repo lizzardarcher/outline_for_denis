@@ -1,8 +1,6 @@
 {% extends 'layouts/base.html' %}
 {% load static %}
-
-{% block title %}Главная{% endblock title %}
-
+{% block title %}Цены{% endblock title %}
 {% block content %}
     <div class="hero_area">
         <div class="hero_bg_box">
@@ -11,18 +9,9 @@
             </div>
         </div>
         {% include 'includes/sections/header.html' %}
-        {% include 'includes/sections/slider.html' %}
-        {% include 'includes/sections/service.html' %}
-        {% include 'includes/sections/client.html' %}
-        {#    {% include 'includes/sections/team.html' %}#}
-        {% include 'includes/sections/why.html' %}
+        {% include 'includes/sections/price_detail.html' %}
         {% include 'includes/sections/about.html' %}
         {% include 'includes/sections/info.html' %}
         {% include 'includes/sections/footer.html' %}
     </div>
 {% endblock content %}
-
-{% block extrascript %}
-{% endblock extrascript %}
-
-
