@@ -1,0 +1,12 @@
+{% extends 'layouts/base.html' %}
+{% load static %}
+{% block title %}Цены{% endblock title %}
+{% block content %}
+    <div class="mb-5" style="background:#00204a;">
+        {% include 'includes/sections/header.html' %}
+    </div>
+        {% include 'includes/sections/sitemap_detail.html' %}
+        {% include 'includes/sections/about.html' %}
+        {% include 'includes/sections/info.html' %}
+        {% include 'includes/sections/footer.html' %}
+{% endblock content %}
