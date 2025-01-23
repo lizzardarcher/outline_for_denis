@@ -31,13 +31,13 @@ DEBUG = True
 ALLOWED_HOSTS = os.getenv('DJANGO_ALLOWED_HOSTS').split(',')
 CSRF_TRUSTED_ORIGINS = os.getenv('CSRF_TRUSTED_ORIGINS').split(',')
 
-COOKIE_CONSENT_ENABLED = True
-SESSION_COOKIE_SECURE = True
-SESSION_COOKIE_SAMESITE = 'Strict'
+# COOKIE_CONSENT_ENABLED = True
+# SESSION_COOKIE_SECURE = True
+# SESSION_COOKIE_SAMESITE = 'Strict'
 
-SECURE_HSTS_SECONDS = 31536000 # 1 год
-SECURE_HSTS_INCLUDE_SUBDOMAINS = True
-SECURE_HSTS_PRELOAD = True
+# SECURE_HSTS_SECONDS = 31536000 # 1 год
+# SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+# SECURE_HSTS_PRELOAD = True
 SECURE_SSL_REDIRECT = True
 
 INSTALLED_APPS = [
@@ -80,16 +80,8 @@ TEMPLATES = [
     },
 ]
 
-INTERNAL_IPS = [
-    # ...
-    "127.0.0.1",
-    # ...
-]
-
+INTERNAL_IPS = ["127.0.0.1", ]
 WSGI_APPLICATION = 'outline_for_denis.wsgi.application'
-
-# Database
-# https://docs.djangoproject.com/en/5.0/ref/settings/#databases
 
 DATABASES = {
     'default': {
@@ -97,9 +89,6 @@ DATABASES = {
         'NAME': BASE_DIR / 'db.sqlite3',
     }
 }
-
-# Password validation
-# https://docs.djangoproject.com/en/5.0/ref/settings/#auth-password-validators
 
 AUTH_PASSWORD_VALIDATORS = [
     {
@@ -116,12 +105,14 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
-# AUTH_USER_MODEL = 'bot.models.TelegramUser'
-TELEGRAM_BOT_TOKEN = "YOUR_TELEGRAM_BOT_TOKEN"
-TELEGRAM_BOT_USERNAME = "YOUR_TELEGRAM_BOT_USERNAME"
-
-# Internationalization
-# https://docs.djangoproject.com/en/5.0/topics/i18n/
+AUTHENTICATION_BACKENDS = [
+    'bot.auth_backends.TelegramBackend',
+    'django.contrib.auth.backends.ModelBackend',
+]
+TELEGRAM_BOT_NAME = 'xDomvpn_Bot'
+TELEGRAM_BOT_TOKEN = '7854367825:AAHSM0PyCf8RmUd4uMY7zBbCa1D3RzmlcyU'
+TELEGRAM_BOT_SECRET_KEY = 'fj)@kdemvrknvR93jn4np#$92j293m49jg9tndynh4s9p'
+TELEGRAM_LOGIN_REDIRECT_URL = 'https://domvpn.ru/profile/'
 
 LANGUAGE_CODE = 'ru-ru'
 
@@ -130,9 +121,6 @@ TIME_ZONE = 'UTC'
 USE_I18N = True
 
 USE_TZ = True
-
-# Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/5.0/howto/static-files/
 
 STATIC_URL = '/static/'
 
@@ -144,7 +132,5 @@ MEDIA_ROOT = os.path.join(BASE_DIR, "static/media")
 STATICFILES_DIRS = (
     os.path.join(BASE_DIR, 'staticfiles/'),
 )
-# Default primary key field type
-# https://docs.djangoproject.com/en/5.0/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'

@@ -1,0 +1,64 @@
+{% load static %}
+<style>
+    .advantage-box {
+        margin-bottom: 80px;
+    }
+    .advantage-box img {
+        max-width: 100px;
+        height: auto;
+        margin-bottom: 15px;
+    }
+    .advantage-box h4 {
+        margin-bottom: 15px;
+    }
+    .advantage-box p {
+        margin-bottom: 10px;
+    }
+</style>
+<div class="container">
+    <h1 class="text-center mb-5">Наши <b class="text-info">Преимущества</b></h1>
+    <div class="row">
+        <div class="col-md-4">
+            <div class="advantage-box text-center">
+                <img src="{% static 'images/adv-secur.png' %}" alt="Преимущество 1">
+                <h4>Безопасность и конфиденциальность</h4>
+                <p>Мы гарантируем надежную защиту ваших данных и полную анонимность в сети.</p>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="advantage-box text-center">
+                <img src="{% static 'images/adv-speed.png' %}" alt="Преимущество 2">
+                <h4>Высокая скорость</h4>
+                <p>Наслаждайтесь быстрым и стабильным соединением без задержек.</p>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="advantage-box text-center">
+                <img src="{% static 'images/adv-glob.png' %}" alt="Преимущество 3">
+                <h4>Глобальный доступ</h4>
+                <p>Получите доступ к любому контенту из любой точки мира, обходя все ограничения.</p>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="advantage-box text-center">
+                <img src="{% static 'images/adv-use.png' %}" alt="Преимущество 4">
+                <h4>Простота использования</h4>
+                <p>Интуитивно понятный интерфейс делает использование VPN максимально простым и удобным.</p>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="advantage-box text-center">
+                <img src="{% static 'images/adv-support.png' %}" alt="Преимущество 5">
+                <h4>Поддержка 24/7</h4>
+                <p>Наша команда поддержки всегда готова помочь вам с любыми вопросами.</p>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="advantage-box text-center">
+                <img src="{% static 'images/adv-server.png' %}" alt="Преимущество 6">
+                <h4>Надежные серверы</h4>
+                <p>Мы используем надежные серверы в разных странах для обеспечения наилучшего соединения.</p>
+            </div>
+        </div>
+    </div>
+</div>
