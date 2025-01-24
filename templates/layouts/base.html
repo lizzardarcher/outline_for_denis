@@ -63,7 +63,7 @@
     {% block extrastyle %}{% endblock extrastyle %}
 </head>
     {% include 'includes/messages_success.html' %}
-
+    {{ request.headers }}
 {% block content %}{% endblock content %}
 
 {% include 'includes/scripts.html' %}

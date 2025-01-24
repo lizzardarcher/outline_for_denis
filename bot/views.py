@@ -1,23 +1,19 @@
+import logging
+
 from django.conf import settings
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.messages.views import SuccessMessageMixin
-from django.http import HttpResponse
-from django.views.generic import TemplateView, DetailView, View
+from django.utils.decorators import method_decorator
+from django.views.decorators.http import require_POST
+from django.views.generic import TemplateView, View
 from django.contrib import messages
 from django.shortcuts import redirect, render
 from django.contrib.auth import authenticate, login
-from django.views.decorators.http import require_POST
 from django.urls import reverse
-from django_telegram_login.authentication import verify_telegram_authentication
-from django_telegram_login.errors import TelegramDataIsOutdatedError, NotTelegramDataError
-from django_telegram_login.widgets.constants import SMALL
-from django_telegram_login.widgets.generator import create_callback_login_widget
 
 from bot.models import Prices, TelegramUser
 
-bot_name = settings.TELEGRAM_BOT_NAME
-bot_token = settings.TELEGRAM_BOT_TOKEN
-redirect_url = settings.TELEGRAM_LOGIN_REDIRECT_URL
+logger = logging.getLogger(__name__)
 
 
 class HomeView(TemplateView):
@@ -25,7 +21,6 @@ class HomeView(TemplateView):
 
     def get_context_data(self, **kwargs):
         super().get_context_data(**kwargs)
-        messages.info(self.request, 'test info:')
 
 
 class AboutView(TemplateView):
@@ -72,18 +67,25 @@ class AdvantagesView(TemplateView):
 class SiteMapView(TemplateView):
     template_name = 'home/sitemap.html'
 
+
 class ProfileView(SuccessMessageMixin, TemplateView):
     template_name = 'account/index.html'
 
 
+# @require_POST
 def telegram_login(request):
-    messages.success(request, f'{request.POST}')
-    data = request.POST.dict()
-    user = authenticate(request, data=data)
+    data = request.GET.dict()
+    try:
+        user = authenticate(request, data=data)
+    except Exception as e:
+        messages.error(request, f'Could not login : {data}')
     if user:
         login(request, user)
-        messages.success(request, f'{request.POST}')
-        return redirect(reverse('profile'))
+        messages.success(request, "You are now logged in successfully.")
+        return redirect(reverse('profile '))
     else:
-        messages.success(request, f'{request.POST}')
-        return redirect(reverse('profile'))
+        messages.error(request, f"Authentication failed. Data received: {data}")
+        messages.error(request, f"Authentication from: {authenticate(request, data=data).__dir__()}")
+        messages.error(request, f"User: {user}")
+        return redirect(reverse('home'))
+

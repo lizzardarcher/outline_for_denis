@@ -21,9 +21,16 @@
                                             data-telegram-login="xDomvpn_Bot"
                                             data-size="large"
                                             data-radius="10"
-                                            data-auth-url="https://domvpn.ru/telegram_login/"
-                                            data-request-access="write">
+                                            data-auth-url="https://domvpn.ru/telegram-login/"
+                                            data-request-access="write"
+{#                                            data-onauth="onTelegramAuth(user)"#}
+                                    >
                                     </script>
+{#                                    <script type="text/javascript">#}
+{#                                        function onTelegramAuth(user) {#}
+{#                                            alert('Logged in as ' + user.first_name + ' ' + user.last_name + ' (' + user.id + (user.username ? ', @' + user.username : '') + ')');#}
+{#                                        }#}
+{#                                    </script>#}
                                 </div>
                             </div>
                         </div>

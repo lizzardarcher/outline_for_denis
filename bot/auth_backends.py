@@ -22,7 +22,6 @@ class TelegramBackend(BaseBackend):
             user_id = int(data.get('id'))
             username = data.get('username')
             first_name = data.get('first_name')
-            last_name = data.get('last_name')
 
             # Ищем пользователя в базе данных TelegramUser
             try:
@@ -33,7 +32,6 @@ class TelegramBackend(BaseBackend):
                     user_id=user_id,
                     username=username,
                     first_name=first_name,
-                    last_name=last_name
                 )
 
             # Пытаемся найти django пользователя. Если его нет, создаем.
@@ -43,7 +41,6 @@ class TelegramBackend(BaseBackend):
                 user = User.objects.create_user(
                     username=user_id,
                     first_name=first_name,
-                    last_name=last_name,
                     password=User.objects.make_random_password(length=10),
                 )
 
@@ -64,7 +61,7 @@ class TelegramBackend(BaseBackend):
         hmac_hash = hmac.new(secret_key, data_check_string, hashlib.sha256).hexdigest()
 
         if hmac_hash != data['hash']:
-            raise Exception("Telegram data is invalid. Hashes doesn't match.")
+            raise Exception(f"Telegram data is invalid. Hashes doesn't match.\n[{hmac_hash}]\n[{data['hash']}]")
 
     def get_user(self, user_id):
         try:

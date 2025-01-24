@@ -1,5 +1,6 @@
 
 from django.urls import path, re_path
+from django.views.decorators.csrf import csrf_exempt
 from django.views.static import serve
 from django.template.defaulttags import url
 from django.conf import settings

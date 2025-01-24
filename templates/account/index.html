@@ -1,21 +1,14 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Hello {{ user }}</title>
-</head>
-<body>
+{% extends 'layouts/base.html' %}
 
-<h1>Hi, {{ user.first_name }}!</h1>
-<p>Meta:</p>
+{% block content %}
+    <h1>Hi, {{ user.first_name }}!</h1>
+    <p>Meta:</p>
 
-<ul>
-    {% for associated in backends.associated %}
-        <li>ID: {{ associated.uid }}</li>
-        <li>Provider: {{ associated.provider }}</li>
-        <li>Extra: {{ associated.extra_data }}</li>
-    {% endfor %}
-</ul>
-
-</body>
-</html>
+    <ul>
+        {% for associated in backends.associated %}
+            <li>ID: {{ associated.uid }}</li>
+            <li>Provider: {{ associated.provider }}</li>
+            <li>Extra: {{ associated.extra_data }}</li>
+        {% endfor %}
+    </ul>
+{% endblock content %}

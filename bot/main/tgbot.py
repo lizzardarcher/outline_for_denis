@@ -44,8 +44,8 @@ logging.basicConfig(
     level=logging.DEBUG,
     datefmt='%Y.%m.%d %I:%M:%S',
     handlers=[
-        # TimedRotatingFileHandler(filename=log_path, when='D', interval=1, backupCount=5),
-        logging.StreamHandler(stream=sys.stderr)
+        TimedRotatingFileHandler(filename=log_path, when='D', interval=1, backupCount=5),
+        # logging.StreamHandler(stream=sys.stderr)
     ],
 )
 
@@ -82,7 +82,7 @@ async def update_user_subscription_status():
             lg.objects.create(log_level='FATAL',
                               message=f'[Ошибка при автообновлении статуса подписки:\n{traceback.format_exc()}]',
                               datetime=datetime.now())
-        await asyncio.sleep(60 * 60 * 23)
+        await asyncio.sleep(150)
 
 
 @bot.message_handler(commands=['start'])
@@ -559,7 +559,6 @@ async def callback_query_handlers(call):
 
 
 if __name__ == '__main__':
-    bot.skip_updates()
     bot.add_custom_filter(asyncio_filters.StateFilter(bot))
     loop = asyncio.get_event_loop()
     loop.create_task(update_user_subscription_status())  # SUBSCRIPTION REDEEM ON EXPIRATION
