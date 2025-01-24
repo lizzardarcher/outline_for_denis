@@ -112,7 +112,7 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 AUTHENTICATION_BACKENDS = [
-    'auth.auth_backends.TelegramBackend',
+    'authentication.auth_backends.TelegramBackend',
     'django.contrib.auth.backends.ModelBackend',
 ]
 
