@@ -36,7 +36,7 @@ class TelegramUser(models.Model):
         else:
             username = '@' + self.username
         if not self.subscription_status:
-            subscription_status = '❌'
+            subscription_status = '🛑'
         else:
             subscription_status = '✅'
         return f"{first_name} {last_name} {username} {subscription_status}"

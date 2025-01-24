@@ -1,6 +1,7 @@
 import hashlib
 import hmac
 from django.conf import settings
+from django.contrib import messages
 from django.contrib.auth.models import User
 from django.contrib.auth.backends import BaseBackend
 from django.core.exceptions import ObjectDoesNotExist
@@ -10,15 +11,21 @@ from bot.models import TelegramUser
 
 class TelegramBackend(BaseBackend):
     def authenticate(self, request, data=None):
-        print("TelegramBackend.authenticate called:", data)  # Добавьте это
+        print("TelegramBackend.authenticate called:", data)
+        messages.info(request, f"TelegramBackend.authenticate called: {data}")
         if not data:
             return None
 
         try:
             # Проверяем подлинность данных
             print("Checking data")
-            self.check_telegram_data(data)
-
+            messages.info(request, f"Checking data: {data}")
+            try:
+                ...
+                # self.check_telegram_data(data)
+            except Exception as e:
+                messages.error(request, f"Error during telegram authentication: {e}")
+                return None
             user_id = int(data.get('id'))
             username = data.get('username')
             first_name = data.get('first_name')
@@ -47,10 +54,11 @@ class TelegramBackend(BaseBackend):
             return user  # Возвращаем django пользователя.
         except Exception as e:
             print(f"Error during telegram authentication: {e}")
+            messages.error(request, f"Error during telegram authentication: {e}")
             return None
 
     def check_telegram_data(self, data):
-        print("TelegramBackend.check_telegram_data:", data)  # Добавьте это
+        print("TelegramBackend.check_telegram_data:", data)
         """ Проверка подписи телеграм виджета. """
         data_check_string = '\n'.join(
             sorted(

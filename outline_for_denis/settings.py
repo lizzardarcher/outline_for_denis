@@ -51,6 +51,9 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'fontawesomefree',
+    'authentication',
+    'home',
+    'dashboard',
     'bot',
 ]
 
@@ -109,7 +112,7 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 AUTHENTICATION_BACKENDS = [
-    'bot.auth_backends.TelegramBackend',
+    'auth.auth_backends.TelegramBackend',
     'django.contrib.auth.backends.ModelBackend',
 ]
 
