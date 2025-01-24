@@ -20,8 +20,6 @@
     <meta name="author" content=""/>
     <link rel="shortcut icon" href="{% static 'img/favicon.png' %}" type="">
 
-    <title> DomVPN </title>
-
     <!-- bootstrap core css -->
     <link rel="stylesheet" type="text/css" href="{% static 'css/bootstrap.css' %}"/>
 
@@ -29,7 +27,8 @@
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;900&display=swap" rel="stylesheet">
 
     <!--owl slider stylesheet -->
-    <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/OwlCarousel2/2.3.4/assets/owl.carousel.min.css"/>
+    <link rel="stylesheet" type="text/css"
+          href="https://cdnjs.cloudflare.com/ajax/libs/OwlCarousel2/2.3.4/assets/owl.carousel.min.css"/>
 
     <!-- font awesome style -->
     <link href="{% static 'css/font-awesome.min.css' %}" rel="stylesheet"/>
@@ -49,23 +48,22 @@
     <link href="{% static 'css/fonts-googleapis.css' %}" rel="stylesheet"/>
 
     <!-- CSS Bootstrap -->
-{#    <link href="{% static 'css/bootstrap.css' %}" rel="stylesheet"/>#}
-{#    <link href="{% static 'css/bootstrap-grid.css' %}" rel="stylesheet"/>#}
-{#    <link href="{% static 'css/bootstrap-reboot.css' %}" rel="stylesheet"/>#}
-{#    <link href="{% static 'css/bootstrap-utilities.css' %}" rel="stylesheet"/>#}
+    {#    <link href="{% static 'css/bootstrap.css' %}" rel="stylesheet"/>#}
+    {#    <link href="{% static 'css/bootstrap-grid.css' %}" rel="stylesheet"/>#}
+    {#    <link href="{% static 'css/bootstrap-reboot.css' %}" rel="stylesheet"/>#}
+    {#    <link href="{% static 'css/bootstrap-utilities.css' %}" rel="stylesheet"/>#}
 
     <!-- Fontawesomefree -->
-{#    <link href="{% static 'fontawesomefree/css/fontawesome.css' %}" rel="stylesheet" type="text/css">#}
-{#    <link href="{% static 'fontawesomefree/css/brands.css' %}" rel="stylesheet" type="text/css">#}
-{#    <link href="{% static 'fontawesomefree/css/solid.css' %}" rel="stylesheet" type="text/css">#}
+    {#    <link href="{% static 'fontawesomefree/css/fontawesome.css' %}" rel="stylesheet" type="text/css">#}
+    {#    <link href="{% static 'fontawesomefree/css/brands.css' %}" rel="stylesheet" type="text/css">#}
+    {#    <link href="{% static 'fontawesomefree/css/solid.css' %}" rel="stylesheet" type="text/css">#}
 
     {% block extrahead %}{% endblock extrahead %}
     {% block extrastyle %}{% endblock extrastyle %}
 </head>
-    {% include 'includes/messages_success.html' %}
-    {{ request.headers }}
+<body>
+{% include 'includes/messages_success.html' %}
 {% block content %}{% endblock content %}
-
 {% include 'includes/scripts.html' %}
 
 {% block extrascript %}{% endblock extrascript %}
