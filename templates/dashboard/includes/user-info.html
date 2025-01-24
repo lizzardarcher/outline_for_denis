@@ -1,0 +1,21 @@
+<!-- Информация о пользователе -->
+<aside class="col-md-3 user-info">
+    <h4>Информация о пользователе</h4>
+    <img src="https://bootdey.com/img/Content/avatar/avatar7.png" alt="User Avatar"
+         class="img-fluid rounded-circle mb-3" style="width: 100px; height: 100px;">
+
+    <p>
+        <i class="fas fa-user"></i> {{ request.user.first_name }}<br>
+        <i class="fas fa-user"></i> {{ request.user.last_name }}<br>
+        {% if request.user.username %}
+            <i class="fa fa-telegram"></i>
+            <a href="https://{{ request.user.username }}">@{{ request.user.username }}</a>
+        {% endif %}
+    </p>
+    <hr>
+    <div>
+        <p>Balance: <span class="badge bg-success">1000$</span></p>
+        <p>Subscription: <span class="badge bg-primary">Active</span></p>
+        <p>Last login: <small class="text-muted">5 min ago</small></p>
+    </div>
+</aside>

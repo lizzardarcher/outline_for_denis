@@ -4,4 +4,4 @@ from django.views.generic import TemplateView
 
 
 class ProfileView(SuccessMessageMixin, TemplateView):
-    template_name = 'account/index.html'
+    template_name = 'dashboard/index.html'
