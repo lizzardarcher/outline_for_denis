@@ -1,21 +1,22 @@
 <!-- Информация о пользователе -->
 <aside class="col-md-3 user-info">
-    <h4>Информация о пользователе</h4>
-    <img src="https://bootdey.com/img/Content/avatar/avatar7.png" alt="User Avatar"
-         class="img-fluid rounded-circle mb-3" style="width: 100px; height: 100px;">
-
+    <h4>User Info</h4>
+    <img src="
+            {% if request.user.profile.telegram_user.photo_url %}{{ request.user.profile.telegram_user.photo_url }}{% else %}https://bootdey.com/img/Content/avatar/avatar7.png{% endif %}"
+         alt="User Avatar" class="img-fluid rounded-circle mb-3" style="width: 100px; height: 100px;">
     <p>
-        <i class="fas fa-user"></i> {{ request.user.first_name }}<br>
-        <i class="fas fa-user"></i> {{ request.user.last_name }}<br>
-        {% if request.user.username %}
-            <i class="fa fa-telegram"></i>
-            <a href="https://{{ request.user.username }}">@{{ request.user.username }}</a>
-        {% endif %}
+        <i class="fas fa-user"></i> {% if request.user.profile.telegram_user.first_name %}
+        {{ request.user.profile.telegram_user.first_name }} {% endif %}
+        {% if request.user.profile.telegram_user.last_name %}
+            {{ request.user.profile.telegram_user.last_name }} {% endif %}<br>
+        <i class="fas fa-envelope"></i> {{ request.user.email }}
     </p>
     <hr>
     <div>
-        <p>Balance: <span class="badge bg-success">1000$</span></p>
-        <p>Subscription: <span class="badge bg-primary">Active</span></p>
+        <p>Balance: <span class="badge bg-success">{% if request.user.profile.telegram_user.balance %}
+            {{ request.user.profile.telegram_user.balance }}{% else %}0.00{% endif %}$</span></p>
+        <p>Subscription: <span class="badge bg-primary">{% if request.user.profile.telegram_user.subscription_status %}
+            Active{% else %}Inactive{% endif %}</span></p>
         <p>Last login: <small class="text-muted">5 min ago</small></p>
     </div>
 </aside>

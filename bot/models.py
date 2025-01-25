@@ -10,7 +10,7 @@ class TelegramUser(models.Model):
     username = models.CharField(max_length=255, blank=True, null=True, verbose_name='username')
     first_name = models.CharField(max_length=255, verbose_name='Имя')
     last_name = models.CharField(max_length=255, blank=True, null=True, verbose_name='Фамилия')
-    photo_url = models.URLField(max_length=1000, default='', null=True, blank=True, verbose_name='Photo URL')
+    photo_url = models.CharField(max_length=1000, default='', null=True, blank=True, verbose_name='Photo URL')
     is_banned = models.BooleanField(default=False, verbose_name='Забанен')
     balance = models.DecimalField(max_digits=10, decimal_places=2, default=0.00,
                                   verbose_name='Баланс для активации подписок')
