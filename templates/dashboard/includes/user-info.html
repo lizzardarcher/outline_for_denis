@@ -1,8 +1,9 @@
 <!-- Информация о пользователе -->
 <aside class="col-md-3 user-info">
-    <h4>User Info</h4>
-    <img src="
-            {% if request.user.profile.telegram_user.photo_url %}{{ request.user.profile.telegram_user.photo_url }}{% else %}https://bootdey.com/img/Content/avatar/avatar7.png{% endif %}"
+    <h4>Пользователь</h4>
+    <img src="{% if request.user.profile.telegram_user.photo_url %}{{ request.user.profile.telegram_user.photo_url }}
+              {% else %}https://bootdey.com/img/Content/avatar/avatar7.png
+              {% endif %}"
          alt="User Avatar" class="img-fluid rounded-circle mb-3" style="width: 100px; height: 100px;">
     <p>
         <i class="fas fa-user"></i> {% if request.user.profile.telegram_user.first_name %}
@@ -13,10 +14,14 @@
     </p>
     <hr>
     <div>
-        <p>Balance: <span class="badge bg-success">{% if request.user.profile.telegram_user.balance %}
-            {{ request.user.profile.telegram_user.balance }}{% else %}0.00{% endif %}$</span></p>
-        <p>Subscription: <span class="badge bg-primary">{% if request.user.profile.telegram_user.subscription_status %}
-            Active{% else %}Inactive{% endif %}</span></p>
-        <p>Last login: <small class="text-muted">5 min ago</small></p>
+        <p>Баланс: <span class="badge bg-secondary">{% if request.user.profile.telegram_user.balance %}
+            {{ request.user.profile.telegram_user.balance }}{% else %}0.00{% endif %} ₽</span></p>
+        <p>Подписка:
+            {% if request.user.profile.telegram_user.subscription_status %}
+                <span class="badge bg-success">Активна</span>
+            {% else %}
+                <span class="badge bg-warning">Неактивна</span>
+            {% endif %}
+        </p>
     </div>
 </aside>

@@ -11,32 +11,36 @@
 
         <div class="m-5">
             <!-- Первый ряд -->
-            <div class="row">
+            <div class="m-5 p-5 row bg-light rounded">
                 {% include 'dashboard/includes/sidepanel.html' %}
                 {% include 'dashboard/includes/main-info.html' %}
                 {% include 'dashboard/includes/user-info.html' %}
             </div>
 
             <!-- Второй ряд -->
-            <div class="row">
+            <div class="m-5 p-5 row bg-light rounded">
                 <!-- Блок 1 статистики -->
                 <div class="col-md-4 stat-block">
-                    <h3><i class="fas fa-chart-bar"></i> Total Sales</h3>
-                    <p>1200</p>
-                    <span class="badge bg-success">+10% Today</span>
+                    <h3><i class="fa fa-server"></i> Доступные сервера</h3>
+                    <ul>{% for server in servers %}
+                        <li>{{ server }}</li>
+                    {% empty %}
+                        ---
+                    {% endfor %}
+                    </ul>
                 </div>
 
                 <!-- Блок 2 статистики -->
-                <div class="col-md-4 stat-block">
-                    <h3><i class="fas fa-users"></i> Total Users</h3>
-                    <p>1000</p>
-                    <span class="badge bg-danger">-5% Today</span>
+                <div class="col-md-4 ">
+                    <h3><i class="fa fa-user"></i> Пользователей DomVPN</h3>
+                     <span class="badge bg-primary">{{ total_users }}</span>
+
                 </div>
+
                 <!-- Блок 3 статистики -->
                 <div class="col-md-4 stat-block">
-                    <h3><i class="fas fa-money-bill-wave"></i> Average Income</h3>
-                    <p>500$</p>
-                    <span class="badge bg-primary">Stable</span>
+                    <h3><i class="fas fa-money-bill-wave"></i> Telegram BOT</h3>
+                    <a href="https://t.me/xDomvpn_Bot"><i class="fa fa-telegram"></i> Ключи Outline (DomVPN Bot)</a>
                 </div>
             </div>
         </div>
