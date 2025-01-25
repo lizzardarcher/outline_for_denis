@@ -1,4 +1,6 @@
 from datetime import datetime
+
+from django.contrib.auth.models import User
 from django.db import models
 
 
@@ -8,7 +10,7 @@ class TelegramUser(models.Model):
     username = models.CharField(max_length=255, blank=True, null=True, verbose_name='username')
     first_name = models.CharField(max_length=255, verbose_name='Имя')
     last_name = models.CharField(max_length=255, blank=True, null=True, verbose_name='Фамилия')
-
+    photo_url = models.URLField(max_length=1000, default='', null=True, blank=True, verbose_name='Photo URL')
     is_banned = models.BooleanField(default=False, verbose_name='Забанен')
     balance = models.DecimalField(max_digits=10, decimal_places=2, default=0.00,
                                   verbose_name='Баланс для активации подписок')
@@ -47,6 +49,18 @@ class TelegramUser(models.Model):
         ordering = ['-join_date']
 
 
+class UserProfile(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
+    telegram_user = models.OneToOneField(TelegramUser, on_delete=models.SET_NULL, null=True, blank=True, related_name='user_profile')
+
+    def __str__(self):
+        return self.user.username
+
+    class Meta:
+        verbose_name = 'Профиль пользователя'
+        verbose_name_plural = 'Профили пользователей'
+
+
 class TelegramReferral(models.Model):
     referrer = models.ForeignKey(TelegramUser, on_delete=models.CASCADE, related_name='given_referrals',
                                  verbose_name='Поделился ссылкой')
@@ -68,7 +82,8 @@ class TelegramBot(models.Model):
     title = models.CharField(max_length=255, verbose_name='Название', blank=True, null=True)
     token = models.CharField(max_length=255, verbose_name='TG BOT Token', blank=True, null=True)
     created_at = models.DateField(auto_now_add=True, verbose_name='Создан')
-    payment_system_api_key = models.CharField(default='', max_length=1000, blank=True, null=True, verbose_name='Payment system token')
+    payment_system_api_key = models.CharField(default='', max_length=1000, blank=True, null=True,
+                                              verbose_name='Payment system token')
 
     class Meta:
         verbose_name = 'Telegram Bot'
@@ -129,7 +144,8 @@ class Server(models.Model):
     user = models.CharField(max_length=1000, blank=True, null=True, default='root', verbose_name='Пользователь')
     password = models.CharField(max_length=1000, blank=True, null=True, default='<PASSWORD>', verbose_name='Пароль')
     # configuration = models.TextField(max_length=10000, blank=True, null=True, verbose_name='Конфигурация')
-    rental_price = models.DecimalField(max_digits=10, blank=True, null=True, decimal_places=2, verbose_name='Цена аренды в месяц')
+    rental_price = models.DecimalField(max_digits=10, blank=True, null=True, decimal_places=2,
+                                       verbose_name='Цена аренды в месяц')
     max_keys = models.IntegerField(default=200, blank=True, null=True, verbose_name='Лимит ключей', editable=False)
     keys_generated = models.IntegerField(default=0, blank=True, null=True, verbose_name='Ключей сгенерировано')
     is_active = models.BooleanField(default=True, verbose_name='Сервер Активен')
