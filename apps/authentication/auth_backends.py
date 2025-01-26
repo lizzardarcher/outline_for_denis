@@ -13,7 +13,7 @@ from bot.models import TelegramUser, UserProfile
 
 class TelegramBackend(BaseBackend):
     def authenticate(self, request, data=None):
-        messages.info(request, f"TelegramBackend.authenticate called: {data}")
+        # messages.info(request, f"TelegramBackend.authenticate called: {data}")
         if not data:
             return None
 
@@ -41,7 +41,7 @@ class TelegramBackend(BaseBackend):
                     subscription_status=True,
                     subscription_expiration=datetime.now() + timedelta(days=3),
                 )
-            messages.info(request, f"TG-USER {tg_user}")
+            # messages.info(request, f"TG-USER {tg_user}")
 
             try:
                 user = User.objects.get(id=user_id)
@@ -54,7 +54,7 @@ class TelegramBackend(BaseBackend):
                     last_name=last_name,
                     password=User.objects.make_random_password(length=10),
                 )
-            messages.info(request, f"DJANGO-USER {user}")
+            # messages.info(request, f"DJANGO-USER {user}")
 
             try:
                 profile = UserProfile.objects.get(user=user)
@@ -64,7 +64,7 @@ class TelegramBackend(BaseBackend):
             else:
                 profile.telegram_user = tg_user
                 profile.save()
-            messages.info(request, f"UserProfile {profile}")
+            # messages.info(request, f"UserProfile {profile}")
 
             return user  # Возвращаем django пользователя.
         except Exception as e:

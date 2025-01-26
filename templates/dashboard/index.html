@@ -23,7 +23,7 @@
                 <div class="col-md-4 stat-block">
                     <h3><i class="fa fa-server"></i> Доступные сервера</h3>
                     <ul>{% for server in servers %}
-                        <li>{{ server }}</li>
+                        <li class="m-2"><span class="bg-success-subtle rounded p-1">{{ server }}</span></li>
                     {% empty %}
                         ---
                     {% endfor %}
@@ -40,7 +40,7 @@
                 <!-- Блок 3 статистики -->
                 <div class="col-md-4 stat-block">
                     <h3><i class="fas fa-money-bill-wave"></i> Telegram BOT</h3>
-                    <a href="https://t.me/xDomvpn_Bot"><i class="fa fa-telegram"></i> Ключи Outline (DomVPN Bot)</a>
+                    <a class="bg-success-subtle rounded p-1 m-2" href="https://t.me/xDomvpn_Bot"><i class="fa fa-telegram"></i> Ключи Outline (DomVPN Bot)</a>
                 </div>
             </div>
         </div>

@@ -10,9 +10,9 @@ def telegram_login(request):
 
     if user:
         login(request, user)
-        messages.success(request, "You are now logged in successfully.")
+        # messages.success(request, "You are now logged in successfully.")
         return redirect(reverse('profile'))
     else:
-        messages.error(request, f"Authentication failed. GET: {request.GET.dict()}")
-        messages.error(request, f"User: {user}")
+        # messages.error(request, f"Authentication failed. GET: {request.GET.dict()}")
+        # messages.error(request, f"User: {user}")
         return redirect(reverse('home'))

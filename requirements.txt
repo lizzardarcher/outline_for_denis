@@ -7,3 +7,5 @@ urllib3~=2.2.3
 setuptools~=68.2.0
 pytest~=8.3.3
 python-dotenv~=1.0.1
+
+yookassa~=3.5.0
