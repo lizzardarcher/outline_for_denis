@@ -4,8 +4,7 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.messages.views import SuccessMessageMixin
 from django.views.generic import TemplateView, CreateView, UpdateView
 
-from apps.dashboard.forms import CreateNewKeyForm
-from bot.models import VpnKey, Server, TelegramUser
+from bot.models import VpnKey, Server, TelegramUser, Country, Prices
 
 
 class ProfileView(LoginRequiredMixin, SuccessMessageMixin, TemplateView):
@@ -20,12 +19,13 @@ class ProfileView(LoginRequiredMixin, SuccessMessageMixin, TemplateView):
         except VpnKey.DoesNotExist:
             ...
         context['total_users'] = TelegramUser.objects.count()
+        context['countries'] = Country.objects.filter(is_active=True)
+        context['subscription'] = Prices.objects.get(id=1)
         return context
 
 
-class CreateNewKeyView(SuccessMessageMixin, CreateView):
+class CreateNewKeyView(LoginRequiredMixin, SuccessMessageMixin, TemplateView):
     template_name = 'dashboard/create_key.html'
-    form_class = CreateNewKeyForm
 
     def get_success_url(self):
         return reverse('profile')
@@ -33,5 +33,5 @@ class CreateNewKeyView(SuccessMessageMixin, CreateView):
     def get_success_message(self, cleaned_data):
         return 'New key has been created!'
 
-class UpdateKeyView(SuccessMessageMixin, UpdateView):
+class UpdateKeyView(LoginRequiredMixin, SuccessMessageMixin, UpdateView):
     ...

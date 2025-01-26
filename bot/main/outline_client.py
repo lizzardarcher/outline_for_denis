@@ -114,9 +114,9 @@ async def delete_user_keys(user: TelegramUser) -> bool:
         servers = [x.server.script_out for x in VpnKey.objects.filter(user=user)]
         if DEBUG: print('server data', servers)
         keys = [key.key_id for key in VpnKey.objects.filter(user=user)]
-        used_bytes = VpnKey.objects.filter(user=user).first().used_bytes
-        data_limit = int(user.data_limit) - int(used_bytes)
-        TelegramUser.objects.filter(user_id=user.user_id).update(data_limit=data_limit)
+        # used_bytes = VpnKey.objects.filter(user=user).first().used_bytes
+        # data_limit = int(user.data_limit) - int(used_bytes)
+        # TelegramUser.objects.filter(user_id=user.user_id).update(data_limit=data_limit)
         if DEBUG: print('keys data', keys)
         for data in servers:
             client = OutlineVPN(api_url=data['apiUrl'], cert_sha256=data['certSha256'])

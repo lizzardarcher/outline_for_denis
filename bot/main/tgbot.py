@@ -64,9 +64,10 @@ def update_sub_status(user: TelegramUser):
 
 async def update_user_subscription_status():
     while True:
-        try:
-            list_users = [x for x in TelegramUser.objects.all()]
-            for user in list_users:
+
+        list_users = [x for x in TelegramUser.objects.all()]
+        for user in list_users:
+            try:
                 exp_date = user.subscription_expiration
                 if exp_date < datetime.now().date():
                     if user.subscription_status:
@@ -77,12 +78,12 @@ async def update_user_subscription_status():
                             pass
                         await delete_user_keys(user=user)
                         lg.objects.create(log_level='WARNING', message='[Закончилась подписка у пользователя]', datetime=datetime.now(), user=user)
-        except Exception as e:
-            logger.error(traceback.format_exc())
-            lg.objects.create(log_level='FATAL',
-                              message=f'[Ошибка при автообновлении статуса подписки:\n{traceback.format_exc()}]',
-                              datetime=datetime.now())
-        await asyncio.sleep(150)
+            except Exception as e:
+                logger.error(f'[Ошибка при автообновлении статуса подписки {user} :\n{traceback.format_exc()}]')
+                lg.objects.create(log_level='FATAL',
+                                  message=f'[Ошибка при автообновлении статуса подписки:\n{traceback.format_exc()}]',
+                                  datetime=datetime.now())
+        await asyncio.sleep(60*60*12)
 
 
 @bot.message_handler(commands=['start'])
@@ -346,7 +347,7 @@ async def callback_query_handlers(call):
                             await bot.send_message(call.message.chat.id, text=f'{msg.key_avail}\n<code>{key}</code>',
                                                    reply_markup=markup.key_menu(country))
                         except:
-                            logger.error(f'{traceback.format_exc()}')
+                            logger.error(f'[{user}] : {traceback.format_exc()}')
                             await bot.send_message(call.message.chat.id, text=msg.get_new_key,
                                                    reply_markup=markup.get_new_key(country))
                 else:

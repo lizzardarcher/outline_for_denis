@@ -270,6 +270,8 @@ class IncomeInfo(admin.ModelAdmin):
 class VpnKey(admin.ModelAdmin):
     list_display = ('user', 'server', 'access_url', 'data_limit', 'created_at')
     list_display_links = ('user', 'server', 'access_url', 'data_limit', 'created_at')
+    search_fields = ('user', 'server', 'access_url')
+    list_filter = ('server',)
     ordering = ['server']
     def has_change_permission(self, request, obj=None):
         return False

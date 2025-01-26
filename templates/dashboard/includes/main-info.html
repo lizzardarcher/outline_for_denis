@@ -1,7 +1,7 @@
 <!-- Основная часть -->
 <main class="col-md-7 main-content">
-    <h2>Добро пожаловать в DomVPN</h2>
-    <p>Тут вы можете приобрести ключ для приложения Outline</p>
+    <h2 class="text-center">Добро пожаловать в DomVPN</h2>
+    <p class="text-center">Тут вы можете приобрести ключ для приложения Outline</p>
     <div class="card mb-4">
         <div class="card-header">
             Главная
@@ -22,18 +22,63 @@
                 <li class="list-group-item mb-4">
                     Outline key
                     {% if vpn_key.access_url %}
-                        <a href="" class="btn btn-outline-warning text-muted float-end"><i class="fa fa-refresh"></i>
-                            Заменить</a>
+                        <!-- Button trigger modal -->
+                        <button type="button" class="btn btn-outline-warning text-muted float-end" data-toggle="modal"
+                                data-target="#change_key">
+                            <i class="fa fa-refresh"></i> Заменить
+                        </button>
                     {% else %}
-                        <a href="" class="btn btn-outline-info text-muted float-end"><i class="fa fa-get-pocket"></i>
-                            Создать
-                            новый</a>
+                        <button type="button" class="btn btn-outline-info text-muted float-end" data-toggle="modal"
+                                data-target="#change_key">
+                            <i class="fa fa-get-pocket"></i>Создать новый
+                        </button>
                     {% endif %}
+                    <!-- Modal -->
+                    <div class="modal fade" id="change_key" tabindex="-1" role="dialog"
+                         aria-labelledby="change_keyLabel" aria-hidden="true">
+                        <div class="modal-dialog" role="document">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title" id="change_keyLabel">Доступные сервера</h5>
+                                </div>
+                                <div class="modal-body">
+                                    <form action="{% url 'profile' %}">
+                                        <label for="country">Выберите страну:</label>
+                                        <select class="form-control" id="country" name="country">
+                                            {% for country in countries %}
+                                                <option value="{{ country.name }}">{{ country.name_for_app }}</option>
+                                            {% endfor %}
+                                        </select>
+                                        <div class="modal-footer">
+                                            <button type="button" class="btn btn-secondary" data-dismiss="modal">
+                                                Отмена
+                                            </button>
+                                            <button type="submit" class="btn btn-primary">Подтвердить</button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </li>
                 <li class="list-group-item">
                     Баланс
                     <a href="" class="btn btn-outline-success text-muted float-end"><i class="fa fa-money"></i>
                         Пополнить</a>
+                </li>
+                <li class="list-group-item">
+                    Приобрести подписку<br>
+                    <small class="text-muted">Средства спишутся с вашего баланса</small>
+                    <form class="text-muted float-end" action="{% url 'profile' %}">
+                        <label for="subscription">Выберите Подписку:</label>
+                        <select class="form-control mt-1 mb-1" id="subscription" name="subscription">
+                            <option value="{{ subscription.price_1 }}">{{ subscription.price_1 }}₽ на 1 месяц</option>
+                            <option value="{{ subscription.price_2 }}">{{ subscription.price_2 }}₽ на 3 месяца</option>
+                            <option value="{{ subscription.price_3 }}">{{ subscription.price_3 }}₽ на 6 месяцев</option>
+                            <option value="{{ subscription.price_4 }}">{{ subscription.price_4 }}₽ на 1 год</option>
+                        </select>
+                        <button type="submit" class="btn btn-outline-primary">Приобрести</button>
+                    </form>
                 </li>
             </ul>
         </div>
@@ -43,17 +88,17 @@
 <script>
     function copyToClipboard(text) {
         navigator.clipboard.writeText(text)
-        .then(() => {
-          //  alert("Текст скопирован в буфер обмена!");
-          document.getElementById('vpnkey').innerHTML =  "Скопировано!";
-           setTimeout(() => {
-            document.getElementById('vpnkey').innerHTML = "{{ vpn_key.access_url }} {{ vpn_key.server.country.name_for_app }}";
-             }, 2000);
-        })
-        .catch(err => {
-            console.error('Ошибка при копировании: ', err);
-            alert("Не удалось скопировать текст.");
-        });
+            .then(() => {
+                //  alert("Текст скопирован в буфер обмена!");
+                document.getElementById('vpnkey').innerHTML = "Скопировано!";
+                setTimeout(() => {
+                    document.getElementById('vpnkey').innerHTML = "{{ vpn_key.access_url }} {{ vpn_key.server.country.name_for_app }}";
+                }, 2000);
+            })
+            .catch(err => {
+                console.error('Ошибка при копировании: ', err);
+                alert("Не удалось скопировать текст.");
+            });
     }
 </script>
 
