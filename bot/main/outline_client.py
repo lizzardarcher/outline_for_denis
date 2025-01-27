@@ -8,8 +8,12 @@ from pathlib import Path
 
 from django.conf import settings
 
-from outline_vpn.outline_vpn import OutlineVPN
-import django_orm
+try:
+    import django_orm
+    from outline_vpn.outline_vpn import OutlineVPN
+except ImportError:
+    from bot.main import django_orm
+    from bot.main.outline_vpn.outline_vpn import OutlineVPN
 from bot.models import VpnKey, Logging
 from bot.models import Server
 from bot.models import TelegramUser

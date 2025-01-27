@@ -11,6 +11,7 @@
 
         <div class="m-5">
             <!-- Первый ряд -->
+            {% include 'includes/messages_success.html' %}
             <div class="m-5 p-5 row bg-light rounded">
                 {% include 'dashboard/includes/sidepanel.html' %}
                 {% include 'dashboard/includes/main-info.html' %}
@@ -33,14 +34,15 @@
                 <!-- Блок 2 статистики -->
                 <div class="col-md-4 ">
                     <h3><i class="fa fa-user"></i> Пользователей DomVPN</h3>
-                     <span class="badge bg-primary">{{ total_users }}</span>
+                    <span class="badge bg-primary">{{ total_users }}</span>
 
                 </div>
 
                 <!-- Блок 3 статистики -->
                 <div class="col-md-4 stat-block">
                     <h3><i class="fas fa-money-bill-wave"></i> Telegram BOT</h3>
-                    <a class="bg-success-subtle rounded p-1 m-2" href="https://t.me/xDomvpn_Bot"><i class="fa fa-telegram"></i> Ключи Outline (DomVPN Bot)</a>
+                    <a class="bg-success-subtle rounded p-1 m-2" href="https://t.me/xDomvpn_Bot"><i
+                            class="fa fa-telegram"></i> Ключи Outline (DomVPN Bot)</a>
                 </div>
             </div>
         </div>

@@ -42,7 +42,7 @@
                                     <h5 class="modal-title" id="change_keyLabel">Доступные сервера</h5>
                                 </div>
                                 <div class="modal-body">
-                                    <form action="{% url 'profile' %}">
+                                    <form action="{% url 'get_new_key' %}">
                                         <label for="country">Выберите страну:</label>
                                         <select class="form-control" id="country" name="country">
                                             {% for country in countries %}

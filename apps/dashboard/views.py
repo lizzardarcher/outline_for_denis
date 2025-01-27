@@ -1,10 +1,11 @@
-from audioop import reverse
-
+from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.messages.views import SuccessMessageMixin
-from django.views.generic import TemplateView, CreateView, UpdateView
+from django.shortcuts import get_object_or_404, redirect
+from django.views.generic import TemplateView, UpdateView
 
-from bot.models import VpnKey, Server, TelegramUser, Country, Prices
+from apps.dashboard.outline_vpn.outline_client import delete_user_keys, create_new_key
+from bot.models import VpnKey, Server, TelegramUser, Country, Prices, UserProfile
 
 
 class ProfileView(LoginRequiredMixin, SuccessMessageMixin, TemplateView):
@@ -24,14 +25,30 @@ class ProfileView(LoginRequiredMixin, SuccessMessageMixin, TemplateView):
         return context
 
 
-class CreateNewKeyView(LoginRequiredMixin, SuccessMessageMixin, TemplateView):
-    template_name = 'dashboard/create_key.html'
+class CreateNewKeyView(LoginRequiredMixin, TemplateView):
 
-    def get_success_url(self):
-        return reverse('profile')
+    def get(self, request, *args, **kwargs):
+        country_name = request.GET.get('country')
+        if not country_name:
+            messages.error(request, 'Ошибка создания ключа! Не указана страна в параметрах запроса.')
+            return redirect('profile')
 
-    def get_success_message(self, cleaned_data):
-        return 'New key has been created!'
+        country = get_object_or_404(Country, name=country_name)
+        server = Server.objects.filter(is_active=True, country=country, keys_generated__lte=200).first()
+
+        if not server:
+            messages.error(request, f"Ошибка создания ключа! Нет доступных серверов для страны '{country.name}'.")
+            return redirect('profile')
+
+        user_profile = get_object_or_404(UserProfile, user=request.user)
+        user = user_profile.telegram_user
+
+        delete_user_keys(user=user)  # Удаляем текущие ключи
+        new_key = create_new_key(server=server, user=user)  # Генерируем новый ключ
+        messages.success(request, f'Новый ключ создан!\n{new_key}')
+        return redirect('profile')
+
+
 
 class UpdateKeyView(LoginRequiredMixin, SuccessMessageMixin, UpdateView):
     ...
