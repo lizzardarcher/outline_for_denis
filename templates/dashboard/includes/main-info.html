@@ -11,8 +11,8 @@
                 <li class="list-group-item mb-4">
                     <i class="fa fa-key text-success"></i> Текущий ключ
                     {% if vpn_key.access_url %}
-                        <small id="vpnkey" class="d-sm-none d-md-block text-muted float-end" style="cursor: pointer;"
-                               onclick="copyToClipboard('{{ vpn_key.access_url }}')">
+                        <small id="vpnkey" class="d-sm-none d-md-block text-muted float-end bg-success-subtle rounded p-1" style="cursor: pointer;"
+                               onclick="copyToClipboardKey('{{ vpn_key.access_url }}')">
                             {{ vpn_key.access_url }} {{ vpn_key.server.country.name_for_app }}
                         </small>
                     {% else %}
@@ -86,7 +86,7 @@
 </main>
 
 <script>
-    function copyToClipboard(text) {
+    function copyToClipboardKey(text) {
         navigator.clipboard.writeText(text)
             .then(() => {
                 //  alert("Текст скопирован в буфер обмена!");

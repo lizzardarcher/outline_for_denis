@@ -2,10 +2,10 @@ from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.messages.views import SuccessMessageMixin
 from django.shortcuts import get_object_or_404, redirect
-from django.views.generic import TemplateView, UpdateView
+from django.views.generic import TemplateView
 
 from apps.dashboard.outline_vpn.outline_client import delete_user_keys, create_new_key
-from bot.models import VpnKey, Server, TelegramUser, Country, Prices, UserProfile
+from bot.models import VpnKey, Server, TelegramUser, Country, Prices, UserProfile, ReferralSettings, TelegramReferral
 
 
 class ProfileView(LoginRequiredMixin, SuccessMessageMixin, TemplateView):
@@ -22,6 +22,12 @@ class ProfileView(LoginRequiredMixin, SuccessMessageMixin, TemplateView):
         context['total_users'] = TelegramUser.objects.count()
         context['countries'] = Country.objects.filter(is_active=True)
         context['subscription'] = Prices.objects.get(id=1)
+        context['referral'] = ReferralSettings.objects.get(pk=1)
+        context['inv_1_lvl'] = TelegramReferral.objects.filter(referrer=self.request.user.profile.telegram_user, level=1).__len__()
+        context['inv_2_lvl'] = TelegramReferral.objects.filter(referrer=self.request.user.profile.telegram_user, level=2).__len__()
+        context['inv_3_lvl'] = TelegramReferral.objects.filter(referrer=self.request.user.profile.telegram_user, level=3).__len__()
+        context['inv_4_lvl'] = TelegramReferral.objects.filter(referrer=self.request.user.profile.telegram_user, level=4).__len__()
+        context['inv_5_lvl'] = TelegramReferral.objects.filter(referrer=self.request.user.profile.telegram_user, level=5).__len__()
         return context
 
 

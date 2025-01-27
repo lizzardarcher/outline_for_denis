@@ -1,35 +1,43 @@
 <div class="col-md-4 ">
     <h2 class="mb-3">Реферальная программа</h2>
+    <h5>Твоя реферальная ссылка:</h5>
     <div class="d-flex align-items-center mb-3">
-        <div class="referral-link" id="referralLink">https://t.me/xDomvpn_Bot?start=5566146968</div>
-        <a class="btn btn-outline-secondary" onclick="copyReferralLink()"><i class="fa fa-copy"></i></a>
+        <div class="link-primary bg-success-subtle rounded p-1" id="referralLink"
+             onclick="copyToClipboardRef('https://t.me/xDomvpn_Bot?start={{ request.user.id }}')"
+                style="cursor: pointer">
+            https://t.me/xDomvpn_Bot?start={{ request.user.id }}</div>
     </div>
-    <h5 class="mb-3"><i class="fa fa-share"></i> Рекомендуйте наш DomVPN сервис своим друзьям, чтобы заработать, а нам развивать проект.</h5>
-    <h5 class="mb-3"><i class="fa fa-money"></i> Вы получите от 1 до 15% с каждой покупки по нашей реферальной программе в зависимости от уровня реферала</h5>
+    <h5 class="mb-3"><i class="fa fa-share"></i> Рекомендуйте наш DomVPN сервис своим друзьям, чтобы заработать, а нам
+        развивать проект.</h5>
+    <h5 class="mb-3"><i class="fa fa-money"></i> Вы получите от 1 до 15% с каждой покупки по нашей реферальной программе
+        в зависимости от уровня реферала</h5>
     <div class="referral-program">
         <ul>
             <li>🏅 Реферальная программа</li>
-            <li>├ Рефералы 1 ур: 0 (15%)</li>
-            <li>├ Рефералы 2 ур: 0 (4%)</li>
-            <li>├ Рефералы 3 ур: 0 (3%)</li>
-            <li>├ Рефералы 4 ур: 0 (2%)</li>
-            <li>├ Рефералы 5 ур: 0 (1%)</li>
-            <li>└ Заработано: 0.00 ₽</li>
+            <li>├ Рефералы 1 ур: {{ inv_1_lvl }} ({{ referral.level_1_percentage }}%)</li>
+            <li>├ Рефералы 2 ур: {{ inv_2_lvl }} ({{ referral.level_2_percentage }}%)</li>
+            <li>├ Рефералы 3 ур: {{ inv_3_lvl }} ({{ referral.level_3_percentage }}%)</li>
+            <li>├ Рефералы 4 ур: {{ inv_4_lvl }} ({{ referral.level_4_percentage }}%)</li>
+            <li>├ Рефералы 5 ур: {{ inv_5_lvl }} ({{ referral.level_5_percentage }}%)</li>
+            <li>└ Заработано: {% if request.user.profile.telegram_user.income %}{{ request.user.profile.telegram_user.income }}{% else %}0.00{% endif %} ₽</li>
         </ul>
     </div>
     <p>Вы можете вывести денежные средства по запросу в нашем ТГ боте</p>
 </div>
 
 <script>
-    function copyReferralLink() {
-        const link = document.getElementById('referralLink').innerText;
-        navigator.clipboard.writeText(link)
+    function copyToClipboardRef(text) {
+        navigator.clipboard.writeText(text)
             .then(() => {
-                alert('Реферальная ссылка скопирована!');
+                //  alert("Текст скопирован в буфер обмена!");
+                document.getElementById('referralLink').innerHTML = "Скопировано!";
+                setTimeout(() => {
+                    document.getElementById('referralLink').innerHTML = 'https://t.me/xDomvpn_Bot?start={{ request.user.id }}';
+                }, 2000);
             })
             .catch(err => {
-                console.error('Failed to copy link: ', err);
-                alert('Failed to copy link! Please, try again.');
+                console.error('Ошибка при копировании: ', err);
+                alert("Не удалось скопировать текст.");
             });
     }
 </script>
