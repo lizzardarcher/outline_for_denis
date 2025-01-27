@@ -1,0 +1,35 @@
+<div class="col-md-4 ">
+    <h2 class="mb-3">Реферальная программа</h2>
+    <div class="d-flex align-items-center mb-3">
+        <div class="referral-link" id="referralLink">https://t.me/xDomvpn_Bot?start=5566146968</div>
+        <a class="btn btn-outline-secondary" onclick="copyReferralLink()"><i class="fa fa-copy"></i></a>
+    </div>
+    <h5 class="mb-3"><i class="fa fa-share"></i> Рекомендуйте наш DomVPN сервис своим друзьям, чтобы заработать, а нам развивать проект.</h5>
+    <h5 class="mb-3"><i class="fa fa-money"></i> Вы получите от 1 до 15% с каждой покупки по нашей реферальной программе в зависимости от уровня реферала</h5>
+    <div class="referral-program">
+        <ul>
+            <li>🏅 Реферальная программа</li>
+            <li>├ Рефералы 1 ур: 0 (15%)</li>
+            <li>├ Рефералы 2 ур: 0 (4%)</li>
+            <li>├ Рефералы 3 ур: 0 (3%)</li>
+            <li>├ Рефералы 4 ур: 0 (2%)</li>
+            <li>├ Рефералы 5 ур: 0 (1%)</li>
+            <li>└ Заработано: 0.00 ₽</li>
+        </ul>
+    </div>
+    <p>Вы можете вывести денежные средства по запросу в нашем ТГ боте</p>
+</div>
+
+<script>
+    function copyReferralLink() {
+        const link = document.getElementById('referralLink').innerText;
+        navigator.clipboard.writeText(link)
+            .then(() => {
+                alert('Реферальная ссылка скопирована!');
+            })
+            .catch(err => {
+                console.error('Failed to copy link: ', err);
+                alert('Failed to copy link! Please, try again.');
+            });
+    }
+</script>

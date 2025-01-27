@@ -26,7 +26,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.getenv('DJANGO_SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = False
 
 ALLOWED_HOSTS = os.getenv('DJANGO_ALLOWED_HOSTS').split(',')
 CSRF_TRUSTED_ORIGINS = os.getenv('CSRF_TRUSTED_ORIGINS').split(',')
@@ -128,7 +128,6 @@ AUTHENTICATION_BACKENDS = [
 TELEGRAM_BOT_NAME = 'xDomvpn_Bot'
 TELEGRAM_BOT_TOKEN = '7854367825:AAHSM0PyCf8RmUd4uMY7zBbCa1D3RzmlcyU'
 TELEGRAM_BOT_SECRET_KEY = '872834723528358239'
-TELEGRAM_LOGIN_REDIRECT_URL = 'https://domvpn.ru/profile/'
 
 LANGUAGE_CODE = 'ru-ru'
 
