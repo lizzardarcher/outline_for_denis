@@ -1,0 +1,9 @@
+<div class="col-md-4 stat-block">
+    <h3><i class="fa fa-credit-card"></i> Платежи</h3>
+    <ul>{% for transaction in transactions %}
+        <li class="m-2"><span class="bg-success-subtle rounded p-1">{{ transaction.timestamp }} {{ transaction.amount }} {{ transaction.currency }} {{ transaction.status }}</span></li>
+    {% empty %}
+        ---
+    {% endfor %}
+    </ul>
+</div>

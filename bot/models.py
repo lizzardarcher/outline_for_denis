@@ -2,6 +2,7 @@ from datetime import datetime
 
 from django.contrib.auth.models import User
 from django.db import models
+from django.utils.safestring import mark_safe
 
 
 class TelegramUser(models.Model):
@@ -51,7 +52,8 @@ class TelegramUser(models.Model):
 
 class UserProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
-    telegram_user = models.OneToOneField(TelegramUser, on_delete=models.SET_NULL, null=True, blank=True, related_name='user_profile')
+    telegram_user = models.OneToOneField(TelegramUser, on_delete=models.SET_NULL, null=True, blank=True,
+                                         related_name='user_profile')
 
     def __str__(self):
         return self.user.username
@@ -98,6 +100,11 @@ SIDE = (
     ('Приход средств', 'Приход средств'),
     ('Вывод средств', 'Вывод средств'),
 )
+DESCRIPTION = (
+    ('1 MONTH', 'Оплатить 1 конвертацию'), ('3 MONTH', 'Оплатить 5 конвертаций'),
+    ('6 MONTH', 'Оплатить 10 конвертаций'), ('1 YEAR', 'Оплатить 10 конвертаций'),)
+STATUS = (('pending', 'В ожидании'), ('succeeded', 'Успешно'), ('canceled', 'Отменено'), ('failed', 'Ошибка'),
+          ('refunded', 'Возврат'), ('captured', 'Захвачено'))
 
 
 class Transaction(models.Model):
@@ -107,9 +114,30 @@ class Transaction(models.Model):
     currency = models.CharField(max_length=100, blank=True, null=True, verbose_name='Валюта')
     timestamp = models.DateTimeField(auto_now_add=True, verbose_name='Время')
     side = models.CharField(max_length=100, blank=True, null=True, choices=SIDE, verbose_name='Направление транзакции')
+    description = models.CharField(max_length=255, choices=DESCRIPTION, blank=True, null=True, default=None,
+                                   verbose_name='Описание платежа')
+    payment_id = models.CharField(max_length=255, blank=True, null=True, default=None, verbose_name='ID платежа')
+    paid = models.BooleanField(null=True, blank=True, default=False, verbose_name='Оплачено')
+    status = models.CharField(max_length=50, choices=STATUS, default='pending', null=True, blank=True, verbose_name='Статус')
+
+    # def __str__(self):
+    #     return f"Транзакция пользователя - {self.user.username}: {self.amount} от {self.timestamp}"
 
     def __str__(self):
-        return f"Транзакция пользователя - {self.user.username}: {self.amount} от {self.timestamp}"
+        if self.status == 'pending':
+            status = f"<span class='badge badge-warning'>{self.status}</span>"
+        elif self.status == 'succeeded':
+            status = f"<span class='badge badge-success'>{self.status}</span>"
+        elif self.status == 'canceled' or self.status == 'failed':
+            status = f"<span class='badge badge-danger'>{self.status}</span>"
+        else:
+            status = f"<span class='badge badge-secondary'>{self.status}</span>"
+        if self.paid:
+            paid = '✅'
+        else:
+            paid = '❌'
+
+        return mark_safe(f"Платеж на <span class='badge badge-info'>{self.amount}</span>p. {self.timestamp.strftime('%Y-%m-%d %H:%M')} {status} {str(self.user)} {paid}")
 
     class Meta:
         verbose_name = 'Транзакция'

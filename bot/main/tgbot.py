@@ -1,9 +1,7 @@
 import asyncio
 import logging
-import os
 import random
 import traceback
-import sys
 from pathlib import Path
 from logging.handlers import RotatingFileHandler, TimedRotatingFileHandler
 from math import ceil
@@ -27,7 +25,6 @@ from bot.models import IncomeInfo
 from bot.models import ReferralSettings
 from bot.models import WithdrawalRequest
 from bot.models import Transaction
-from bot.models import GlobalSettings
 from bot.models import Logging as lg
 
 from bot.main import msg
@@ -35,7 +32,6 @@ from bot.main import markup
 from bot.main.utils import return_matches
 from bot.main.outline_client import create_new_key
 from bot.main.outline_client import delete_user_keys
-from bot.main.outline_client import update_keys_data_limit
 
 log_path = Path(__file__).parent.absolute() / 'log/bot_log.log'
 logger = logging.getLogger(__name__)
@@ -270,7 +266,7 @@ async def got_payment(message):
     users_balance = float(IncomeInfo.objects.get(pk=1).user_balance_total)  # Общий баланс всех пользователей
     IncomeInfo.objects.all().update(total_amount=income + amount, user_balance_total=users_balance + amount)
     Transaction.objects.create(user=user, income_info=IncomeInfo.objects.get(pk=1), timestamp=datetime.now(),
-                               currency=currency, amount=amount, side='Приход средств')
+                               currency=currency, amount=amount, side='Приход средств', paid=True, status='succeeded')
 
     referred_list = [x for x in TelegramReferral.objects.filter(referred=user)]
     if referred_list:
