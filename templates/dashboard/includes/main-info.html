@@ -79,8 +79,15 @@
                 </li>
                 <li class="list-group-item">
                     Баланс
-                    <a href="" class="btn btn-outline-success text-muted float-end"><i class="fa fa-money"></i>
-                        Пополнить</a>
+                    <form class="text-muted float-end" method="post" action="{% url 'create_payment' %}">
+                        {% csrf_token %}
+                        <label for="amount" >Введите сумму для пополнения:</label>
+                        <input class="form-control mt-1 mb-2" id="amount" name="amount" type="number" placeholder=""/>
+                        <button type="submit" class="btn btn-outline-success text-muted float-end"><i
+                                class="fa fa-money"></i>
+                            Пополнить
+                        </button>
+                    </form>
                 </li>
                 <li class="list-group-item">
                     Приобрести подписку<br>
