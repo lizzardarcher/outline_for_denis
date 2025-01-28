@@ -1,7 +1,7 @@
 <!-- Основная часть -->
 <main class="col-sm-12 col-md-8">
-    <h2 class="text-center">Добро пожаловать в DomVPN</h2>
-    <p class="text-center">Тут вы можете приобрести ключ для приложения Outline</p>
+    <h1 class="text-center">Добро пожаловать в DomVPN</h1>
+    <p class="text-center">Здесь вы можете приобрести ключ для приложения Outline</p>
     <div class="card mb-4">
         <div class="card-header">
             Главная
@@ -11,9 +11,13 @@
                 <li class="list-group-item mb-4">
                     <i class="fa fa-key text-success"></i> Текущий ключ
                     {% if vpn_key.access_url %}
-                        <small id="vpnkey" class="d-sm-none d-md-block text-muted float-end bg-success-subtle rounded p-1" style="cursor: pointer;"
+                        <small id="vpnkey" class="d-none d-lg-block text-muted float-end bg-success-subtle rounded p-1" style="cursor: pointer;"
                                onclick="copyToClipboardKey('{{ vpn_key.access_url }}')">
                             {{ vpn_key.access_url }} {{ vpn_key.server.country.name_for_app }}
+                        </small>
+                        <small id="vpnkey-sm" class="d-sm-block d-md-none text-muted float-end bg-success-subtle rounded p-1" style="cursor: pointer;"
+                               onclick="copyToClipboardKeySM('{{ vpn_key.access_url }}')">
+                            Нажми, чтобы скопировать {{ vpn_key.server.country.name_for_app }}
                         </small>
                     {% else %}
                         <small class="text-muted float-end">У вас нет VPN ключей.</small>
@@ -93,6 +97,20 @@
                 document.getElementById('vpnkey').innerHTML = "Скопировано!";
                 setTimeout(() => {
                     document.getElementById('vpnkey').innerHTML = "{{ vpn_key.access_url }} {{ vpn_key.server.country.name_for_app }}";
+                }, 2000);
+            })
+            .catch(err => {
+                console.error('Ошибка при копировании: ', err);
+                alert("Не удалось скопировать текст.");
+            });
+    }
+    function copyToClipboardKeySM(text) {
+        navigator.clipboard.writeText(text)
+            .then(() => {
+                //  alert("Текст скопирован в буфер обмена!");
+                document.getElementById('vpnkey-sm').innerHTML = "Скопировано!";
+                setTimeout(() => {
+                    document.getElementById('vpnkey-sm').innerHTML = "Нажми, чтобы скопировать {{ vpn_key.server.country.name_for_app }}";
                 }, 2000);
             })
             .catch(err => {

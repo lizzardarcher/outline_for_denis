@@ -9,28 +9,28 @@
             {% include 'home/sections/header.html' %}
         </div>
 
-        <div class="m-5">
+        <div id="responsiveMargin" class="m-1">
             <!-- Первый ряд -->
             {% include 'includes/messages_success.html' %}
-            <div class="m-5 p-5 row bg-light rounded">
+            <div class="m-2 p-2 row bg-light rounded">
                 {% include 'dashboard/includes/sidepanel.html' %}
                 {% include 'dashboard/includes/main-info.html' %}
                 {% include 'dashboard/includes/user-info.html' %}
             </div>
 
             <!-- Второй ряд -->
-            <div class="m-5 p-5 row bg-light rounded">
+            <div class="m-2 p-2 row bg-light rounded">
                 {% include 'dashboard/includes/servers.html' %}
                 {% include 'dashboard/includes/referral.html' %}
                 {% include 'dashboard/includes/bot-info.html' %}
             </div>
-            
+
             <!-- Второй ряд -->
-            <div class="m-5 p-5 row bg-light rounded">
+            <div class="m-2 p-2 row bg-light rounded">
                 {% include 'dashboard/includes/transactions.html' %}
-{#                {% include 'dashboard/includes/instructions.html' %}#}
+                {#                {% include 'dashboard/includes/instructions.html' %}#}
             </div>
-            
+
         </div>
     </div>
 
@@ -39,6 +39,23 @@
 {% endblock content %}
 
 {% block extrascript %}
+    <script>
+        function updateMargin() {
+            const div = document.getElementById('responsiveMargin');
+            if (window.innerWidth < 768) {
+                div.className = 'm-1'; // Mobile (or smaller screen)
+            } else {
+                div.className = 'm-5'; // Larger screen
+            }
+        }
+
+        // Initial call to set the correct class on page load
+        updateMargin();
+
+        // Event listener to update the class when the window resizes
+        window.addEventListener('resize', updateMargin);
+
+    </script>
 {% endblock extrascript %}
 
 

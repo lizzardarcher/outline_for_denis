@@ -31,7 +31,7 @@ class TelegramBackend(BaseBackend):
             try:
                 tg_user = TelegramUser.objects.get(user_id=user_id)
             except ObjectDoesNotExist as e:
-                messages.info(request, f"TG-USER {e}")
+                # messages.info(request, f"TG-USER {e}")
                 tg_user = TelegramUser.objects.create(
                     user_id=user_id,
                     username=username,
@@ -41,12 +41,12 @@ class TelegramBackend(BaseBackend):
                     subscription_status=True,
                     subscription_expiration=datetime.now() + timedelta(days=3),
                 )
-            # messages.info(request, f"TG-USER {tg_user}")
+                messages.info(request, f"У вас активирован пробный трёхдневный период! Нажмите на ключ, чтобы его скопировать или создайте новый!")
 
             try:
                 user = User.objects.get(id=user_id)
             except ObjectDoesNotExist as e:
-                messages.info(request, f"DJANGO-USER {e}")
+                # messages.info(request, f"DJANGO-USER {e}")
                 user = User.objects.create_user(
                     id=user_id,
                     username=username or first_name,
@@ -59,7 +59,7 @@ class TelegramBackend(BaseBackend):
             try:
                 profile = UserProfile.objects.get(user=user)
             except ObjectDoesNotExist as e:
-                messages.info(request, f"UserProfile {e}")
+                # messages.info(request, f"UserProfile {e}")
                 profile = UserProfile.objects.create(user=user, telegram_user=tg_user)
             else:
                 profile.telegram_user = tg_user
