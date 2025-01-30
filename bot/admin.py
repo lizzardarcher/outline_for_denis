@@ -58,6 +58,7 @@ class TransactionInline(admin.TabularInline):
 
 class VpnKeyInline(admin.TabularInline):
     model = VpnKey
+    list_display_links = ('key_id', 'access_url')
     def has_add_permission(self, request, obj=None):
         if not DEBUG:
             return False
@@ -172,7 +173,7 @@ class TelegramReferralAdmin(admin.ModelAdmin):
 
 @admin.register(Transaction)
 class TransactionAdmin(admin.ModelAdmin):
-    list_display = ('timestamp', 'amount', 'currency', 'user', 'side')
+    list_display = ('timestamp', 'amount', 'currency', 'status', 'user', 'side')
     list_display_links = ('user',)
     ordering = ['-timestamp']
 
@@ -191,11 +192,11 @@ class TransactionAdmin(admin.ModelAdmin):
     def has_change_permission(self, request, obj=None):
         return False
 
-    def get_actions(self, request):
-        actions = super().get_actions(request)
-        if 'delete_selected' in actions:
-            del actions['delete_selected']
-        return actions
+    # def get_actions(self, request):
+    #     actions = super().get_actions(request)
+    #     if 'delete_selected' in actions:
+    #         del actions['delete_selected']
+    #     return actions
 
 
 @admin.register(WithdrawalRequest)
@@ -270,7 +271,7 @@ class IncomeInfo(admin.ModelAdmin):
 class VpnKey(admin.ModelAdmin):
     list_display = ('user', 'server', 'access_url', 'data_limit', 'created_at')
     list_display_links = ('user', 'server', 'access_url', 'data_limit', 'created_at')
-    search_fields = ('user', 'server', 'access_url')
+    search_fields = ('access_url',)
     list_filter = ('server',)
     ordering = ['server']
     def has_change_permission(self, request, obj=None):

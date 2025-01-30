@@ -92,7 +92,7 @@
                 <li class="list-group-item">
                     Приобрести подписку<br>
                     <small class="text-muted">Средства спишутся с вашего баланса</small>
-                    <form class="text-muted float-end" action="{% url 'profile' %}">
+                    <form class="text-muted float-end" action="{% url 'update_subscription' request.user.profile.telegram_user.user_id %}">
                         <label for="subscription">Выберите Подписку:</label>
                         <select class="form-control mt-1 mb-1" id="subscription" name="subscription">
                             <option value="{{ subscription.price_1 }}">{{ subscription.price_1 }}₽ на 1 месяц</option>

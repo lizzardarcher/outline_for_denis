@@ -9,6 +9,7 @@ from datetime import datetime, timedelta, date
 
 import django_orm
 from django.conf import settings
+from django.utils import timezone
 from telebot import asyncio_filters
 from telebot.async_telebot import AsyncTeleBot
 from telebot.asyncio_storage import StateMemoryStorage
@@ -60,25 +61,30 @@ def update_sub_status(user: TelegramUser):
 
 async def update_user_subscription_status():
     while True:
-
-        list_users = [x for x in TelegramUser.objects.all()]
-        for user in list_users:
+        users = TelegramUser.objects.filter(subscription_expiration__lt=timezone.now(), subscription_status=True)
+        logger.info(f'[Всего просроченных пользователей] [{users.count()}] [Текущее время: {timezone.now()}]')
+        for user in users:
             try:
-                exp_date = user.subscription_expiration
-                if exp_date < datetime.now().date():
-                    if user.subscription_status:
-                        TelegramUser.objects.filter(user_id=user.user_id).update(subscription_status=False)
-                        try:
-                            await bot.send_message(chat_id=user.user_id, text=msg.subscription_expired)
-                        except:
-                            pass
-                        await delete_user_keys(user=user)
-                        lg.objects.create(log_level='WARNING', message='[Закончилась подписка у пользователя]', datetime=datetime.now(), user=user)
+                user.subscription_status=False
+                user.save()
+                try:
+                    await bot.send_message(chat_id=user.user_id, text=msg.subscription_expired)
+                except:
+                    pass
+                lg.objects.create(log_level='WARNING', message='[Закончилась подписка у пользователя]', datetime=datetime.now(), user=user)
             except Exception as e:
                 logger.error(f'[Ошибка при автообновлении статуса подписки {user} :\n{traceback.format_exc()}]')
                 lg.objects.create(log_level='FATAL',
                                   message=f'[Ошибка при автообновлении статуса подписки:\n{traceback.format_exc()}]',
                                   datetime=datetime.now())
+
+        vpn_keys = VpnKey.objects.filter(user__subscription_status=False)
+        for key in vpn_keys:
+            try:
+                await delete_user_keys(user=key.user)
+            except:
+                pass
+
         await asyncio.sleep(60*60*12)
 
 

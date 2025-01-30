@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.messages.views import SuccessMessageMixin
@@ -9,7 +11,7 @@ from bot.models import VpnKey, Server, TelegramUser, Country, Prices, UserProfil
     Transaction
 
 
-class ProfileView(LoginRequiredMixin, SuccessMessageMixin, TemplateView):
+class ProfileView(SuccessMessageMixin, TemplateView):
     template_name = 'dashboard/index.html'
 
     def get_context_data(self, **kwargs):
@@ -57,4 +59,37 @@ class CreateNewKeyView(LoginRequiredMixin, TemplateView):
         return redirect('profile')
 
 
+class UpdateSubscriptionView(LoginRequiredMixin, TemplateView):
+    def get(self, request, *args, **kwargs):
+        subscription = request.GET.get('subscription')
+        telegram_user_id = request.GET.get('telegram_user_id')
+        if not subscription:
+            messages.error(request, f'Ошибка обновления подписки! SUB - [{subscription}] USER [{telegram_user_id}]')
+            return redirect('profile')
 
+        prices = Prices.objects.get(pk=1)
+        amount = 0
+        days = 0
+        if float(subscription) == float(prices.price_1):
+            amount = float(prices.price_1)
+            days = 31
+        elif float(subscription) == float(prices.price_2):
+            amount = float(prices.price_2)
+            days = 93
+        elif float(subscription) == float(prices.price_3):
+            amount = float(prices.price_3)
+            days = 184
+        elif float(subscription) == float(prices.price_4):
+            amount = float(prices.price_4)
+            days = 366
+
+        if days and amount:
+            user = get_object_or_404(TelegramUser, user_id=self.request.user.profile.telegram_user.user_id)
+            user.balance = float(user.balance) - float(amount)
+            user.subscription_status = True
+            user.subscription_expiration = user.subscription_expiration + timedelta(days=days)
+            user.save()
+            messages.success(request, f'Поздравляем с приобретением подписки! Действие подписки до {user.subscription_expiration}')
+        else:
+            messages.error(request, f'Ошибка обновления подписки! DAYS - [{str(days)}] AMOUNT [{str(amount)}]')
+        return redirect('profile')

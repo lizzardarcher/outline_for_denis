@@ -15,9 +15,8 @@
                     <div class="mb-4">
                         <h4 class="mb-2">Детали платежа:</h4>
                         <ul class="list-unstyled">
-                            <li><strong>ID платежа:</strong> {{ payment_id }}</li>
-                            <li><strong>Дата:</strong> {{ timestamp }}</li>
-                            <li><strong>Сумма:</strong> {{ amount }} RUB</li>
+                            <li><strong>Дата:</strong> {{ request.GET.date }}</li>
+                            <li><strong>Сумма:</strong> {{ request.GET.amount }} RUB</li>
                         </ul>
                     </div>
                     <div class="text-center">
