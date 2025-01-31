@@ -36,7 +36,7 @@ def create_new_key(server: Server, user: TelegramUser) -> str:
     keys_generated = server.keys_generated
     server.keys_generated = keys_generated + 1
     server.save()
-    Logging.objects.create(log_level='INFO', message=f'[Новый Ключ Создан]', datetime=datetime.now(), user=user)
+    Logging.objects.create(log_level='INFO', message=f'[WEB] [Новый Ключ Создан]', datetime=datetime.now(), user=user)
     return f'{key.access_url}#{server.country.name_for_app} VPN'
 
 
@@ -49,14 +49,17 @@ def delete_user_keys(user: TelegramUser):
             try:
                 client.delete_key(key)
                 keys.remove(key)
+                Logging.objects.create(log_level='WARNING', message='[WEB] [Недействительный Ключ Удалён]',
+                                       datetime=datetime.now(), user=user)
                 try:
                     #  Добавляется запись об уменьшении кол-ва сгенерированных ключей на 1
                     keys_generated = Server.objects.filter(script_out=data).first().keys_generated - 1
                     Server.objects.filter(script_out=data).update(keys_generated=keys_generated)
                 except:
-                    Logging.objects.create(log_level='ERROR', message=f'{traceback.format_exc()}', datetime=datetime.now(), user=user)
+                    Logging.objects.create(log_level='ERROR', message=f'{traceback.format_exc()}',
+                                           datetime=datetime.now(), user=user)
             except:
-                Logging.objects.create(log_level='ERROR', message=f'{traceback.format_exc()}', datetime=datetime.now(), user=user)
+                Logging.objects.create(log_level='ERROR', message=f'{traceback.format_exc()}', datetime=datetime.now(),
+                                       user=user)
 
     VpnKey.objects.filter(user=user).delete()
-    Logging.objects.create(log_level='WARNING', message='[Недействительный Ключ Удалён]', datetime=datetime.now(), user=user)

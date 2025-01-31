@@ -16,7 +16,6 @@ from django.http import HttpResponse
 from bot.models import TelegramUser, Transaction, IncomeInfo, Logging
 
 
-
 class CreatePaymentView(View):
     def post(self, request, *args, **kwargs):
 
@@ -46,7 +45,7 @@ class CreatePaymentView(View):
                 'user_id': request.user.id,
                 'telegram_user_id': request.user.profile.telegram_user.id,
             }
-        },)
+        }, )
 
         # Сохраняем payment_id в сессию (потом понадобится)
         request.session['yookassa_payment_id'] = payment.id
@@ -182,10 +181,13 @@ class YookassaWebhookView(View):
                 income.total_amount = float(income.total_amount) + float(amount_value)
                 income.save()
 
-                Logging.objects.create(log_level="SUCCESS", message=f'[WEB] [Платёж  на сумму {str(amount_value)} р. прошёл]', datetime=datetime.now(), user=telegram_user)
+                Logging.objects.create(log_level="SUCCESS",
+                                       message=f'[WEB] [Платёж  на сумму {str(amount_value)} р. прошёл]',
+                                       datetime=datetime.now(), user=telegram_user)
                 return HttpResponse(f'Обновляем баланс пользователя', status=200)
         except Exception as e:
-            Logging.objects.create(log_level="DANGER", message=f'[WEB] [Ошибка при приёме вебхука {str(traceback.format_exc())}]',
+            Logging.objects.create(log_level="DANGER",
+                                   message=f'[WEB] [Ошибка при приёме вебхука {str(traceback.format_exc())}]',
                                    datetime=datetime.now(), user=telegram_user)
 
     def handle_canceled_payment(self, payment_data):
@@ -196,7 +198,10 @@ class YookassaWebhookView(View):
             transaction.status = status
             transaction.paid = False
             transaction.save()
-            Logging.objects.create(log_level="WARNING", message=f'[WEB] [Платёж  на сумму {str(traceback.format_exc())} р. отменён]', datetime=datetime.now(), user=self.request.user.profile.telegram_user)
+            Logging.objects.create(log_level="WARNING",
+                                   message=f'[WEB] [Платёж  на сумму {str(traceback.format_exc())} р. отменён]',
+                                   datetime=datetime.now(), user=self.request.user.profile.telegram_user)
         except Exception as e:
-            Logging.objects.create(log_level="DANGER", message=f'[WEB] [Ошибка при приёме вебхука {str(traceback.format_exc())}]', datetime=datetime.now(), user=self.request.user.profile.telegram_user)
-
+            Logging.objects.create(log_level="DANGER",
+                                   message=f'[WEB] [Ошибка при приёме вебхука {str(traceback.format_exc())}]',
+                                   datetime=datetime.now(), user=self.request.user.profile.telegram_user)

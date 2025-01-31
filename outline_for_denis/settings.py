@@ -6,7 +6,6 @@ load_dotenv()
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-
 SECRET_KEY = os.getenv('DJANGO_SECRET_KEY')
 
 DEBUG = False
@@ -16,10 +15,11 @@ CSRF_TRUSTED_ORIGINS = os.getenv('CSRF_TRUSTED_ORIGINS').split(',')
 
 COOKIE_CONSENT_ENABLED = True
 SESSION_COOKIE_SECURE = True
-# SESSION_COOKIE_SAMESITE = 'Strict'
+SESSION_COOKIE_SAMESITE = 'Strict'
 SECURE_CROSS_ORIGIN_OPENER_POLICY = "None"
 # SESSION_COOKIE_SAMESITE = 'None'
 # SECURE_CROSS_ORIGIN_OPENER_POLICY = "same-origin-allow-popups"
+
 
 SECURE_HSTS_SECONDS = 31536000  # 1 год
 SECURE_HSTS_INCLUDE_SUBDOMAINS = True
@@ -28,12 +28,12 @@ SECURE_SSL_REDIRECT = True
 
 # YOOKASSA_SHOP_ID=os.getenv('YOOKASSA_SHOP_ID_TEST')
 # YOOKASSA_SECRET=os.getenv('YOOKASSA_SECRET_TEST')
-YOOKASSA_SHOP_ID=os.getenv('YOOKASSA_SHOP_ID_LIVE')
-YOOKASSA_SECRET=os.getenv('YOOKASSA_SECRET_LIVE')
+YOOKASSA_SHOP_ID = os.getenv('YOOKASSA_SHOP_ID_LIVE')
+YOOKASSA_SECRET = os.getenv('YOOKASSA_SECRET_LIVE')
 
-YOOKASSA_PAYMENT_DESCRIPTION = 'Пополнение баланса пользователя' # Описание платежа
+YOOKASSA_PAYMENT_DESCRIPTION = 'Пополнение баланса пользователя'  # Описание платежа
 YOOKASSA_SUCCESS_URL = 'https://domvpn.ru/dashboard/profile/'  # URL успеха
-YOOKASSA_FAIL_URL = 'YOUR_FAIL_URL'   # URL неудачи
+YOOKASSA_FAIL_URL = 'YOUR_FAIL_URL'  # URL неудачи
 
 INSTALLED_APPS = [
     'django.contrib.admin',
