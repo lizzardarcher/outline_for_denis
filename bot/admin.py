@@ -190,7 +190,8 @@ class TransactionAdmin(admin.ModelAdmin):
             return True
 
     def has_change_permission(self, request, obj=None):
-        return False
+        return True
+
 
     # def get_actions(self, request):
     #     actions = super().get_actions(request)

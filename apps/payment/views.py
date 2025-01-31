@@ -165,20 +165,25 @@ class YookassaWebhookView(View):
         amount_value = float(payment_data.get('amount').get('value'))
         telegram_user_id = int(metadata.get('telegram_user_id'))
         telegram_user = TelegramUser.objects.get(id=telegram_user_id)
+        user_balance = float(telegram_user.balance) + float(amount_value)
+
         try:
-            telegram_user.balance = float(telegram_user.balance) + float(amount_value)
-            telegram_user.save()
 
             transaction = Transaction.objects.filter(payment_id=payment_id).first()
-            transaction.status = status
-            transaction.paid = True
-            transaction.save()
+            if transaction.status != 'succeeded' and int(amount_value) > 0:
+                transaction.status = status
+                transaction.paid = True
+                transaction.save()
 
-            income = IncomeInfo.objects.get(id=1)
-            income.total_amount = float(income.total_amount) + float(amount_value)
-            income.save()
-            Logging.objects.create(log_level="SUCCESS", message=f'[WEB] [Платёж  на сумму {str(amount_value)} р. прошёл]', datetime=datetime.now(), user=telegram_user)
-            return HttpResponse(f'Обновляем баланс пользователя', status=200)
+                telegram_user.balance = user_balance
+                telegram_user.save()
+
+                income = IncomeInfo.objects.get(id=1)
+                income.total_amount = float(income.total_amount) + float(amount_value)
+                income.save()
+
+                Logging.objects.create(log_level="SUCCESS", message=f'[WEB] [Платёж  на сумму {str(amount_value)} р. прошёл]', datetime=datetime.now(), user=telegram_user)
+                return HttpResponse(f'Обновляем баланс пользователя', status=200)
         except Exception as e:
             Logging.objects.create(log_level="DANGER", message=f'[WEB] [Ошибка при приёме вебхука {str(traceback.format_exc())}]',
                                    datetime=datetime.now(), user=telegram_user)
