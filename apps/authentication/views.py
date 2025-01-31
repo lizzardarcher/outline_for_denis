@@ -17,13 +17,14 @@ def telegram_login(request):
         return redirect(reverse('home'))
 
 
+
 def register_view(request):
     if request.method == 'POST':
         form = UserRegistrationForm(request.POST)
         if form.is_valid():
             user = form.save()
             messages.success(request, 'Регистрация прошла успешно!')
-            return redirect('login')  # перенаправить на страницу входа
+            return redirect('login')
         else:
             messages.error(request, 'Ошибка регистрации, проверьте данные.')
     else:

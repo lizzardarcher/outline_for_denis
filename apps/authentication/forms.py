@@ -1,9 +1,8 @@
-# users/forms.py
-
 from django import forms
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django_recaptcha.fields import ReCaptchaField
+
 
 User = get_user_model()
 
@@ -43,6 +42,7 @@ class UserRegistrationForm(forms.Form):
 
     def save(self):
         email = self.cleaned_data['email']
+        username = self.cleaned_data['email']
         password = self.cleaned_data['password']
-        user = User.objects.create_user(email=email, password=password)
+        user = User.objects.create_user(username=username, email=email, password=password)
         return user
