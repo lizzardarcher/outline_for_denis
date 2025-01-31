@@ -56,7 +56,7 @@ class CreateNewKeyView(LoginRequiredMixin, TemplateView):
         delete_user_keys(user=user)  # Удаляем текущие ключи
         new_key = create_new_key(server=server, user=user)  # Генерируем новый ключ
         messages.success(request, f'Новый ключ создан!\n{new_key}')
-        Logging.objects.create(log_level=" INFO", message=f'[Новый ключ создан]',
+        Logging.objects.create(log_level=" INFO", message=f'[WEB] [Новый ключ создан]',
                                datetime=datetime.now(), user=self.request.user.profile.telegram_user)
         return redirect('profile')
 
@@ -66,7 +66,7 @@ class UpdateSubscriptionView(LoginRequiredMixin, TemplateView):
         subscription = request.GET.get('subscription')
         telegram_user_id = request.GET.get('telegram_user_id')
         if not subscription:
-            Logging.objects.create(log_level="DANGER", message=f'Ошибка обновления подписки! SUB - [{subscription}] USER [{telegram_user_id}]', datetime=datetime.now(), user=self.request.user.profile.telegram_user)
+            Logging.objects.create(log_level="DANGER", message=f'[WEB] Ошибка обновления подписки! SUB - [{subscription}] USER [{telegram_user_id}]', datetime=datetime.now(), user=self.request.user.profile.telegram_user)
             return redirect('profile')
 
         prices = Prices.objects.get(pk=1)
@@ -92,8 +92,8 @@ class UpdateSubscriptionView(LoginRequiredMixin, TemplateView):
             user.subscription_expiration = user.subscription_expiration + timedelta(days=days)
             user.save()
             messages.success(request, f'Поздравляем с приобретением подписки! Подписка действительна до {user.subscription_expiration}')
-            Logging.objects.create(log_level=" INFO", message=f'Приобретена подписка! DAYS - [{str(days)}]', datetime=datetime.now(), user=self.request.user.profile.telegram_user)
+            Logging.objects.create(log_level=" INFO", message=f'[WEB] [Приобретена подписка] [дни - {str(days)}]', datetime=datetime.now(), user=self.request.user.profile.telegram_user)
         else:
-            Logging.objects.create(log_level="DANGER", message=f'Ошибка обновления подписки! DAYS - [{str(days)}] AMOUNT [{str(amount)}]', datetime=datetime.now(), user=self.request.user.profile.telegram_user)
+            Logging.objects.create(log_level="DANGER", message=f'[WEB] Ошибка обновления подписки DAYS - [{str(days)}] AMOUNT [{str(amount)}]', datetime=datetime.now(), user=self.request.user.profile.telegram_user)
 
         return redirect('profile')

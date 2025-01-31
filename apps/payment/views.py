@@ -2,9 +2,10 @@
 import traceback
 from datetime import datetime
 
+from django.urls import reverse
 from django.views.generic import TemplateView
 
-from django.shortcuts import redirect
+from django.shortcuts import redirect, render
 from django.conf import settings
 from django.views import View
 from django.views.decorators.csrf import csrf_exempt
@@ -19,45 +20,39 @@ from bot.models import TelegramUser, Transaction, IncomeInfo, Logging
 class CreatePaymentView(View):
     def post(self, request, *args, **kwargs):
 
-        # получаем сумму из POST, вы можете сделать по другому
         amount = request.POST.get('amount')
         try:
             amount = float(amount)
         except ValueError:
             return HttpResponse('Неправильная сумма', status=400)
 
-        # Получаем текущего пользователя
-        user = request.user
-        # Получаем профиль пользователя Django, связанный с пользователем Telegram.
-        try:
-            telegram_user = user.profile.telegram_user
-        except Exception as e:
-            return HttpResponse('Пользователь не найден', status=400)
-
         # Настройка ЮKassa
         Configuration.account_id = int(settings.YOOKASSA_SHOP_ID)
         Configuration.secret_key = settings.YOOKASSA_SECRET
 
-        # Создание платежа
         payment = Payment.create({
             "amount": {
                 "value": amount,
-                "currency": "RUB"  # Валюта платежа
+                "currency": "RUB"
             },
             "confirmation": {
                 "type": "redirect",
-                "return_url": f'https://domvpn.ru/payment/payment-success/?id=&date={datetime.now()}&amount={amount}',  # URL Успеха
-                "enforce": False  # Это нужно для избежания некоторых ошибок редиректа.
+                "return_url": f'https://domvpn.ru/payment/payment-success/?id=&date={datetime.now()}&amount={amount}',
+                "enforce": False
             },
             "capture": True,  # Автоматическое списание средств
             "description": settings.YOOKASSA_PAYMENT_DESCRIPTION,
-            # Тут можно указать id вашего пользователя
             "metadata": {
                 'user_id': request.user.id,
                 'telegram_user_id': request.user.profile.telegram_user.id,
             }
-        },
-        )
+        },)
+
+        # Сохраняем payment_id в сессию (потом понадобится)
+        request.session['yookassa_payment_id'] = payment.id
+        # Сохраняем сумму в сессию, чтобы потом понять, на какую сумму пользователь пополнил баланс
+        request.session['yookassa_payment_amount'] = float(amount)
+        # Перенаправляем пользователя на страницу ЮKassa
 
         Transaction.objects.create(status='pending', paid=False, amount=amount, user=request.user.profile.telegram_user,
                                    currency='RUB', income_info=IncomeInfo.objects.get(pk=1), side='Приход средств',
@@ -67,8 +62,39 @@ class CreatePaymentView(View):
         return redirect(payment.confirmation.confirmation_url)
 
 
-class PaymentSuccessView(TemplateView):
-    template_name = 'payments/payment_success.html'
+# class PaymentSuccessView(TemplateView):
+#     template_name = 'payments/payment_success.html'
+#
+#     def get_context_data(self, **kwargs):
+#         context = super().get_context_data(**kwargs)
+#         return context
+
+
+class PaymentSuccessView(View):
+    def get(self, request, *args, **kwargs):
+
+        # получаем id платежа из сессии
+        payment_id = request.session.get('yookassa_payment_id', None)
+        amount = request.session.get('yookassa_payment_amount', None)
+        if payment_id is None or amount is None:
+            return HttpResponse("Произошла ошибка при оплате. Попробуйте позже.", status=400)
+
+        # Настройка ЮKassa
+        Configuration.account_id = settings.YOOKASSA_SHOP_ID
+        Configuration.secret_key = settings.YOOKASSA_SECRET
+
+        # Получаем данные о платеже
+        try:
+            payment = Payment.find_one(payment_id)
+        except Exception as e:
+            return HttpResponse("Произошла ошибка при оплате. Попробуйте позже.", status=400)
+
+        if payment.status == 'succeeded':
+            del request.session['yookassa_payment_id']
+            del request.session['yookassa_payment_amount']
+            return render(request, 'payments/payment_success.html')  # Создайте payment_success.html
+        else:
+            return redirect(reverse('payment_failure'))
 
 
 class PaymentFailureView(TemplateView):
