@@ -142,7 +142,7 @@ async def delete_user_keys(user: TelegramUser) -> bool:
                 except:
                     ...
         VpnKey.objects.filter(user=user).delete()
-        Logging.objects.create(log_level='WARNING', message='[Недействительный Ключ Удалён]', datetime=datetime.now(),
+        Logging.objects.create(log_level='WARNING', message='[BOT] [Недействительный Ключ Удалён]', datetime=datetime.now(),
                                user=user)
         return True
     except Exception as e:

@@ -71,11 +71,11 @@ async def update_user_subscription_status():
                     await bot.send_message(chat_id=user.user_id, text=msg.subscription_expired)
                 except:
                     pass
-                lg.objects.create(log_level='WARNING', message='[Закончилась подписка у пользователя]', datetime=datetime.now(), user=user)
+                lg.objects.create(log_level='WARNING', message='[BOT] [Закончилась подписка у пользователя]', datetime=datetime.now(), user=user)
             except Exception as e:
                 logger.error(f'[Ошибка при автообновлении статуса подписки {user} :\n{traceback.format_exc()}]')
                 lg.objects.create(log_level='FATAL',
-                                  message=f'[Ошибка при автообновлении статуса подписки:\n{traceback.format_exc()}]',
+                                  message=f'[BOT] [Ошибка при автообновлении статуса подписки:\n{traceback.format_exc()}]',
                                   datetime=datetime.now())
 
         vpn_keys = VpnKey.objects.filter(user__subscription_status=False)
@@ -107,7 +107,7 @@ async def start(message):
                                         subscription_status=True,
                                         subscription_expiration=datetime.now() + timedelta(days=3))
             await bot.send_message(chat_id=message.chat.id, text=msg.new_user_bonus)
-            lg.objects.create(log_level='INFO', message='[Создан новый пользователь]', datetime=datetime.now(),
+            lg.objects.create(log_level='INFO', message='[BOT] [Создан новый пользователь]', datetime=datetime.now(),
                               user=TelegramUser.objects.get(user_id=message.from_user.id))
         except:
             ...
@@ -132,13 +132,13 @@ async def start(message):
                         new_referral = TelegramReferral.objects.create(referrer=current_referrer, referred=referred,
                                                                        level=current_level + 1)
                         logger.info(f'Создана новая реферальная связь {new_referral}')
-                        lg.objects.create(log_level='INFO', message=f'[Создана новая реферальная связь {new_referral}]',
+                        lg.objects.create(log_level='INFO', message=f'[BOT] [Создана новая реферальная связь {new_referral}]',
                                           datetime=datetime.now(),
                                           user=TelegramUser.objects.get(user_id=message.from_user.id))
 
                 except:
                     logger.error(f'{traceback.format_exc()}')
-                    lg.objects.create(log_level='FATAL', message=f'[ОШИБКА:\n{traceback.format_exc()}]',
+                    lg.objects.create(log_level='FATAL', message=f'[BOT] [ОШИБКА:\n{traceback.format_exc()}]',
                                       datetime=datetime.now(),
                                       user=TelegramUser.objects.get(user_id=message.from_user.id))
 
@@ -231,14 +231,14 @@ async def handle_referral(message):
                                            text=msg.start_payment_error.format(message.text),
                                            reply_markup=markup.back())
                 lg.objects.create(log_level='INFO',
-                                  message=f'[Пользователь хочет пополнить баланс на {str(amount)}P.]',
+                                  message=f'[BOT] [Пользователь хочет пополнить баланс на {str(amount)}P.]',
                                   datetime=datetime.now(), user=user)
             except:
                 await bot.send_message(chat_id=message.chat.id, text=msg.start_payment_error.format(message.text),
                                        reply_markup=markup.back())
                 logger.error(f'{traceback.format_exc()}')
                 lg.objects.create(log_level='FATAL',
-                                  message=f'[Ошибка при пополнении баланса:\n{traceback.format_exc()}]',
+                                  message=f'[BOT] [Ошибка при пополнении баланса:\n{traceback.format_exc()}]',
                                   datetime=datetime.now(), user=user)
 
 
@@ -259,7 +259,7 @@ async def got_payment(message):
     user = TelegramUser.objects.get(user_id=message.chat.id)
     amount = float(message.successful_payment.total_amount / 100)
 
-    lg.objects.create(log_level='SUCCESS', message=f'[Пользователь успешно пополнил баланс на {str(amount)}P.]',
+    lg.objects.create(log_level='SUCCESS', message=f'[BOT] [Пользователь успешно пополнил баланс на {str(amount)}P.]',
                       datetime=datetime.now(), user=user)
 
     currency = message.successful_payment.currency
@@ -309,10 +309,10 @@ async def callback_query_handlers(call):
         country_list = [x.name for x in Country.objects.all()]
         payment_token = TelegramBot.objects.get(pk=1).payment_system_api_key
         if data == 'confirm_subscription':
-            lg.objects.create(log_level='SUCCESS', message=f'[ДЕЙСТВИЕ: {call.data}]',
+            lg.objects.create(log_level='SUCCESS', message=f'[BOT] [ДЕЙСТВИЕ: {call.data}]',
                               datetime=datetime.now(), user=user)
         else:
-            lg.objects.create(log_level='INFO', message=f'[ДЕЙСТВИЕ: {call.data}]',
+            lg.objects.create(log_level='INFO', message=f'[BOT] [ДЕЙСТВИЕ: {call.data}]',
                               datetime=datetime.now(), user=user)
 
         async def send_dummy():

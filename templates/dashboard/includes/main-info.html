@@ -9,7 +9,8 @@
         <div class="card-body">
             <ul class="list-group list-group-flush">
                 <li class="list-group-item mb-4">
-                    <i class="fa fa-key text-success"></i> Текущий ключ
+                    <i class="fa fa-key text-success"></i> Текущий ключ<br>
+{#                    <small class="text-muted">Скопируйте и вставьте ключ в ваше приложение Outline</small>#}
                     {% if vpn_key.access_url %}
                         <small id="vpnkey"
                                class="d-none d-lg-block text-muted float-end bg-success-subtle rounded p-1"
@@ -78,7 +79,8 @@
                     </div>
                 </li>
                 <li class="list-group-item">
-                    Баланс
+                    Баланс<br>
+                    <small class="text-muted">Пополните баланс для активации подписки</small>
                     <form class="text-muted float-end" method="post" action="{% url 'create_payment' %}">
                         {% csrf_token %}
                         <label for="amount" >Введите сумму для пополнения:</label>
