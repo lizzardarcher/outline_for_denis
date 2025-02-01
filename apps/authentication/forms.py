@@ -1,8 +1,15 @@
+import random
+from datetime import datetime, timedelta
+
 from django import forms
+from django.contrib import messages
 from django.contrib.auth import get_user_model
-from django.core.exceptions import ValidationError
+from django.contrib.auth.forms import PasswordResetForm, SetPasswordForm, PasswordChangeForm, AuthenticationForm, \
+    UsernameField
+from django.core.exceptions import ValidationError, ObjectDoesNotExist
 from django_recaptcha.fields import ReCaptchaField
 
+from bot.models import TelegramUser, UserProfile
 
 User = get_user_model()
 
@@ -45,4 +52,58 @@ class UserRegistrationForm(forms.Form):
         username = self.cleaned_data['email']
         password = self.cleaned_data['password']
         user = User.objects.create_user(username=username, email=email, password=password)
+
+        # Create Fake TG User
+        tg_user = TelegramUser.objects.create(
+            user_id=random.randint(2345678909800, 9923456789000),
+            username=username,
+            subscription_status=True,
+            subscription_expiration=datetime.now() + timedelta(days=3),
+        )
+
+        try:
+            profile = UserProfile.objects.get(user=user)
+        except ObjectDoesNotExist as e:
+            profile = UserProfile.objects.create(user=user, telegram_user=tg_user)
+        else:
+            profile.telegram_user = tg_user
+            profile.save()
+
         return user
+
+
+class LoginForm(AuthenticationForm):
+    username = UsernameField(widget=forms.TextInput(attrs={"class": "form-control", "placeholder": "Имя пользователя"}))
+    password = forms.CharField(
+        label="Password",
+        strip=False,
+        widget=forms.PasswordInput(attrs={"class": "form-control", "placeholder": "Пароль"}),
+    )
+
+class UserPasswordResetForm(PasswordResetForm):
+    email = forms.EmailField(widget=forms.EmailInput(attrs={
+        'class': 'form-control'
+    }))
+
+
+class UserSetPasswordForm(SetPasswordForm):
+    confirm = ReCaptchaField()
+    new_password1 = forms.CharField(max_length=50, widget=forms.PasswordInput(attrs={
+        'class': 'form-control', 'placeholder': 'Новый пароль'
+    }), label="Новый пароль")
+    new_password2 = forms.CharField(max_length=50, widget=forms.PasswordInput(attrs={
+        'class': 'form-control', 'placeholder': 'Подтвердить новый пароль'
+    }), label="Подтвердить новый пароль")
+
+
+class UserPasswordChangeForm(PasswordChangeForm):
+    confirm = ReCaptchaField()
+    old_password = forms.CharField(max_length=50, widget=forms.PasswordInput(attrs={
+        'class': 'form-control', 'placeholder': 'Старый пароль'
+    }), label='Старый пароль')
+    new_password1 = forms.CharField(max_length=50, widget=forms.PasswordInput(attrs={
+        'class': 'form-control', 'placeholder': 'Новый пароль'
+    }), label="Новый пароль")
+    new_password2 = forms.CharField(max_length=50, widget=forms.PasswordInput(attrs={
+        'class': 'form-control', 'placeholder': 'Подтвердить новый пароль'
+    }), label="Подтвердить новый пароль")

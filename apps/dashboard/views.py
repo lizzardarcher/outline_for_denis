@@ -11,7 +11,7 @@ from bot.models import VpnKey, Server, TelegramUser, Country, Prices, UserProfil
     Transaction, Logging
 
 
-class ProfileView(SuccessMessageMixin, TemplateView):
+class ProfileView(LoginRequiredMixin, SuccessMessageMixin, TemplateView):
     template_name = 'dashboard/index.html'
 
     def get_context_data(self, **kwargs):
@@ -88,6 +88,8 @@ class UpdateSubscriptionView(LoginRequiredMixin, TemplateView):
         if days and amount:
             user = get_object_or_404(TelegramUser, user_id=self.request.user.profile.telegram_user.user_id)
             user.balance = float(user.balance) - float(amount)
+            if user.subscription_expiration < datetime.now():
+                user.subscription_expiration = datetime.now()
             user.subscription_status = True
             user.subscription_expiration = user.subscription_expiration + timedelta(days=days)
             user.save()

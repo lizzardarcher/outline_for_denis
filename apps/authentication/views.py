@@ -1,9 +1,11 @@
-from django.contrib.auth import authenticate, login
+from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth.views import PasswordResetView, PasswordResetConfirmView, PasswordChangeView, LoginView
 from django.urls import reverse
 from django.shortcuts import render, redirect
 from django.contrib import messages
 
-from .forms import UserRegistrationForm
+from .forms import UserRegistrationForm, UserPasswordResetForm, UserSetPasswordForm, UserPasswordChangeForm, LoginForm
+
 
 def telegram_login(request):
     data = request.GET.dict()
@@ -30,3 +32,33 @@ def register_view(request):
     else:
         form = UserRegistrationForm()
     return render(request, 'account/register.html', {'form': form})
+
+def logout_view(request):
+    logout(request)
+    return redirect('/')
+
+
+class UserLoginView(LoginView):
+    template_name = 'account/login.html'
+    form_class = LoginForm
+    success_url = '/'
+
+    def get_success_url(self):
+        return reverse('profile')
+
+
+
+
+class UserPasswordResetView(PasswordResetView):
+    template_name = 'account/password_reset.html'
+    form_class = UserPasswordResetForm
+
+
+class UserPasswordResetConfirmView(PasswordResetConfirmView):
+    template_name = 'account/password_reset_confirm.html'
+    form_class = UserSetPasswordForm
+
+
+class UserPasswordChangeView(PasswordChangeView):
+    template_name = 'account/password_change.html'
+    form_class = UserPasswordChangeForm
