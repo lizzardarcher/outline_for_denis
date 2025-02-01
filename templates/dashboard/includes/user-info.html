@@ -1,5 +1,4 @@
 <!-- Информация о пользователе -->
-<aside class="col-md-2">
     <h4>Пользователь</h4>
     <img src="{% if request.user.profile.telegram_user.photo_url %}{{ request.user.profile.telegram_user.photo_url }}
               {% else %}https://bootdey.com/img/Content/avatar/avatar7.png
@@ -43,4 +42,3 @@
                 class="badge bg-secondary">{% if request.user.profile.telegram_user.income %}
             {{ request.user.profile.telegram_user.income }}{% else %}0.00{% endif %} ₽</span></p>
     </div>
-</aside>

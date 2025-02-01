@@ -1,38 +1,73 @@
-<div class="col-md-4 ">
-    <h3 class="mb-3"><i class="fa fa-share-square"></i> Реферальная программа</h3>
-    <h5>Твоя реферальная ссылка:</h5>
-    <div class="d-flex align-items-center mb-3">
-        <div class="link-primary bg-success-subtle rounded p-1" id="referralLink"
-             onclick="copyToClipboardRef('https://t.me/xDomvpn_Bot?start={{ request.user.id }}')"
-                style="cursor: pointer">
-            https://t.me/xDomvpn_Bot?start={{ request.user.id }}</div>
+<div class="card shadow mb-4">
+    <div class="card-header">
+        <h3 class="card-title mb-0"><i class="fa fa-share-square me-2"></i> Реферальная программа</h3>
     </div>
-    <h5 class="mb-3"><i class="fa fa-share"></i> Рекомендуйте наш DomVPN сервис своим друзьям, чтобы заработать, а нам
-        развивать проект.</h5>
-    <h5 class="mb-3"><i class="fa fa-money"></i> Вы получите от 1 до 15% с каждой покупки по нашей реферальной программе
-        в зависимости от уровня реферала</h5>
-    <div class="referral-program">
-        <ul>
-            <li>🏅 Реферальная программа</li>
-            <li>├ Рефералы 1 ур: {{ inv_1_lvl }} ({{ referral.level_1_percentage }}%)</li>
-            <li>├ Рефералы 2 ур: {{ inv_2_lvl }} ({{ referral.level_2_percentage }}%)</li>
-            <li>├ Рефералы 3 ур: {{ inv_3_lvl }} ({{ referral.level_3_percentage }}%)</li>
-            <li>├ Рефералы 4 ур: {{ inv_4_lvl }} ({{ referral.level_4_percentage }}%)</li>
-            <li>├ Рефералы 5 ур: {{ inv_5_lvl }} ({{ referral.level_5_percentage }}%)</li>
-            <li>└ Заработано: {% if request.user.profile.telegram_user.income %}{{ request.user.profile.telegram_user.income }}{% else %}0.00{% endif %} ₽</li>
-        </ul>
-    </div>
-    <p>Вы можете вывести денежные средства по запросу в нашем ТГ боте</p>
+    <div class="card-body">
+      <h5 class="card-text"><i class="fa fa-link me-2"></i>Твоя реферальная ссылка:</h5>
+        <div class="input-group mb-3">
+            <input type="text" class="form-control link-primary bg-success-subtle rounded" id="referralLink"
+                   value="https://t.me/xDomvpn_Bot?start={{ request.user.id }}" readonly style="cursor: pointer" aria-describedby="copyBtn">
+            <button class="btn btn-outline-secondary" type="button" id="copyBtn"
+                     onclick="copyToClipboardRef('https://t.me/xDomvpn_Bot?start={{ request.user.id }}')">
+                <i class="fa fa-copy"></i> Скопировать</button>
+        </div>
+        <p class="card-text mb-3">
+            <i class="fa fa-share me-2"></i> Рекомендуйте наш DomVPN сервис своим друзьям, чтобы заработать, а нам развивать проект.
+        </p>
+         <p class="card-text mb-3">
+           <i class="fa fa-money me-2"></i> Вы получите от 1 до 15% с каждой покупки по нашей реферальной программе в зависимости от уровня реферала.
+         </p>
+        <div class="card border-secondary mb-3">
+            <div class="card-body">
+                <ul class="list-unstyled">
+                    <li class="mb-1">
+                      <i class="fa fa-trophy me-2"></i> Реферальная программа
+                    </li>
+                    <li class="mb-1 ms-3">
+                      <i class="fa fa-level-down me-2"></i>Рефералы 1 ур: <span class="badge bg-primary">{{ inv_1_lvl }}</span> (<span class="badge bg-secondary">{{ referral.level_1_percentage }}%</span>)
+                    </li>
+                   <li class="mb-1 ms-3">
+                       <i class="fa fa-level-down me-2"></i>Рефералы 2 ур: <span class="badge bg-primary">{{ inv_2_lvl }}</span> (<span class="badge bg-secondary">{{ referral.level_2_percentage }}%</span>)
+                   </li>
+                    <li class="mb-1 ms-3">
+                        <i class="fa fa-level-down me-2"></i>Рефералы 3 ур: <span class="badge bg-primary">{{ inv_3_lvl }}</span> (<span class="badge bg-secondary">{{ referral.level_3_percentage }}%</span>)
+                    </li>
+                    <li class="mb-1 ms-3">
+                        <i class="fa fa-level-down me-2"></i>Рефералы 4 ур: <span class="badge bg-primary">{{ inv_4_lvl }}</span> (<span class="badge bg-secondary">{{ referral.level_4_percentage }}%</span>)
+                    </li>
+                    <li class="mb-1 ms-3">
+                      <i class="fa fa-level-down me-2"></i>Рефералы 5 ур: <span class="badge bg-primary">{{ inv_5_lvl }}</span> (<span class="badge bg-secondary">{{ referral.level_5_percentage }}%</span>)
+                    </li>
+                    <li class="mb-1 ms-3">
+                      <i class="fa fa-wallet me-2"></i> Заработано:
+                      <span class="fw-bold">
+                        {% if request.user.profile.telegram_user.income %}
+                          {{ request.user.profile.telegram_user.income }}
+                         {% else %}
+                            0.00
+                         {% endif %}
+                       </span> ₽
+                    </li>
+                 </ul>
+            </div>
+        </div>
+        <p class="card-text">Вы можете вывести денежные средства по запросу в нашем ТГ боте</p>
+   </div>
 </div>
 
 <script>
     function copyToClipboardRef(text) {
         navigator.clipboard.writeText(text)
             .then(() => {
-                //  alert("Текст скопирован в буфер обмена!");
-                document.getElementById('referralLink').innerHTML = "Скопировано!";
+                const referralLinkInput = document.getElementById('referralLink');
+                const copyBtn = document.getElementById('copyBtn');
+                referralLinkInput.classList.remove('bg-success-subtle', 'link-primary');
+                referralLinkInput.value = "Скопировано!";
+                copyBtn.innerHTML = '<i class="fa fa-check"></i> Скопировано!';
                 setTimeout(() => {
-                    document.getElementById('referralLink').innerHTML = 'https://t.me/xDomvpn_Bot?start={{ request.user.id }}';
+                    referralLinkInput.value = text;
+                    referralLinkInput.classList.add('bg-success-subtle','link-primary');
+                    copyBtn.innerHTML = '<i class="fa fa-copy"></i> Скопировать';
                 }, 2000);
             })
             .catch(err => {

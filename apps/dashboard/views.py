@@ -54,8 +54,8 @@ class CreateNewKeyView(LoginRequiredMixin, TemplateView):
         user = user_profile.telegram_user
 
         delete_user_keys(user=user)  # Удаляем текущие ключи
-        new_key = create_new_key(server=server, user=user)  # Генерируем новый ключ
-        messages.success(request, f'Новый ключ создан!\n{new_key}')
+        create_new_key(server=server, user=user)  # Генерируем новый ключ
+        messages.success(request, f'Новый ключ создан!')
         Logging.objects.create(log_level=" INFO", message=f'[WEB] [Новый ключ создан]',
                                datetime=datetime.now(), user=self.request.user.profile.telegram_user)
         return redirect('profile')

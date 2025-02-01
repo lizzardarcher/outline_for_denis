@@ -12,23 +12,36 @@
         <div id="responsiveMargin" class="m-1">
             <!-- Первый ряд -->
             {% include 'includes/messages_success.html' %}
-            <div class="m-2 p-2 row bg-light rounded">
-                {% include 'dashboard/includes/sidepanel.html' %}
-                {% include 'dashboard/includes/main-info.html' %}
-                {% include 'dashboard/includes/user-info.html' %}
+            <div class="row">
+                <div class="d-none d-lg-block col-sm-12 col-md-2 bg-light rounded p-4 mt-2">
+                    {% include 'dashboard/includes/sidepanel.html' %}
+                </div>
+                <div class="col-sm-12 col-md-7 bg-light rounded p-4 mt-2">
+                    {% include 'dashboard/includes/main-info.html' %}
+                </div>
+                <div class="col-sm-12 col-md-3 bg-light rounded p-4 mt-2">
+                    {% include 'dashboard/includes/user-info.html' %}
+                </div>
             </div>
 
             <!-- Второй ряд -->
-            <div class="m-2 p-2 row bg-light rounded">
-                {% include 'dashboard/includes/servers.html' %}
-                {% include 'dashboard/includes/referral.html' %}
-                {% include 'dashboard/includes/bot-info.html' %}
+            <div class="row">
+                <div class="col-sm-12 col-md-2 p-2 bg-light rounded p-4 mt-2">
+                    {% include 'dashboard/includes/servers.html' %}
+                </div>
+                <div class="col-sm-12 col-md-7 p-2 bg-light rounded p-4 mt-2">
+                    {% include 'dashboard/includes/referral.html' %}
+                </div>
+                <div class="col-sm-12 col-md-3 p-2 bg-light rounded p-4 mt-2">
+                    {% include 'dashboard/includes/bot-info.html' %}
+                </div>
             </div>
 
             <!-- Второй ряд -->
-            <div class="m-2 p-2 row bg-light rounded">
-                {% include 'dashboard/includes/transactions.html' %}
-                {#                {% include 'dashboard/includes/instructions.html' %}#}
+            <div class="m-2 p-2 row bg-light rounded p-4 mt-2">
+                <div class="col-sm-12 col-md-3 p-2 bg-light rounded p-4 mt-2">
+                    {% include 'dashboard/includes/transactions.html' %}
+                </div>
             </div>
 
         </div>

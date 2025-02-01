@@ -1,4 +1,4 @@
-<div class="col-md-3 stat-block">
+<div class="card shadow mb-3 p-2">
     <h3><i class="fa fa-credit-card"></i> Платежи</h3>
     <ul class="list-unstyled">
     {% for transaction in transactions %}
@@ -11,8 +11,8 @@
             {% with status=transaction.status %}
                 <span class="badge
                     {% if status == 'succeeded' %} bg-success
-                    {% elif status == 'pending' %} bg-secondary
-                    {% elif status == 'canceled' %} bg-warning
+                    {% elif status == 'pending' %} bg-warning
+                    {% elif status == 'canceled' %} bg-secondary
                     {% else %} bg-secondary
                     {% endif %}
                     ">{{ status }}
