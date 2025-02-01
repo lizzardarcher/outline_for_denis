@@ -63,40 +63,41 @@ class CreatePaymentView(View):
         return redirect(payment.confirmation.confirmation_url)
 
 
-# class PaymentSuccessView(TemplateView):
-#     template_name = 'payments/payment_success.html'
+class PaymentSuccessView(TemplateView):
+    template_name = 'payments/payment_success.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        return context
+
+
+# class PaymentSuccessView(View):
+#     def get(self, request, *args, **kwargs):
 #
-#     def get_context_data(self, **kwargs):
-#         context = super().get_context_data(**kwargs)
-#         return context
-
-
-class PaymentSuccessView(View):
-    def get(self, request, *args, **kwargs):
-
-        # получаем id платежа из сессии
-        payment_id = request.session.get('yookassa_payment_id', None)
-        amount = request.session.get('yookassa_payment_amount', None)
-        if payment_id is None or amount is None:
-            messages.error(request, 'Платёж отменен.')
-            return redirect(reverse('payment_failure'))
-
-        # Настройка ЮKassa
-        Configuration.account_id = settings.YOOKASSA_SHOP_ID
-        Configuration.secret_key = settings.YOOKASSA_SECRET
-
-        # Получаем данные о платеже
-        try:
-            payment = Payment.find_one(payment_id)
-        except Exception as e:
-            return HttpResponse("Произошла ошибка при оплате. Попробуйте позже.", status=400)
-
-        if payment.status == 'succeeded':
-            del request.session['yookassa_payment_id']
-            del request.session['yookassa_payment_amount']
-            return render(request, 'payments/payment_success.html')  # Создайте payment_success.html
-        else:
-            return redirect(reverse('payment_failure'))
+#         # получаем id платежа из сессии
+#         payment = Transaction.objects.filter(user=request.user.profile.telegram_user).last()
+#         payment_id = payment.payment_id
+#         amount = payment.amount
+#         if payment_id is None or amount is None:
+#             messages.error(request, 'Платёж отменен.')
+#             return redirect(reverse('payment_failure'))
+#
+#         # Настройка ЮKassa
+#         Configuration.account_id = settings.YOOKASSA_SHOP_ID
+#         Configuration.secret_key = settings.YOOKASSA_SECRET
+#
+#         # Получаем данные о платеже
+#         try:
+#             payment = Payment.find_one(payment_id)
+#         except Exception as e:
+#             return HttpResponse("Произошла ошибка при оплате. Попробуйте позже.", status=400)
+#
+#         if payment.status == 'succeeded':
+#             del request.session['yookassa_payment_id']
+#             del request.session['yookassa_payment_amount']
+#             return render(request, 'payments/payment_success.html')  # Создайте payment_success.html
+#         else:
+#             return redirect(reverse('payment_failure'))
 
 
 class PaymentFailureView(TemplateView):

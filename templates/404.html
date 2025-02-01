@@ -6,21 +6,19 @@
 {% block stylesheets %}{% endblock stylesheets %}
 
 {% block content %}
-
-    <div class="row">
-        <div class="col-md-12">
+    
+    <div class="container mt-5">
             <div class="card card-profile">
                 <div class="card-body">
-                    <h6 class="card-category text-gray">Error 404</h6>
+                    <h2 class="card-category text-gray">Error <strong>404</strong></h2>
                     <h4 class="card-title">
-                        Page not found
+                        Такой страницы не существует
                     </h4>
-                    <a href="/" class="btn btn-primary btn-round">Home</a>
+                    <a href="/" class="btn btn-primary btn-round">Главная</a>
                 </div>
-            </div>
         </div>
     </div>
-
+    {% include 'home/sections/footer.html' %}
 
 {% endblock content %}
 
