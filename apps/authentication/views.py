@@ -47,11 +47,9 @@ class UserLoginView(LoginView):
         return reverse('profile')
 
 
-
-
-class UserPasswordResetView(PasswordResetView):
-    template_name = 'account/password_reset.html'
-    form_class = UserPasswordResetForm
+# class UserPasswordResetView(PasswordResetView):
+#     template_name = 'account/password_reset.html'
+#     form_class = UserPasswordResetForm
 
 
 class UserPasswordResetConfirmView(PasswordResetConfirmView):

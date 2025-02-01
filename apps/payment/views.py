@@ -2,6 +2,7 @@
 import traceback
 from datetime import datetime
 
+from django.contrib import messages
 from django.urls import reverse
 from django.views.generic import TemplateView
 
@@ -23,7 +24,8 @@ class CreatePaymentView(View):
         try:
             amount = float(amount)
         except ValueError:
-            return HttpResponse('Неправильная сумма', status=400)
+            messages.error(request, 'Укажите сумму в поле для пополнения баланса.')
+            return redirect(reverse('profile'))
 
         # Настройка ЮKassa
         Configuration.account_id = int(settings.YOOKASSA_SHOP_ID)
@@ -76,7 +78,8 @@ class PaymentSuccessView(View):
         payment_id = request.session.get('yookassa_payment_id', None)
         amount = request.session.get('yookassa_payment_amount', None)
         if payment_id is None or amount is None:
-            return HttpResponse("Произошла ошибка при оплате. Попробуйте позже.", status=400)
+            messages.error(request, 'Платёж отменен.')
+            return redirect(reverse('payment_failure'))
 
         # Настройка ЮKassa
         Configuration.account_id = settings.YOOKASSA_SHOP_ID

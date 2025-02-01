@@ -8,7 +8,6 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = os.getenv('DJANGO_SECRET_KEY')
 
-
 DEBUG = True
 
 ALLOWED_HOSTS = os.getenv('DJANGO_ALLOWED_HOSTS').split(',')
@@ -30,8 +29,8 @@ EMAIL_USE_TLS = True
 SERVER_EMAIL = EMAIL_HOST_USER
 DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 
-RECAPTCHA_PUBLIC_KEY = '6LckLMkqAAAAACzb0PZbvwxx1Js5OjwlgkG62TyG'
-RECAPTCHA_PRIVATE_KEY = '6LckLMkqAAAAAIQzkTXJaGdCHwmQ051AoHe54jme'
+RECAPTCHA_PUBLIC_KEY = os.getenv('RECAPTCHA_PUBLIC_KEY')
+RECAPTCHA_PRIVATE_KEY = os.getenv('RECAPTCHA_PRIVATE_KEY')
 RECAPTCHA_DEFAULT_LANGUAGE = 'ru'
 
 SECURE_HSTS_SECONDS = 31536000  # 1 год
@@ -44,9 +43,9 @@ SECURE_SSL_REDIRECT = True
 YOOKASSA_SHOP_ID = os.getenv('YOOKASSA_SHOP_ID_LIVE')
 YOOKASSA_SECRET = os.getenv('YOOKASSA_SECRET_LIVE')
 
-YOOKASSA_PAYMENT_DESCRIPTION = 'Пополнение баланса пользователя'  # Описание платежа
-YOOKASSA_SUCCESS_URL = 'https://domvpn.ru/dashboard/profile/'  # URL успеха
-YOOKASSA_FAIL_URL = 'YOUR_FAIL_URL'  # URL неудачи
+YOOKASSA_PAYMENT_DESCRIPTION = 'Пополнение баланса пользователя'
+YOOKASSA_SUCCESS_URL = 'https://domvpn.ru/dashboard/profile/'
+YOOKASSA_FAIL_URL = 'YOUR_FAIL_URL'
 
 INSTALLED_APPS = [
     'django.contrib.admin',

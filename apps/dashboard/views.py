@@ -1,4 +1,4 @@
-from datetime import timedelta, datetime
+from datetime import timedelta, datetime, date
 
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
@@ -87,14 +87,18 @@ class UpdateSubscriptionView(LoginRequiredMixin, TemplateView):
 
         if days and amount:
             user = get_object_or_404(TelegramUser, user_id=self.request.user.profile.telegram_user.user_id)
-            user.balance = float(user.balance) - float(amount)
-            if user.subscription_expiration < datetime.now():
-                user.subscription_expiration = datetime.now()
-            user.subscription_status = True
-            user.subscription_expiration = user.subscription_expiration + timedelta(days=days)
-            user.save()
-            messages.success(request, f'Поздравляем с приобретением подписки! Подписка действительна до {user.subscription_expiration}')
-            Logging.objects.create(log_level=" INFO", message=f'[WEB] [Приобретена подписка] [дни - {str(days)}]', datetime=datetime.now(), user=self.request.user.profile.telegram_user)
+            if float(user.balance) > float(amount):
+                user.balance = float(user.balance) - float(amount)
+                if user.subscription_expiration < date.today():
+                    user.subscription_expiration = date.today()
+                user.subscription_status = True
+                user.subscription_expiration = user.subscription_expiration + timedelta(days=days)
+                user.save()
+                messages.success(request, f'Поздравляем с приобретением подписки! Подписка действительна до {user.subscription_expiration}')
+                Logging.objects.create(log_level=" INFO", message=f'[WEB] [Приобретена подписка] [дни - {str(days)}]', datetime=datetime.now(), user=self.request.user.profile.telegram_user)
+            else:
+                messages.error(request,f'У вас недостаточно средств на балансе для выбранной подписки 😐')
+
         else:
             Logging.objects.create(log_level="DANGER", message=f'[WEB] Ошибка обновления подписки DAYS - [{str(days)}] AMOUNT [{str(amount)}]', datetime=datetime.now(), user=self.request.user.profile.telegram_user)
 
