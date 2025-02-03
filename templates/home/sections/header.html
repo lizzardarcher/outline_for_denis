@@ -1,16 +1,8 @@
-<header class="header_section">
+<header class="header_section fixed-top" style="background-color: #0f054c">
     <div class="container-fluid">
         <nav class="navbar navbar-expand-lg custom_nav-container ">
             <a class="navbar-brand" href="{% url 'home' %}">
                 <span>DomVPN</span>
-            </a>
-
-            <a class="text-light navbar-brand" href="https://t.me/domvpn_news" target="_blank">
-                Новости
-            </a>
-
-            <a class="text-light navbar-brand" href="https://t.me/xDomvpn_Bot" target="_blank">
-                Телеграм бот
             </a>
             <button class="navbar-toggler" type="button" data-toggle="collapse"
                     data-target="#navbarSupportedContent" aria-controls="navbarSupportedContent"
@@ -20,8 +12,19 @@
 
             <div class="collapse navbar-collapse" id="navbarSupportedContent">
                 <ul class="navbar-nav  ">
-                    <li class="nav-item {% if 'home' in request.path %}active{% endif %}">
-                        <a class="nav-link" href="{% url 'home' %}">Главная </a>
+                    {% if request.path != '/' %}
+                        <li class="nav-item {% if 'home' in request.path %}active{% endif %}">
+                            <a class="nav-link" href="{% url 'home' %}">Главная</a>
+                        </li>
+                    {% endif %}
+
+                    <li class="nav-item">
+                        <a class="nav-link" href="https://t.me/domvpn_news" target="_blank"> Новости </a>
+                    </li>
+
+                    <li class="nav-item">
+                        <a class="nav-link" href="https://t.me/xDomvpn_Bot" target="_blank"> Телеграм
+                            бот </a>
                     </li>
                     <li class="nav-item {% if 'outline_links' in request.path %}active{% endif %}">
                         <a class="nav-link" href="{% url 'outline_links' %}"> Ссылки на Outline </a>
@@ -33,7 +36,7 @@
                         <a class="nav-link" href="{% url 'contacts' %}"> Контакты </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="#price"> Цены </a>
+                        <a class="nav-link" href="/#price"> Цены </a>
                     </li>
                     {% if request.user.is_authenticated %}
                         <li class="nav-item {% if 'profile' in request.path %}active{% endif %}">

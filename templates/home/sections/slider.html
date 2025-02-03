@@ -1,4 +1,10 @@
 {% load static %}
+<style>
+    .login-button-wide {
+        width: 10rem; /* Ширина в rem, чтобы она изменялась в зависимости от базового размера шрифта */
+        max-width: 200px; /* Максимальная ширина, чтобы не растягивалась на больших экранах */
+    }
+</style>
 <div id="telegram-login-link" class="slider_section ">
     <div id="customCarousel1" class="carousel slide" data-ride="carousel">
         <div class="carousel-inner">
@@ -16,8 +22,10 @@
                                 <h5 class="text-light">
                                     Защитите свои данные и сохраняйте анонимность в сети с помощью Dom VPN.
                                 </h5>
-                                {% include 'home/components/telegram_login.html' %}
-                                <a href="{% url 'login' %}" class="btn btn-info rounded-3 text-light mt-2 p-2"><i class="fa fa-envelope m-1"></i> Войти по Email</a>
+{#                                <a href="{% url 'login' %}" class="btn btn-info rounded-3 text-light mt-2 p-2"><i class="fa fa-envelope m-1"></i> Войти по Email</a>#}
+                                <a href="{% url 'login' %}" class="btn btn-info rounded-3 text-light mt-4 p-2 login-button-wide">
+                                    <i class="fa fa-sign-in"></i> Войти
+                                </a>
                             </div>
                         </div>
 

@@ -404,3 +404,7 @@ class PricesAdmin(admin.ModelAdmin):
 @admin.register(UserProfile)
 class UserProfileAdmin(admin.ModelAdmin):
     ...
+
+@admin.register(TelegramMessage)
+class TelegramMessageAdmin(admin.ModelAdmin):
+    readonly_fields = ('status',)

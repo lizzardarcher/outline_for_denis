@@ -2,6 +2,7 @@ from datetime import datetime
 
 from django.contrib.auth.models import User
 from django.db import models
+from django.utils import timezone
 from django.utils.safestring import mark_safe
 
 
@@ -351,3 +352,36 @@ class Prices(models.Model):
     class Meta:
         verbose_name = 'Цена'
         verbose_name_plural = 'Цены'
+
+
+class TelegramMessage(models.Model):
+    """
+    Модель сообщения для рассылки в Telegram.
+    """
+    STATUS_CHOICES = (
+        ('sent', 'Отправлено'),
+        ('not_sent', 'Не отправлено'),
+    )
+
+    text = models.TextField(verbose_name='Текст сообщения')
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='Дата создания')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='not_sent', verbose_name='Статус рассылки')
+    send_to_subscribed = models.BooleanField(default=False, verbose_name='Отправить подписанным')
+    send_to_notsubscribed = models.BooleanField(default=False, verbose_name='Отправить не подписанным')
+    counter = models.PositiveIntegerField(default=0, verbose_name='Отправлено пользователям')
+    def __str__(self):
+        return f"Сообщение от {self.created_at.strftime('%Y-%m-%d %H:%M:%S')} [{self.status}] [Отправлено: {str(self.counter)} пользователям]"
+
+    def save(self, *args, **kwargs):
+        """
+        При сохранении нового сообщения ставим время отправки как сейчас.
+        Если сообщение создается через админку, то время будет переписано, если админ захочет отложить рассылку
+        """
+        if not self.pk:
+            self.send_at = timezone.now()
+        super().save(*args, **kwargs)
+
+    class Meta:
+        verbose_name = 'Сообщение Telegram'
+        verbose_name_plural = 'Сообщения Telegram'
+        ordering = ['-created_at']

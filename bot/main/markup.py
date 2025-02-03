@@ -129,7 +129,8 @@ def my_profile():
 
 def paymemt_menu():
     markup = InlineKeyboardMarkup()
-    markup.add(InlineKeyboardButton(text=f'Юкасса', callback_data=f'account:payment:ukassa'))
+    markup.add(InlineKeyboardButton(text=f'Юкасса (Банковская карта)', callback_data=f'account:payment:ukassa'))
+    markup.add(InlineKeyboardButton(text=f'Оплатить через сайт (Банковская карта, SberPay, ЮMoney)', url=f'https://domvpn.ru/auth/accounts/login/'))
     # markup.add(InlineKeyboardButton(text=f'USDT', callback_data=f'account:payment:usdt'))
     markup.add(btn_back)
     return markup

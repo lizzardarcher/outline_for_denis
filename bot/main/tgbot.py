@@ -16,7 +16,7 @@ from telebot.asyncio_storage import StateMemoryStorage
 from telebot.asyncio_handler_backends import State, StatesGroup
 from telebot.types import LabeledPrice, InlineKeyboardButton, InlineKeyboardMarkup
 
-from bot.models import TelegramBot, Prices
+from bot.models import TelegramBot, Prices, TelegramMessage
 from bot.models import TelegramUser
 from bot.models import TelegramReferral
 from bot.models import VpnKey
@@ -59,19 +59,50 @@ def update_sub_status(user: TelegramUser):
         TelegramUser.objects.filter(user_id=user.user_id).update(subscription_status=True)
 
 
+async def send_pending_messages():
+    while True:
+
+        messages = TelegramMessage.objects.filter(status='not_sent')
+        counter = 0
+        for message in messages:
+
+            users = []
+
+            if message.send_to_subscribed:
+                users += TelegramUser.objects.filter(subscription_status=True)
+            elif message.send_to_notsubscribed:
+                users += TelegramUser.objects.filter(subscription_status=False)
+            else:
+                users += TelegramUser.objects.all()
+
+            for user in users:
+                try:
+                    await bot.send_message(chat_id=user.user_id, text=message.text)
+                    counter += 1
+                    await asyncio.sleep(0.2)
+                except Exception as e:
+                    ...
+
+            message.status = 'sent'
+            message.counter = counter
+            message.save()
+
+        await asyncio.sleep(15)
+
 async def update_user_subscription_status():
     while True:
         users = TelegramUser.objects.filter(subscription_expiration__lt=timezone.now(), subscription_status=True)
         logger.info(f'[Всего просроченных пользователей] [{users.count()}] [Текущее время: {timezone.now()}]')
         for user in users:
             try:
-                user.subscription_status=False
+                user.subscription_status = False
                 user.save()
                 try:
                     await bot.send_message(chat_id=user.user_id, text=msg.subscription_expired)
                 except:
                     pass
-                lg.objects.create(log_level='WARNING', message='[BOT] [Закончилась подписка у пользователя]', datetime=datetime.now(), user=user)
+                lg.objects.create(log_level='WARNING', message='[BOT] [Закончилась подписка у пользователя]',
+                                  datetime=datetime.now(), user=user)
             except Exception as e:
                 logger.error(f'[Ошибка при автообновлении статуса подписки {user} :\n{traceback.format_exc()}]')
                 lg.objects.create(log_level='FATAL',
@@ -85,7 +116,7 @@ async def update_user_subscription_status():
             except:
                 pass
 
-        await asyncio.sleep(60*60*12)
+        await asyncio.sleep(60 * 60 * 12)
 
 
 @bot.message_handler(commands=['start'])
@@ -132,7 +163,8 @@ async def start(message):
                         new_referral = TelegramReferral.objects.create(referrer=current_referrer, referred=referred,
                                                                        level=current_level + 1)
                         logger.info(f'Создана новая реферальная связь {new_referral}')
-                        lg.objects.create(log_level='INFO', message=f'[BOT] [Создана новая реферальная связь {new_referral}]',
+                        lg.objects.create(log_level='INFO',
+                                          message=f'[BOT] [Создана новая реферальная связь {new_referral}]',
                                           datetime=datetime.now(),
                                           user=TelegramUser.objects.get(user_id=message.from_user.id))
 
@@ -303,7 +335,8 @@ async def got_payment(message):
 async def callback_query_handlers(call):
     try:
         data = call.data.split(':')
-        print(f'[{call.message.chat.first_name}:{call.message.chat.username}:{call.message.chat.id}] [data: {call.data}]')
+        print(
+            f'[{call.message.chat.first_name}:{call.message.chat.username}:{call.message.chat.id}] [data: {call.data}]')
         user = TelegramUser.objects.get(user_id=call.message.chat.id)
         update_sub_status(user=user)
         country_list = [x.name for x in Country.objects.all()]
@@ -328,7 +361,8 @@ async def callback_query_handlers(call):
                 await bot.send_message(call.message.chat.id, text=msg.download_app, reply_markup=markup.download_app())
 
             elif 'app_installed' in data:
-                await bot.send_message(chat_id=call.message.chat.id, text=msg.app_installed, reply_markup=markup.start())
+                await bot.send_message(chat_id=call.message.chat.id, text=msg.app_installed,
+                                       reply_markup=markup.start())
                 if user.subscription_status and not VpnKey.objects.filter(user=user):
                     server = random.choice(Server.objects.filter(is_active=True, keys_generated__lte=200))
                     logger.info(f"[app_installed] [SERVER] [{server}]")
@@ -390,7 +424,8 @@ async def callback_query_handlers(call):
                         logger.error(f'{traceback.format_exc()}')
 
                 elif 'top_up_balance' in data:
-                    await bot.send_message(call.message.chat.id, text=msg.paymemt_menu, reply_markup=markup.paymemt_menu())
+                    await bot.send_message(call.message.chat.id, text=msg.paymemt_menu,
+                                           reply_markup=markup.paymemt_menu())
 
                 elif 'buy_subscripton' in data:
                     await bot.send_message(call.message.chat.id, text=msg.choose_subscription,
@@ -511,7 +546,8 @@ async def callback_query_handlers(call):
                 inv_5_lvl = TelegramReferral.objects.filter(referrer=user, level=5).__len__()
                 referral_link = f"Твоя реферальная ссылка: <code>https://t.me/{bot_username}?start={referral_code}</code>\n"
                 await bot.send_message(call.message.chat.id,
-                                       text=referral_link + msg.referral.format(inv_1_lvl, inv_2_lvl, inv_3_lvl, inv_4_lvl,
+                                       text=referral_link + msg.referral.format(inv_1_lvl, inv_2_lvl, inv_3_lvl,
+                                                                                inv_4_lvl,
                                                                                 inv_5_lvl, user_income),
                                        reply_markup=markup.withdraw_funds(call.message.chat.id))
 
@@ -555,15 +591,16 @@ async def callback_query_handlers(call):
                 await bot.send_message(call.message.chat.id, text=msg.commom_info, reply_markup=markup.help_markup())
 
             elif 'back' in data:
-                await bot.send_message(chat_id=call.message.chat.id, text=msg.main_menu_choice, reply_markup=markup.start())
+                await bot.send_message(chat_id=call.message.chat.id, text=msg.main_menu_choice,
+                                       reply_markup=markup.start())
     except:
         print(traceback.format_exc())
-
 
 
 if __name__ == '__main__':
     bot.add_custom_filter(asyncio_filters.StateFilter(bot))
     loop = asyncio.get_event_loop()
-    loop.create_task(update_user_subscription_status())  # SUBSCRIPTION REDEEM ON EXPIRATION
+    loop.create_task(update_user_subscription_status())                                                # SUBSCRIPTION REDEEM ON EXPIRATION
+    loop.create_task(send_pending_messages())                                                          # MAILING
     loop.create_task(bot.polling(non_stop=True, request_timeout=100, timeout=100, skip_pending=True))  # TELEGRAM BOT
     loop.run_forever()
