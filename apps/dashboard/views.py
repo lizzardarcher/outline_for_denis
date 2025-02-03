@@ -87,7 +87,7 @@ class UpdateSubscriptionView(LoginRequiredMixin, TemplateView):
 
         if days and amount:
             user = get_object_or_404(TelegramUser, user_id=self.request.user.profile.telegram_user.user_id)
-            if float(user.balance) > float(amount):
+            if float(user.balance) >= float(amount):
                 user.balance = float(user.balance) - float(amount)
                 if user.subscription_expiration < date.today():
                     user.subscription_expiration = date.today()
