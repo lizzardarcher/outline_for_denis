@@ -31,7 +31,7 @@ class ProfileView(LoginRequiredMixin, SuccessMessageMixin, TemplateView):
         context['inv_3_lvl'] = TelegramReferral.objects.filter(referrer=self.request.user.profile.telegram_user, level=3).__len__()
         context['inv_4_lvl'] = TelegramReferral.objects.filter(referrer=self.request.user.profile.telegram_user, level=4).__len__()
         context['inv_5_lvl'] = TelegramReferral.objects.filter(referrer=self.request.user.profile.telegram_user, level=5).__len__()
-        context['transactions'] = Transaction.objects.filter(user=self.request.user.profile.telegram_user)
+        context['transactions'] = Transaction.objects.filter(user=self.request.user.profile.telegram_user).order_by('-timestamp')[:7]
         return context
 
 

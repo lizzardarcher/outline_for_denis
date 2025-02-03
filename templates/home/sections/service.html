@@ -1,13 +1,27 @@
 {% load static %}
 <!-- service section -->
+    <style>
+        @media (max-width: 900px) {
+            .mobile-white {
+                color: white !important;
+            }
+        }
+
+        @media (min-width: 1650px) {
+            .mrg {
+                margin-top: 550px;
+            }
+        }
+    </style>
+<div class="mrg"></div>
 <section class="service_section layout_padding">
     <div class="service_container">
         <div class="container ">
             <div class="heading_container heading_center">
-                <h2 class="text-light">
+                <h2 class="text-dark mobile-white">
                     Наши <span>Преимущества</span>
                 </h2>
-                <p class="text-light">
+                <p class="text-dark mobile-white">
                     Начните пользоваться Dom VPN прямо сейчас и откройте для себя безопасный интернет!
                 </p>
             </div>
@@ -22,7 +36,8 @@
                                 Безопасный интернет
                             </h5>
                             <p>
-                                Наш сервис обеспечивает быстрое и безопасное подключение к интернету из любой точки мира.
+                                Наш сервис обеспечивает быстрое и безопасное подключение к интернету из любой точки
+                                мира.
                             </p>
                             <a href="#about">
                                 Подробнее
@@ -71,3 +86,4 @@
     </div>
 </section>
 <!-- end service section -->
+

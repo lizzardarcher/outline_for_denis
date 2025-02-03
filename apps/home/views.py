@@ -1,5 +1,4 @@
 import logging
-
 from django.contrib.messages.views import SuccessMessageMixin
 from django.views.generic import TemplateView
 
@@ -12,8 +11,9 @@ class HomeView(TemplateView):
     template_name = 'home/index.html'
 
     def get_context_data(self, **kwargs):
-        super().get_context_data(**kwargs)
-
+        context = super().get_context_data(**kwargs)
+        context['prices'] = Prices.objects.get(pk=1)
+        return context
 
 class AboutView(TemplateView):
     template_name = 'home/about.html'
@@ -28,12 +28,6 @@ class PriceView(TemplateView):
         return context
 
 
-class WhyView(TemplateView):
-    template_name = 'home/why.html'
-
-
-class ServiceView(TemplateView):
-    template_name = 'home/service.html'
 
 
 class OfertaView(TemplateView):
@@ -58,5 +52,9 @@ class AdvantagesView(TemplateView):
 
 class SiteMapView(TemplateView):
     template_name = 'home/sitemap.html'
+
+
+class OutlineLinksView(TemplateView):
+    template_name = 'home/outline_links.html'
 
 
