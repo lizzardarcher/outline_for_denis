@@ -407,4 +407,4 @@ class UserProfileAdmin(admin.ModelAdmin):
 
 @admin.register(TelegramMessage)
 class TelegramMessageAdmin(admin.ModelAdmin):
-    readonly_fields = ('status',)
+    readonly_fields = ('status', 'counter')
