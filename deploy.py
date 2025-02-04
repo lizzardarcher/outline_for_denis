@@ -46,23 +46,6 @@ def configure_nginx():
     """Настраивает Nginx."""
     print("--- Настройка Nginx ---")
     nginx_config = f"""
-server {{
-    listen 80;
-    server_name {DOMAIN_NAME};
-
-    location = /favicon.ico {{ access_log off; log_not_found off; }}
-    location /static/ {{
-        root {PROJECT_DIR};
-    }}
-
-    location / {{
-        include proxy_params;
-        proxy_pass http://unix:{PROJECT_DIR}/gunicorn.sock;
-    }}
-}}
-"""
-
-    f"""
     server {{
     listen 80;
     listen [::]:80;

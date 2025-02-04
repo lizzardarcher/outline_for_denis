@@ -9,3 +9,5 @@ pytest~=8.3.3
 python-dotenv~=1.0.1
 yookassa~=3.5.0
 django-recaptcha~=4.0.0
+fontawesomefree
+aiohttp
