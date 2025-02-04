@@ -22,12 +22,11 @@ def install_dependencies():
     os.system("sudo apt install -y ")
     os.system("sudo apt install -y python3 ")
     os.system("sudo apt install -y python3-pip ")
-    os.system("sudo apt install -y python3-venv ")
+    os.system("sudo apt install -y python3.12-venv")
     os.system("sudo apt install -y nginx ")
     os.system("sudo apt install -y certbot ")
     os.system("sudo apt install -y python3-certbot-nginx")
     os.system("sudo apt install -y git")
-    os.system("sudo apt install -y python3.12-venv")
 
 def clone_repo():
     """Клонирует репозиторий из GitHub."""
