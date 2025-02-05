@@ -79,6 +79,8 @@ async def send_pending_messages():
                 try:
                     await bot.send_message(chat_id=user.user_id, text=message.text)
                     counter += 1
+                    message.counter = counter
+                    message.save()
                     await asyncio.sleep(0.2)
                 except Exception as e:
                     ...
@@ -88,6 +90,7 @@ async def send_pending_messages():
             message.save()
 
         await asyncio.sleep(15)
+
 
 async def update_user_subscription_status():
     while True:
