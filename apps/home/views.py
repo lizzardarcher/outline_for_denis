@@ -59,3 +59,10 @@ class OutlineLinksView(TemplateView):
     template_name = 'home/outline_links.html'
 
 
+class RobotsTXTView(TemplateView):
+    template_name = 'robots.txt'
+
+
+class SitemapXMLView(TemplateView):
+    template_name = 'sitemap.xml'
+
