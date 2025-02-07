@@ -1,0 +1,29 @@
+<style>
+    
+        @media (max-width: 900px) {
+        .mobile-white {
+            color: white !important;
+        }
+    }
+    
+</style>
+<div class="container">
+    <div class="mt-5">
+        <div class="heading_container heading_center mb-5">
+            <h2 class="mobile-white">
+                Наши сервера <span class="text-info">доступны</span>
+            </h2>
+        </div>
+        <div class="card-body">
+            <ul class="list-group list-group-flush">
+                {% for server in servers %}
+                    <li class="mt-2 mb-2 list-group-item shadow rounded">
+                        <h4>{{ server }}</h4>
+                    </li>
+                {% empty %}
+                    <li class="list-group-item text-center">Нет доступных серверов</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+</div>

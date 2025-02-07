@@ -12,7 +12,7 @@ urlpatterns = [
     path('advantages/', views.AdvantagesView.as_view(), name='advantages'),
     path('site_map/', views.SiteMapView.as_view(), name='site_map'),
     path('outline_links/', views.OutlineLinksView.as_view(), name='outline_links'),
-    path('robots.txt/', views.RobotsTXTView.as_view(content_type="text/plain"), name='robots.txt'),
+    path('robots.txt', views.RobotsTXTView.as_view(content_type="text/plain"), name='robots.txt'),
     # path('sitemap.xml/', views.SitemapXMLView.as_view(content_type="text/plain"), name='sitemap'),
 
 ]
