@@ -396,35 +396,42 @@ async def callback_query_handlers(call):
             elif 'account' in data:
 
                 if 'get_new_key' in call.data:
-                    try:
-
-                        #  Удаляем все предыдущие ключи
-                        await delete_user_keys(user=user)
-                        country = call.data.split('_')[-1]
-                        server = Server.objects.filter(country__name=country, keys_generated__lte=200).last()
-                        logger.info(f"[get_new_key] [SERVER] [{server}]")
-                        key = await create_new_key(
-                            server=server,
-                            user=user)
-                        await bot.send_message(call.message.chat.id, text=f'{msg.key_avail}\n<code>{key}</code>',
-                                               reply_markup=markup.key_menu(country))
-                    except:
-                        logger.error(f'{traceback.format_exc()}')
+                    if user.subscription_status:
+                        try:
+                            #  Удаляем все предыдущие ключи
+                            await delete_user_keys(user=user)
+                            country = call.data.split('_')[-1]
+                            server = Server.objects.filter(country__name=country, keys_generated__lte=200).last()
+                            logger.info(f"[get_new_key] [SERVER] [{server}]")
+                            key = await create_new_key(
+                                server=server,
+                                user=user)
+                            await bot.send_message(call.message.chat.id, text=f'{msg.key_avail}\n<code>{key}</code>',
+                                                   reply_markup=markup.key_menu(country))
+                        except:
+                            logger.error(f'{traceback.format_exc()}')
+                    else:
+                        await bot.send_message(call.message.chat.id, msg.no_subscription,
+                                               reply_markup=markup.get_subscription())
 
                 elif 'swap_key' in call.data:
-                    try:
-                        #  Удаляем все предыдущие ключи
-                        await delete_user_keys(user=user)
-                        country = call.data.split('_')[-1]
-                        server = Server.objects.filter(country__name=country, keys_generated__lte=200).last()
-                        logger.info(f"[swap_key] [SERVER] [{server}]")
-                        key = await create_new_key(
-                            server=server,
-                            user=user)
-                        await bot.send_message(call.message.chat.id, text=f'{msg.key_avail}\n<code>{key}</code>',
-                                               reply_markup=markup.key_menu(country))
-                    except:
-                        logger.error(f'{traceback.format_exc()}')
+                    if user.subscription_status:
+                        try:
+                            #  Удаляем все предыдущие ключи
+                            await delete_user_keys(user=user)
+                            country = call.data.split('_')[-1]
+                            server = Server.objects.filter(country__name=country, keys_generated__lte=200).last()
+                            logger.info(f"[swap_key] [SERVER] [{server}]")
+                            key = await create_new_key(
+                                server=server,
+                                user=user)
+                            await bot.send_message(call.message.chat.id, text=f'{msg.key_avail}\n<code>{key}</code>',
+                                                   reply_markup=markup.key_menu(country))
+                        except:
+                            logger.error(f'{traceback.format_exc()}')
+                    else:
+                        await bot.send_message(call.message.chat.id, msg.no_subscription,
+                                               reply_markup=markup.get_subscription())
 
                 elif 'top_up_balance' in data:
                     await bot.send_message(call.message.chat.id, text=msg.paymemt_menu,
