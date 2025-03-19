@@ -35,6 +35,14 @@ def start():
     return markup
 
 
+def choose_protocol(country: str):
+    markup = InlineKeyboardMarkup()
+    markup.add(InlineKeyboardButton(text=f'🔑 OUTLINE', callback_data=f'protocol_outline:{country}'))
+    markup.add(InlineKeyboardButton(text=f'🚀 VLESS', callback_data=f'protocol_vless:{country}'))
+    markup.add(btn_back)
+    return markup
+
+
 def download_app():
     markup = InlineKeyboardMarkup()
     markup.add(
@@ -148,18 +156,18 @@ def choose_subscription():
     return markup
 
 
-def key_menu(country: str):
+def key_menu(country: str, protocol: str):
     markup = InlineKeyboardMarkup()
-    btn1 = InlineKeyboardButton(text=f'🔃 Заменить ключ', callback_data=f'account:swap_key_{country}')
+    btn1 = InlineKeyboardButton(text=f'🔃 Заменить ключ', callback_data=f'account:{protocol}:swap_key_{country}')
     btn2 = InlineKeyboardButton(text=f'❔ Помощь', callback_data=f'help')
     markup.row(btn1, btn2)
     markup.row(btn_back)
     return markup
 
 
-def get_new_key(country: str):
+def get_new_key(country: str, protocol: str):
     markup = InlineKeyboardMarkup()
-    btn1 = InlineKeyboardButton(text=f'🔑 Получить ключ', callback_data=f'account:get_new_key_{country}')
+    btn1 = InlineKeyboardButton(text=f'🔑 Получить ключ', callback_data=f'account:{protocol}:get_new_key_{country}')
     markup.row(btn1)
     markup.row(btn_back)
     return markup

@@ -376,6 +376,9 @@ async def callback_query_handlers(call):
                 await bot.send_message(call.message.chat.id, msg.avail_location_choice,
                                        reply_markup=markup.get_avail_location())
             elif 'country' in data:
+
+                # await bot.send_message(call.message.chat.id, msg.choose_protocol, reply_markup=markup.choose_protocol(str(data).split(':')[-1]))
+
                 if user.subscription_status:
                     keys = VpnKey.objects.filter(user=user)
                     country = return_matches(country_list, data)[0]
@@ -526,8 +529,6 @@ async def callback_query_handlers(call):
                         pass
                     await bot.send_message(call.message.chat.id, text=msg.sub_successful.format(new_exp_date, data[-2]),
                                            reply_markup=markup.proceed_to_profile())
-
-            # todo  Разобраться с остатками ГБ
 
             elif 'profile' in data:
                 # try:
