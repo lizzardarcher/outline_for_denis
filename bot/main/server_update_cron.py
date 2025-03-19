@@ -40,7 +40,7 @@ def find_dict_item(obj, key):
 
 def init_outline_servers():
     cloud_init = '#!/bin/sh\ntouch configfile.txt\nbash -c "$(wget -qO- https://raw.githubusercontent.com/Jigsaw-Code/outline-server/master/src/server_manager/install_scripts/install_server.sh) > configfile.txt"'
-    servers = Server.objects.filter(is_activated=False)
+    servers = Server.objects.filter(is_active=True, is_activated=False)
     if servers:
         for server in servers:
 
