@@ -23,12 +23,40 @@ class MarzbanAPI:
             api_url (str): URL API Marzban (например, "https://your-marzban-domain.com/api/").  Обязательно укажите '/api/' в конце!
             api_token (str): Токен API для аутентификации.
         """
+
         self.api_url = "https://mvless.ru/api"
-        self.api_token = TelegramBot.objects.all().first().marzban_api_key
+        self.api_token = self.get_access_token()
         self.headers = {
             "Authorization": f"Bearer {self.api_token}",
             "Content-Type": "application/json",
         }
+
+    def get_access_token(self):
+        _username = TelegramBot.objects.all().first().vless_unane
+        _password = TelegramBot.objects.all().first().vless_pwd
+        url = 'https://mvless.ru/api/admin/token'
+        headers = {
+            'accept': 'application/json',
+            'Content-Type': 'application/x-www-form-urlencoded'
+        }
+        data = {
+            'grant_type': 'password',
+            'username': _username,
+            'password': _password,
+            'scope': '',
+            'client_id': 'string',
+            'client_secret': 'string'
+        }
+
+        response = requests.post(url, headers=headers, data=data)
+
+        if response.status_code == 200:
+            # Если запрос успешен, возвращаем access_token
+            return response.json().get('access_token')
+        else:
+            # Если произошла ошибка, выводим сообщение
+            print(f"Error: {response.status_code}, {response.text}")
+            return None
 
     def _make_request(self, method, endpoint, data=None):
         """
@@ -170,7 +198,7 @@ class MarzbanAPI:
 # Пример создания пользователя с настройками
 # marzban = MarzbanAPI()
 # success, result = marzban.create_user(
-#     username="testuser22212",
+#     username="testuser2221112",
 #     data_limit_reset_strategy="monthly",
 #     # expire=int(round(datetime.now().timestamp() + (60 * 60 * 24 * 30))),  # 30 дней
 #     proxies={
@@ -186,7 +214,7 @@ class MarzbanAPI:
 #     print("Ошибка создания пользователя:", result)
 
 
-# # Получение информации о пользователе
+# Получение информации о пользователе
 # success, result = marzban.get_user("testuser22212")
 # if success:
 #     links = result["links"]

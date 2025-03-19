@@ -45,18 +45,20 @@ def choose_protocol(country: str):
 
 def download_app():
     markup = InlineKeyboardMarkup()
-    markup.add(
-        InlineKeyboardButton(text=f'📱 iPhone/iPad', url=f'https://itunes.apple.com/app/outline-app/id1356177741'))
-    markup.add(InlineKeyboardButton(text=f'📱 Android',
-                                    url=f'https://play.google.com/store/apps/details?id=org.outline.android.client'))
-    markup.add(InlineKeyboardButton(text=f'📺 Android TV',
-                                    url=f'https://github.com/agolyud/VPN_Outline_TV/releases/'))
-    markup.add(InlineKeyboardButton(text=f'💻 Windows',
-                                    url=f'https://github.com/Jigsaw-Code/outline-apps/releases/download/v1.10.1/Outline-Client.exe'))
-    markup.add(InlineKeyboardButton(text=f'💻 MacOS',
-                                    url=f'https://apps.apple.com/ru/app/outline-secure-internet-access/id1356178125'))
-    markup.add(InlineKeyboardButton(text=f'💻 Linux',
-                                    url=f'https://s3.amazonaws.com/outline-releases/client/linux/stable/Outline-Client.AppImage'))
+    markup.add( InlineKeyboardButton(text=f'📱 iPhone/iPad (Outline)', url=f'https://itunes.apple.com/app/outline-app/id1356177741'))
+    markup.add(InlineKeyboardButton(text=f'📱 Android (Outline)', url=f'https://play.google.com/store/apps/details?id=org.outline.android.client'))
+    markup.add(InlineKeyboardButton(text=f'📺 Android TV (Outline)', url=f'https://github.com/agolyud/VPN_Outline_TV/releases/'))
+    markup.add(InlineKeyboardButton(text=f'💻 Windows (Outline)', url=f'https://github.com/Jigsaw-Code/outline-apps/releases/download/v1.10.1/Outline-Client.exe'))
+    markup.add(InlineKeyboardButton(text=f'💻 MacOS (Outline)', url=f'https://apps.apple.com/ru/app/outline-secure-internet-access/id1356178125'))
+    markup.add(InlineKeyboardButton(text=f'💻 Linux (Outline)', url=f'https://s3.amazonaws.com/outline-releases/client/linux/stable/Outline-Client.AppImage'))
+
+    markup.add( InlineKeyboardButton(text=f'📱 iPhone/iPad (Vless)',  url=f'https://apps.apple.com/ru/app/v2raytun/id6476628951'))
+    markup.add(InlineKeyboardButton(text=f'📱 Android (Vless)',       url=f'https://play.google.com/store/apps/details?id=com.v2raytun.android&hl=ru&pli=1'))
+    markup.add(InlineKeyboardButton(text=f'📺 Android TV (Vless)',    url=f'https://play.google.com/store/apps/details?id=com.v2raytun.android&hl=ru&pli=1'))
+    markup.add(InlineKeyboardButton(text=f'💻 Windows (Vless)',       url=f'https://github.com/Cenmrev/V2RayW'))
+    markup.add(InlineKeyboardButton(text=f'💻 MacOS (Vless)',         url=f'https://apps.apple.com/pl/app/v2raytun/id6476628951'))
+    markup.add(InlineKeyboardButton(text=f'💻 Linux (Vless)',         url=f'https://snapcraft.io/v4freedom'))
+
     markup.add(InlineKeyboardButton(text=f'Приложение установлено 👌', callback_data=f'app_installed'))
     markup.add(btn_back)
     return markup
@@ -69,6 +71,7 @@ def help_markup():
     markup.add(InlineKeyboardButton(text='Условия использования',
                                     url='https://telegra.ph/Usloviya-polzovaniya-servisom-VPN-TON-11-20'))
     markup.add(InlineKeyboardButton(text='Инструкция', url='https://telegra.ph/Instrukciya-VPN-11-20'))
+    # markup.add(InlineKeyboardButton(text='Инструкция VLESS', url='https://telegra.ph/Instrukciya-VPN-11-20'))
     markup.add(btn_back)
     return markup
 

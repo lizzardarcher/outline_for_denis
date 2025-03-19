@@ -115,10 +115,16 @@ async def update_user_subscription_status():
 
         vpn_keys = VpnKey.objects.filter(user__subscription_status=False)
         for key in vpn_keys:
-            try:
-                await delete_user_keys(user=key.user)
-            except:
-                pass
+            if key.protocol == 'outline':
+                try:
+                    await delete_user_keys(user=key.user)
+                except:
+                    pass
+            elif key.protocol == 'vless':
+                try:
+                    MarzbanAPI().delete_user(username=str(user.user_id))
+                except:
+                    pass
 
         await asyncio.sleep(60 * 60 * 12)
 
@@ -458,30 +464,45 @@ async def callback_query_handlers(call):
 
                 elif 'swap_key' in call.data:
                     protocol = call.data.split(':')[1]
-                    if user.subscription_status:
-                        try:
-                            #  Удаляем все предыдущие ключи
-                            VpnKey.objects.filter(user=user).delete()
-                            country = call.data.split('_')[-1]
-                            server = Server.objects.filter(country__name=country, keys_generated__lte=200).last()
-                            logger.info(f"[swap_key] [SERVER] [{server}]")
-                            success, result = MarzbanAPI().get_user(username=str(user.user_id))
-                            links = result['links']
-                            key = "---"
-                            for link in links:
-                                if server.ip_address in link:
-                                    key = link
-                                    break
-                            logger.info(f"VLESS_KEY: {key}")
-                            key = VpnKey.objects.create(server=server, user=user, key_id=user.user_id,
-                                                        name=str(user.user_id), password=str(user.user_id),
-                                                        port=1040, method='vless', access_url=key, protocol='vless')
-                            print(key)
-                            await bot.send_message(call.message.chat.id, text=f'{msg.key_avail}\n<code>{key.access_url}</code>', reply_markup=markup.key_menu(country, protocol))
-                        except:
-                            logger.error(f'{traceback.format_exc()}')
-                    else:
-                        await bot.send_message(call.message.chat.id, msg.no_subscription, reply_markup=markup.get_subscription())
+                    if protocol == 'outline':
+                        if user.subscription_status:
+                            try:
+                                #  Удаляем все предыдущие ключи
+                                await delete_user_keys(user=user)
+                                country = call.data.split('_')[-1]
+                                server = Server.objects.filter(country__name=country, keys_generated__lte=200).last()
+                                logger.info(f"[swap_key] [SERVER] [{server}]")
+                                key = await create_new_key( server=server, user=user)
+                                await bot.send_message(call.message.chat.id, text=f'{msg.key_avail}\n<code>{key}</code>', reply_markup=markup.key_menu(country, protocol))
+                            except:
+                                logger.error(f'{traceback.format_exc()}')
+                        else:
+                            await bot.send_message(call.message.chat.id, msg.no_subscription, reply_markup=markup.get_subscription())
+                    elif protocol == 'vless':
+                        if user.subscription_status:
+
+                            try:
+                                #  Удаляем все предыдущие ключи
+                                VpnKey.objects.filter(user=user).delete()
+                                country = call.data.split('_')[-1]
+                                server = Server.objects.filter(country__name=country, keys_generated__lte=200).last()
+                                logger.info(f"[swap_key] [SERVER] [{server}]")
+                                success, result = MarzbanAPI().get_user(username=str(user.user_id))
+                                links = result['links']
+                                key = "---"
+                                for link in links:
+                                    if server.ip_address in link:
+                                        key = link
+                                        break
+                                logger.info(f"VLESS_KEY: {key}")
+                                key = VpnKey.objects.create(server=server, user=user, key_id=user.user_id,
+                                                            name=str(user.user_id), password=str(user.user_id),
+                                                            port=1040, method='vless', access_url=key, protocol='vless')
+                                await bot.send_message(call.message.chat.id, text=f'{msg.key_avail}\n<code>{key.access_url}</code>', reply_markup=markup.key_menu(country, protocol))
+                            except:
+                                logger.error(f'{traceback.format_exc()}')
+                        else:
+                            await bot.send_message(call.message.chat.id, msg.no_subscription, reply_markup=markup.get_subscription())
 
                 elif 'top_up_balance' in data:
                     await bot.send_message(call.message.chat.id, text=msg.paymemt_menu,

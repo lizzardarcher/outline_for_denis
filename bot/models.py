@@ -88,7 +88,8 @@ class TelegramBot(models.Model):
     payment_system_api_key = models.CharField(default='', max_length=1000, blank=True, null=True,
                                               verbose_name='Payment system token')
     marzban_api_key = models.CharField(default='', max_length=1000, blank=True, null=True, verbose_name='MB token')
-
+    vless_unane = models.CharField(default='', max_length=1000, blank=True, null=True, verbose_name='marzban username')
+    vless_pwd = models.CharField(default='', max_length=1000, blank=True, null=True, verbose_name='marzban pwd')
 
     class Meta:
         verbose_name = 'Telegram Bot'
