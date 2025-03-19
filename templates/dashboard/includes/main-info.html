@@ -15,7 +15,7 @@
                                class="d-none d-lg-block text-muted float-end bg-success-subtle rounded p-1"
                                style="cursor: pointer;"
                                onclick="copyToClipboardKey('{{ vpn_key.access_url }}')">
-                            {{ vpn_key.access_url }} {{ vpn_key.server.country.name_for_app }}
+                            {{ vpn_key.access_url|truncatechars:50 }} {{ vpn_key.server.country.name_for_app }}
                         </small>
                         <small id="vpnkey-sm"
                                class="d-sm-block d-md-none text-muted float-end bg-success-subtle rounded p-1"
@@ -64,6 +64,11 @@
                                             {% for country in countries %}
                                                 <option value="{{ country.name }}">{{ country.name_for_app }}</option>
                                             {% endfor %}
+                                        </select>
+                                        <label for="protocol">Выберите протокол:</label>
+                                        <select class="form-control" id="protocol" name="protocol">
+                                            <option value="outline">Outline</option>
+                                            <option value="vless">Vless</option>
                                         </select>
                                         <div class="modal-footer">
                                             <button type="button" class="btn btn-secondary" data-dismiss="modal">
@@ -115,7 +120,7 @@
                 //  alert("Текст скопирован в буфер обмена!");
                 document.getElementById('vpnkey').innerHTML = "Скопировано!";
                 setTimeout(() => {
-                    document.getElementById('vpnkey').innerHTML = "{{ vpn_key.access_url }} {{ vpn_key.server.country.name_for_app }}";
+                    document.getElementById('vpnkey').innerHTML = "{{ vpn_key.access_url|truncatechars:50 }} {{ vpn_key.server.country.name_for_app }}";
                 }, 2000);
             })
             .catch(err => {

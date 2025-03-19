@@ -7,6 +7,7 @@ from django.shortcuts import get_object_or_404, redirect
 from django.views.generic import TemplateView
 
 from apps.dashboard.outline_vpn.outline_client import delete_user_keys, create_new_key
+from bot.main.vless.MarzbanAPI import MarzbanAPI
 from bot.models import VpnKey, Server, TelegramUser, Country, Prices, UserProfile, ReferralSettings, TelegramReferral, \
     Transaction, Logging
 
@@ -39,12 +40,13 @@ class CreateNewKeyView(LoginRequiredMixin, TemplateView):
 
     def get(self, request, *args, **kwargs):
         country_name = request.GET.get('country')
-        if not country_name:
-            messages.error(request, 'Ошибка создания ключа! Не указана страна в параметрах запроса.')
+        protocol = request.GET.get('protocol')
+        if not country_name or not protocol:
+            messages.error(request, 'Ошибка создания ключа! Не указана страна или протокол в параметрах запроса.')
             return redirect('profile')
 
         country = get_object_or_404(Country, name=country_name)
-        server = Server.objects.filter(is_active=True, country=country, keys_generated__lte=200).first()
+        server = Server.objects.filter(is_active=True, is_activated=True, country=country, keys_generated__lte=200).first()
 
         if not server:
             messages.error(request, f"Ошибка создания ключа! Нет доступных серверов для страны '{country.name}'.")
@@ -53,11 +55,28 @@ class CreateNewKeyView(LoginRequiredMixin, TemplateView):
         user_profile = get_object_or_404(UserProfile, user=request.user)
         user = user_profile.telegram_user
 
-        delete_user_keys(user=user)  # Удаляем текущие ключи
-        create_new_key(server=server, user=user)  # Генерируем новый ключ
-        messages.success(request, f'Новый ключ создан!')
-        Logging.objects.create(log_level=" INFO", message=f'[WEB] [Новый ключ создан]',
-                               datetime=datetime.now(), user=self.request.user.profile.telegram_user)
+        if protocol == 'outline':
+            delete_user_keys(user=user)  # Удаляем текущие ключи outline
+            create_new_key(server=server, user=user)  # Генерируем новый ключ outline
+            messages.success(request, f'Новый ключ создан!')
+            Logging.objects.create(log_level=" INFO", message=f'[WEB] [Новый ключ создан]', datetime=datetime.now(), user=self.request.user.profile.telegram_user)
+        elif protocol == 'vless':
+            server = Server.objects.filter(is_active=True, is_activated_vless=True, country=country, keys_generated__lte=200).last()
+
+            VpnKey.objects.filter(user=user).delete()  # Удаляем текущие ключи vless
+            MarzbanAPI().create_user(username=str(user.user_id)) # Генерируем новый ключ vless
+            success, result = MarzbanAPI().get_user(username=str(user.user_id))
+            links = result['links']
+            key = "---"
+            for link in links:
+                if server.ip_address in link:
+                    key = link
+                    break
+            key = VpnKey.objects.create(server=server, user=user, key_id=user.user_id,
+                                        name=str(user.user_id), password=str(user.user_id),
+                                        port=1040, method='vless', access_url=key, protocol='vless')
+            messages.success(request, f'Новый ключ создан!')
+            Logging.objects.create(log_level=" INFO", message=f'[WEB] [Новый ключ создан]', datetime=datetime.now(), user=self.request.user.profile.telegram_user)
         return redirect('profile')
 
 
