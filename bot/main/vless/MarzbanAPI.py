@@ -159,7 +159,6 @@ class MarzbanAPI:
 
 # Пример использования:
 # if __name__ == '__main__':
-#     marzban = MarzbanAPI()
 #     marzban.add_node("178.208.78.170", "test")
 # #
 # #     # Замените на свои значения
@@ -168,7 +167,8 @@ class MarzbanAPI:
 #
 #
 #     marzban = MarzbanAPI(API_URL, API_TOKEN)
-# # Пример создания пользователя с настройками
+# Пример создания пользователя с настройками
+# marzban = MarzbanAPI()
 # success, result = marzban.create_user(
 #     username="testuser22212",
 #     data_limit_reset_strategy="monthly",
@@ -187,10 +187,11 @@ class MarzbanAPI:
 
 
 # # Получение информации о пользователе
-# success, result = marzban.get_user("baby3")
+# success, result = marzban.get_user("testuser22212")
 # if success:
-#     print("Информация о пользователе:", result)
-#     print("Link:", result["links"][0].split("#")[0] + "#VLESS 🇳🇱")
+#     links = result["links"]
+#     for link in links:
+#         print(link)
 # else:
 #     print("Ошибка получения информации о пользователе:", result)
 
