@@ -87,6 +87,8 @@ class TelegramBot(models.Model):
     created_at = models.DateField(auto_now_add=True, verbose_name='Создан')
     payment_system_api_key = models.CharField(default='', max_length=1000, blank=True, null=True,
                                               verbose_name='Payment system token')
+    marzban_api_key = models.CharField(default='', max_length=1000, blank=True, null=True, verbose_name='MB token')
+
 
     class Meta:
         verbose_name = 'Telegram Bot'
@@ -159,6 +161,8 @@ class VpnKey(models.Model):
     used_bytes = models.BigIntegerField(verbose_name='Used Bytes', blank=True, null=True)
     data_limit = models.BigIntegerField(verbose_name='Data Limit', blank=True, null=True)
 
+    protocol = models.CharField(max_length=255, default='outline', verbose_name='Protocol', blank=True, null=True)
+
     def __str__(self):
         return f"{self.user} {self.access_url} ({self.created_at})"
 
@@ -185,6 +189,7 @@ class Server(models.Model):
     country = models.ForeignKey('Country', on_delete=models.CASCADE, null=True, blank=True, verbose_name='Страна')
 
     is_activated = models.BooleanField(default=False, verbose_name='Сервер Активирован для Outline (не трогать)')
+    is_activated_vless = models.BooleanField(default=False, verbose_name='Сервер Активирован для VLESS (не трогать)')
 
     def __str__(self):
         return f"{self.hosting} root@{self.ip_address} ({self.created_at}) {self.country.name}"
@@ -217,6 +222,7 @@ class GlobalSettings(models.Model):
     data_limit = models.BigIntegerField(blank=True, null=True, verbose_name='Data Limit GB')
     os_id = models.IntegerField(blank=True, null=True, verbose_name='OS id')
     software_id = models.IntegerField(blank=True, null=True, verbose_name='Software id')
+
 
     def __str__(self):
         return f"НАСТРОЙКИ: Количество VPN серверов: {str(self.server_amount)}"

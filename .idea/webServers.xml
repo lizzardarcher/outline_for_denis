@@ -9,6 +9,21 @@
           </advancedOptions>
         </fileTransfer>
       </webServer>
+      <webServer id="fc9e04e3-eab5-48a5-bb00-7a1211261494" name="marzban">
+        <fileTransfer accessType="SFTP" host="45.12.142.197" port="22" sshConfigId="6f1d974b-6ab4-428e-b8c0-af54ea97252e" sshConfig="root@45.12.142.197:22 password">
+          <advancedOptions>
+            <advancedOptions dataProtectionLevel="Private" keepAliveTimeout="0" passiveMode="true" shareSSLContext="true" />
+          </advancedOptions>
+        </fileTransfer>
+      </webServer>
     </option>
+    <groups>
+      <group>
+        <name>bot</name>
+        <servers>
+          <name value="marzban" />
+        </servers>
+      </group>
+    </groups>
   </component>
 </project>

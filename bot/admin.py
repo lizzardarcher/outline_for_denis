@@ -298,7 +298,7 @@ class ServerAdmin(admin.ModelAdmin):
     get_key_generated.short_description = 'Всего ключей'
 
     list_display = (
-        'hosting', 'ip_address', 'user', 'password', 'rental_price', 'max_keys', 'get_key_generated', 'is_active',
+        'hosting', 'ip_address', 'user', 'password', 'rental_price', 'max_keys', 'get_key_generated', 'is_active', 'is_activated', 'is_activated_vless',
         'country', 'created_at')
     list_display_links = ('hosting', 'ip_address',)
     inlines = [VpnKeyInline]
