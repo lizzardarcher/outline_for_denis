@@ -35,10 +35,10 @@ def start():
     return markup
 
 
-def choose_protocol(country: str):
+def choose_protocol():
     markup = InlineKeyboardMarkup()
-    markup.add(InlineKeyboardButton(text=f'🔑 OUTLINE', callback_data=f'protocol_outline:{country}'))
-    markup.add(InlineKeyboardButton(text=f'🚀 VLESS', callback_data=f'protocol_vless:{country}'))
+    markup.add(InlineKeyboardButton(text=f'🔑 OUTLINE', callback_data=f'protocol_outline'))
+    markup.add(InlineKeyboardButton(text=f'🚀 VLESS', callback_data=f'protocol_vless'))
     markup.add(btn_back)
     return markup
 
@@ -82,11 +82,11 @@ def back():
     return markup
 
 
-def get_avail_location():
+def get_avail_location(protocol: str):
     markup = InlineKeyboardMarkup()
     countries = Country.objects.filter(is_active=True)
     for country in countries:
-        markup.add(InlineKeyboardButton(text=country.name_for_app, callback_data=f'country:{country.name}'))
+        markup.add(InlineKeyboardButton(text=country.name_for_app, callback_data=f'country:{protocol}:{country.name}'))
     markup.add(btn_back)
     return markup
 

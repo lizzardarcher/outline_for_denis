@@ -380,44 +380,55 @@ async def callback_query_handlers(call):
                     await bot.send_message(chat_id=user.user_id, text=msg.trial_key.format(key))
 
             elif 'manage' in data:
-                await bot.send_message(call.message.chat.id, msg.avail_location_choice,
-                                       reply_markup=markup.get_avail_location())
+                # await bot.send_message(call.message.chat.id, msg.avail_location_choice, reply_markup=markup.get_avail_location())
+                await bot.send_message(call.message.chat.id, msg.choose_protocol, reply_markup=markup.choose_protocol())
             elif 'country' in data:
 
-                await bot.send_message(call.message.chat.id, msg.choose_protocol, reply_markup=markup.choose_protocol(data[-1]))
+                if 'outline' in data:
 
-            elif 'protocol_outline' in data:
-                if user.subscription_status:
-                    country = return_matches(country_list, data[-1])[0]
-                    if country:
-                        try:
-                            key = VpnKey.objects.filter(user=user, server__country__name=country).last()
-                            if key.protocol == 'outline':
-                                await bot.send_message(call.message.chat.id, text=f'{msg.key_avail}\n<code>{key.access_url}</code>', reply_markup=markup.key_menu(country, 'outline'))
-                            else:
+                    if user.subscription_status:
+                        country = return_matches(country_list, data[-1])[0]
+                        if country:
+                            try:
+                                key = VpnKey.objects.filter(user=user, server__country__name=country).last()
+                                if key.protocol == 'outline':
+                                    await bot.send_message(call.message.chat.id, text=f'{msg.key_avail}\n<code>{key.access_url}</code>', reply_markup=markup.key_menu(country, 'outline'))
+                                else:
+                                    await bot.send_message(call.message.chat.id, text=msg.get_new_key, reply_markup=markup.get_new_key(country, 'outline'))
+
+                            except:
+                                logger.error(f'[{user}] : {traceback.format_exc()}')
                                 await bot.send_message(call.message.chat.id, text=msg.get_new_key, reply_markup=markup.get_new_key(country, 'outline'))
+                    else:
+                        await bot.send_message(call.message.chat.id, msg.no_subscription, reply_markup=markup.get_subscription())
+                elif 'vless' in data:
 
-                        except:
-                            logger.error(f'[{user}] : {traceback.format_exc()}')
-                            await bot.send_message(call.message.chat.id, text=msg.get_new_key, reply_markup=markup.get_new_key(country, 'outline'))
-                else:
-                    await bot.send_message(call.message.chat.id, msg.no_subscription, reply_markup=markup.get_subscription())
+                    if user.subscription_status:
+                        country = return_matches(country_list, data[-1])[0]
+                        if country:
+                            try:
+                                key = VpnKey.objects.filter(user=user, server__country__name=country).last()
+                                if key.protocol == 'vless':
+                                    await bot.send_message(call.message.chat.id,
+                                                           text=f'{msg.key_avail}\n<code>{key.access_url}</code>',
+                                                           reply_markup=markup.key_menu(country, 'vless'))
+                                else:
+                                    await bot.send_message(call.message.chat.id, text=msg.get_new_key,
+                                                           reply_markup=markup.get_new_key(country, 'vless'))
+                            except:
+                                logger.error(f'[{user}] : {traceback.format_exc()}')
+                                await bot.send_message(call.message.chat.id, text=msg.get_new_key,
+                                                       reply_markup=markup.get_new_key(country, 'vless'))
+                    else:
+                        await bot.send_message(call.message.chat.id, msg.no_subscription,
+                                               reply_markup=markup.get_subscription())
+            elif 'protocol_outline' in data:
+
+                await bot.send_message(call.message.chat.id, msg.avail_location_choice, reply_markup=markup.get_avail_location('outline'))
 
             elif 'protocol_vless' in data:
-                if user.subscription_status:
-                    country = return_matches(country_list, data[-1])[0]
-                    if country:
-                        try:
-                            key = VpnKey.objects.filter(user=user, server__country__name=country).last()
-                            if key.protocol == 'vless':
-                                await bot.send_message(call.message.chat.id, text=f'{msg.key_avail}\n<code>{key.access_url}</code>', reply_markup=markup.key_menu(country, 'vless'))
-                            else:
-                                await bot.send_message(call.message.chat.id, text=msg.get_new_key, reply_markup=markup.get_new_key(country, 'vless'))
-                        except:
-                            logger.error(f'[{user}] : {traceback.format_exc()}')
-                            await bot.send_message(call.message.chat.id, text=msg.get_new_key, reply_markup=markup.get_new_key(country, 'vless'))
-                else:
-                    await bot.send_message(call.message.chat.id, msg.no_subscription, reply_markup=markup.get_subscription())
+
+                await bot.send_message(call.message.chat.id, msg.avail_location_choice, reply_markup=markup.get_avail_location('vless'))
 
             elif 'account' in data:
 
