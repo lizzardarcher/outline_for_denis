@@ -14,21 +14,20 @@
             {% include 'includes/messages_success.html' %}
             <div class="row mt-5">
                 <div class="col-sm-12 col-md-2 bg-light rounded p-4 mt-2">
-                    {#                    {% include 'dashboard/includes/sidepanel.html' %}#}
+                    <br><br>
                     {% include 'dashboard/includes/servers.html' %}
-
                 </div>
                 <div class="col-sm-12 col-md-7 bg-light rounded p-4 mt-2">
                     {% include 'dashboard/includes/main-info.html' %}
                 </div>
                 <div class="col-sm-12 col-md-3 bg-light rounded p-4 mt-2">
+                    <br><br><br><br>
                     {% include 'dashboard/includes/user-info.html' %}
                 </div>
             </div>
 
             <div class="row">
                 <div class="col-sm-12 col-md-2 p-2 bg-light rounded p-4 mt-2">
-{#                    {% include 'dashboard/includes/servers.html' %}#}
                     {% include 'dashboard/includes/transactions.html' %}
                 </div>
                 <div class="col-1 bg-light rounded p-4 mt-2"></div>
@@ -44,11 +43,6 @@
                 <div class="col-1 bg-light rounded "></div>
             </div>
 
-{#            <div class="m-2 p-2 row bg-light rounded p-4 mt-2">#}
-{#                <div class="col-sm-12 col-md-3 p-2 bg-light rounded p-4 mt-2">#}
-{#                    {% include 'dashboard/includes/transactions.html' %}#}
-{#                </div>#}
-{#            </div>#}
 
         </div>
     </div>
@@ -67,13 +61,8 @@
                 div.className = 'm-5'; // Larger screen
             }
         }
-
-        // Initial call to set the correct class on page load
         updateMargin();
-
-        // Event listener to update the class when the window resizes
         window.addEventListener('resize', updateMargin);
-
     </script>
 {% endblock extrascript %}
 

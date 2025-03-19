@@ -1,6 +1,6 @@
 <!-- Основная часть -->
     <h1 class="text-center">Добро пожаловать в DomVPN</h1>
-    <p class="text-center">Здесь вы можете приобрести ключ для приложения Outline</p>
+    <p class="text-center">Здесь вы можете приобрести ключи Vless и Outline</p>
     <div class="card mb-4">
         <div class="card-header">
             Главная
@@ -8,8 +8,7 @@
         <div class="card-body">
             <ul class="list-group list-group-flush">
                 <li class="list-group-item mb-4">
-                    <i class="fa fa-key text-success"></i> Текущий ключ
-{#                    <small class="text-muted">Скопируйте и вставьте ключ в ваше приложение Outline</small>#}
+                    <i class="fa fa-key text-warning"></i> Текущий ключ
                     {% if vpn_key.access_url %}
                         <small id="vpnkey"
                                class="d-none d-lg-block text-muted float-end bg-success-subtle rounded p-1"
@@ -29,14 +28,18 @@
 
                 </li>
                 <li class="list-group-item mb-4">
-                    Outline key
+                    {% if vpn_key %}
+                        <span class="text-muted">Выберите локацию и протокол</span>
+                    {% else %}
+                        {{ vpn_key.protocol|upper }} {{ vpn_key.server.country.name_for_app }}
+                    {% endif %}
                     {% if request.user.profile.telegram_user.subscription_status %}
                         {% if vpn_key.access_url %}
                             <!-- Button trigger modal -->
                             <button type="button" class="btn btn-outline-warning text-muted float-end"
                                     data-toggle="modal"
                                     data-target="#change_key">
-                                <i class="fa fa-refresh"></i> Заменить
+                                <i class="fa fa-refresh"></i> Сменить локацию/Протокол
                             </button>
                         {% else %}
                             <button type="button" class="btn btn-outline-info text-muted float-end" data-toggle="modal"

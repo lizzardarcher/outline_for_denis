@@ -37,8 +37,8 @@ def start():
 
 def choose_protocol():
     markup = InlineKeyboardMarkup()
+    markup.add(InlineKeyboardButton(text=f'🚀 VLESS (рекомендуем)', callback_data=f'protocol_vless'))
     markup.add(InlineKeyboardButton(text=f'🔑 OUTLINE', callback_data=f'protocol_outline'))
-    markup.add(InlineKeyboardButton(text=f'🚀 VLESS', callback_data=f'protocol_vless'))
     markup.add(btn_back)
     return markup
 
