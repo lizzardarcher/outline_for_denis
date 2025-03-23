@@ -55,7 +55,7 @@ def download_app():
     markup.add( InlineKeyboardButton(text=f'📱 iPhone/iPad (Vless)',  url=f'https://apps.apple.com/ru/app/v2raytun/id6476628951'))
     markup.add(InlineKeyboardButton(text=f'📱 Android (Vless)',       url=f'https://play.google.com/store/apps/details?id=com.v2raytun.android&hl=ru&pli=1'))
     markup.add(InlineKeyboardButton(text=f'📺 Android TV (Vless)',    url=f'https://play.google.com/store/apps/details?id=com.v2raytun.android&hl=ru&pli=1'))
-    markup.add(InlineKeyboardButton(text=f'💻 Windows (Vless)',       url=f'https://github.com/Cenmrev/V2RayW'))
+    markup.add(InlineKeyboardButton(text=f'💻 Windows (Vless)',       url=f'https://github.com/InvisibleManVPN/InvisibleMan-XRayClient/releases'))
     markup.add(InlineKeyboardButton(text=f'💻 MacOS (Vless)',         url=f'https://apps.apple.com/pl/app/v2raytun/id6476628951'))
     markup.add(InlineKeyboardButton(text=f'💻 Linux (Vless)',         url=f'https://snapcraft.io/v4freedom'))
 
