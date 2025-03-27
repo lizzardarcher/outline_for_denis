@@ -61,9 +61,17 @@ class CreateNewKeyView(LoginRequiredMixin, TemplateView):
             messages.success(request, f'Новый ключ создан!')
             Logging.objects.create(log_level=" INFO", message=f'[WEB] [Новый ключ создан]', datetime=datetime.now(), user=self.request.user.profile.telegram_user)
         elif protocol == 'vless':
+
             server = Server.objects.filter(is_active=True, is_activated_vless=True, country=country, keys_generated__lte=200).last()
 
-            VpnKey.objects.filter(user=user).delete()  # Удаляем текущие ключи vless
+            #  Удаляем все предыдущие ключи
+            _key = VpnKey.objects.filter(user=user)
+            #  Обновляем счетчик - 1
+            _server = _key.first().server
+            _server.keys_generated = _server.keys_generated - 1
+            _server.save()
+            _key.delete()
+
             MarzbanAPI().create_user(username=str(user.user_id)) # Генерируем новый ключ vless
             success, result = MarzbanAPI().get_user(username=str(user.user_id))
             links = result['links']
@@ -75,6 +83,10 @@ class CreateNewKeyView(LoginRequiredMixin, TemplateView):
             key = VpnKey.objects.create(server=server, user=user, key_id=user.user_id,
                                         name=str(user.user_id), password=str(user.user_id),
                                         port=1040, method='vless', access_url=key, protocol='vless')
+            #  Обновляем счетчик + 1
+            server.keys_generated = server.keys_generated + 1
+            server.save()
+
             messages.success(request, f'Новый ключ создан!')
             Logging.objects.create(log_level=" INFO", message=f'[WEB] [Новый ключ создан]', datetime=datetime.now(), user=self.request.user.profile.telegram_user)
         return redirect('profile')

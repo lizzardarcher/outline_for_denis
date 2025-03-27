@@ -182,6 +182,7 @@ class MarzbanAPI:
             "port": port,
             "usage_coefficient": 1
         }
+        print(self.api_token)
         success, result = self._make_request("POST", f"/node", data=node)
         return success, result
 

@@ -449,7 +449,13 @@ async def callback_query_handlers(call):
                         elif protocol == 'vless':
                             try:
                                 #  Удаляем все предыдущие ключи
-                                VpnKey.objects.filter(user=user).delete()
+                                _key = VpnKey.objects.filter(user=user)
+                                #  Обновляем счетчик - 1
+                                _server = _key.first().server
+                                _server.keys_generated = _server.keys_generated - 1
+                                _server.save()
+                                _key.delete()
+
                                 country = call.data.split('_')[-1]
                                 server = Server.objects.filter(country__name=country, keys_generated__lte=200).last()
                                 logger.info(f"[get_new_key] [SERVER] [{server}]")
@@ -466,7 +472,11 @@ async def callback_query_handlers(call):
                                 key = VpnKey.objects.create(server=server,user=user,key_id=user.user_id,
                                                       name=str(user.user_id),password=str(user.user_id),
                                                       port=1040,method='vless',access_url=key, protocol='vless')
-                                print(key)
+
+                                #  Обновляем счетчик + 1
+                                server.keys_generated = server.keys_generated + 1
+                                server.save()
+
                                 await bot.send_message(call.message.chat.id, text=f'{msg.key_avail}\n<code>{key.access_url}</code>', reply_markup=markup.key_menu(country, protocol))
                             except:
                                 logger.error(f'{traceback.format_exc()}')
@@ -494,21 +504,39 @@ async def callback_query_handlers(call):
 
                             try:
                                 #  Удаляем все предыдущие ключи
-                                VpnKey.objects.filter(user=user).delete()
+                                _key = VpnKey.objects.filter(user=user)
+                                #  Обновляем счетчик - 1
+                                _server = _key.first().server
+                                _server.keys_generated = _server.keys_generated - 1
+                                _server.save()
+                                _key.delete()
+
                                 country = call.data.split('_')[-1]
+
                                 server = Server.objects.filter(country__name=country, keys_generated__lte=200).last()
+
                                 logger.info(f"[swap_key] [SERVER] [{server}]")
+
                                 success, result = MarzbanAPI().get_user(username=str(user.user_id))
+
                                 links = result['links']
+
                                 key = "---"
                                 for link in links:
                                     if server.ip_address in link:
                                         key = link
                                         break
+
                                 logger.info(f"VLESS_KEY: {key}")
+
                                 key = VpnKey.objects.create(server=server, user=user, key_id=user.user_id,
                                                             name=str(user.user_id), password=str(user.user_id),
                                                             port=1040, method='vless', access_url=key, protocol='vless')
+
+                                #  Обновляем счетчик + 1
+                                server.keys_generated = server.keys_generated + 1
+                                server.save()
+
                                 await bot.send_message(call.message.chat.id, text=f'{msg.key_avail}\n<code>{key.access_url}</code>', reply_markup=markup.key_menu(country, protocol))
                             except:
                                 logger.error(f'{traceback.format_exc()}')
