@@ -122,7 +122,12 @@ async def update_user_subscription_status():
                     pass
             elif key.protocol == 'vless':
                 try:
-                    MarzbanAPI().delete_user(username=str(user.user_id))
+                    MarzbanAPI().delete_user(username=str(key.user.user_id))
+                    #  Обновляем счетчик - 1
+                    _server = key.server
+                    _server.keys_generated = _server.keys_generated - 1
+                    _server.save()
+                    key.delete()
                 except:
                     pass
 

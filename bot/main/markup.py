@@ -71,8 +71,6 @@ def help_markup():
     markup.add(InlineKeyboardButton(text='Условия использования',
                                     url='https://telegra.ph/Usloviya-polzovaniya-servisom-VPN-TON-11-20'))
     markup.add(InlineKeyboardButton(text='Инструкция', url='https://telegra.ph/Instrukciya-VPN-11-20'))
-    markup.add(InlineKeyboardButton(text='Инструкция VLESS на Android', url='https://vpn-keys.ru/ustanovka-i-nastrojka-v2rayng-na-android/'))
-    markup.add(InlineKeyboardButton(text='Инструкция VLESS на Windows', url='https://vpn-keys.ru/nastrojka-invisible-man-xray-na-windows-dlja-raboty-s-vless/'))
     markup.add(btn_back)
     return markup
 

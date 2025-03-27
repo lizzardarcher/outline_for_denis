@@ -107,7 +107,7 @@ class LogInline(admin.TabularInline):
 @admin.register(TelegramUser)
 class TelegramUserAdmin(admin.ModelAdmin):
     list_display = (
-        'join_date', 'first_name', 'last_name', 'username', 'subscription_status', 'subscription_expiration', 'balance')
+        'join_date', 'first_name', 'last_name', 'username', 'subscription_status', 'subscription_expiration', 'balance', 'referral_link')
     list_display_links = (
         'join_date', 'first_name', 'last_name', 'username', 'subscription_status', 'subscription_expiration', 'balance')
     search_fields = ('first_name', 'last_name', 'username', 'user_id')
@@ -116,6 +116,15 @@ class TelegramUserAdmin(admin.ModelAdmin):
     ordering = ('-subscription_status', '-join_date',)
     empty_value_display = '---'
     inlines = [TransactionInline, VpnKeyInline, WithdrawalRequestInline, LogInline]
+
+    def referral_link(self, obj):
+        """
+        Generates the referral link for the user.
+        """
+        referral_url = f"https://t.me/xDomvpn_Bot?start={obj.user_id}"
+        return format_html('{}', referral_url, referral_url)
+
+    referral_link.short_description = 'Referral Link'  # Set column header
 
     def has_add_permission(self, request):
         if not DEBUG:
@@ -401,9 +410,29 @@ class PricesAdmin(admin.ModelAdmin):
         return False
 
 
+# @admin.register(UserProfile)
+# class UserProfileAdmin(admin.ModelAdmin):
+#     ...
+
 @admin.register(UserProfile)
 class UserProfileAdmin(admin.ModelAdmin):
-    ...
+    list_display = ('user', 'telegram_user', 'referral_link')
+    readonly_fields = ('referral_link',)
+    search_fields = ('user__username', 'user__first_name', 'user__last_name', 'telegram_user__user_id', 'telegram_user__username')  # Search on related fields
+    list_filter = ('telegram_user__is_banned', 'telegram_user__subscription_status') # Filter by telegram user status.
+
+    def referral_link(self, obj):
+        """
+        Generates the referral link for the associated TelegramUser.
+        Returns an empty string if there's no associated TelegramUser.
+        """
+        if obj.telegram_user:
+            referral_url = f"https://t.me/xDomvpn_Bot?start={obj.telegram_user.user_id}"
+            return format_html('{}', referral_url, referral_url)
+        else:
+            return "No Telegram User"  # Or any appropriate message
+
+    referral_link.short_description = 'Referral Link'
 
 @admin.register(TelegramMessage)
 class TelegramMessageAdmin(admin.ModelAdmin):
