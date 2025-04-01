@@ -445,7 +445,7 @@ async def callback_query_handlers(call):
                                 #  Удаляем все предыдущие ключи
                                 await delete_user_keys(user=user)
                                 country = call.data.split('_')[-1]
-                                server = Server.objects.filter(country__name=country, keys_generated__lte=200).last()
+                                server = Server.objects.filter(is_active=True, is_activated=True,country__name=country, keys_generated__lte=200).last()
                                 logger.info(f"[get_new_key] [SERVER] [{server}]")
                                 key = await create_new_key(server=server, user=user)
                                 await bot.send_message(call.message.chat.id, text=f'{msg.key_avail}\n<code>{key}</code>', reply_markup=markup.key_menu(country, protocol))
@@ -462,7 +462,7 @@ async def callback_query_handlers(call):
                                 _key.delete()
 
                                 country = call.data.split('_')[-1]
-                                server = Server.objects.filter(country__name=country, keys_generated__lte=200).last()
+                                server = Server.objects.filter(is_active=True, is_activated_vless=True,country__name=country, keys_generated__lte=200).last()
                                 logger.info(f"[get_new_key] [SERVER] [{server}]")
 
                                 MarzbanAPI().create_user(username=str(user.user_id))
@@ -496,7 +496,7 @@ async def callback_query_handlers(call):
                                 #  Удаляем все предыдущие ключи
                                 await delete_user_keys(user=user)
                                 country = call.data.split('_')[-1]
-                                server = Server.objects.filter(country__name=country, keys_generated__lte=200).last()
+                                server = Server.objects.filter(is_active=True, is_activated=True, country__name=country, keys_generated__lte=200).last()
                                 logger.info(f"[swap_key] [SERVER] [{server}]")
                                 key = await create_new_key( server=server, user=user)
                                 await bot.send_message(call.message.chat.id, text=f'{msg.key_avail}\n<code>{key}</code>', reply_markup=markup.key_menu(country, protocol))
@@ -518,7 +518,7 @@ async def callback_query_handlers(call):
 
                                 country = call.data.split('_')[-1]
 
-                                server = Server.objects.filter(country__name=country, keys_generated__lte=200).last()
+                                server = Server.objects.filter(is_active=True, is_activated_vless=True, country__name=country, keys_generated__lte=200).last()
 
                                 logger.info(f"[swap_key] [SERVER] [{server}]")
 
@@ -576,7 +576,7 @@ async def callback_query_handlers(call):
                             provider_token=f'{payment_token}',
                             currency='RUB',
                             prices=[price],
-                            photo_url='https://bitlaunch.io/blog/content/images/size/w2000/2022/10/Outline-VPN.png',
+                            photo_url='https://domvpn.store/static/images/slider-img2.png',
                             photo_height=512,  # !=0/None or picture won't be shown
                             photo_width=512,
                             photo_size=512,

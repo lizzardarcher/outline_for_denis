@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import random
+import sys
 import traceback
 from pathlib import Path
 from logging.handlers import RotatingFileHandler, TimedRotatingFileHandler
@@ -10,14 +11,16 @@ from datetime import datetime, timedelta, date
 import django_orm
 from django.conf import settings
 from django.utils import timezone
+
 from telebot import asyncio_filters
 from telebot.async_telebot import AsyncTeleBot
 from telebot.asyncio_storage import StateMemoryStorage
 from telebot.asyncio_handler_backends import State, StatesGroup
 from telebot.types import LabeledPrice, InlineKeyboardButton, InlineKeyboardMarkup
 
-from bot.main.vless.MarzbanAPI import MarzbanAPI
-from bot.models import TelegramBot, Prices, TelegramMessage
+from bot.models import TelegramBot
+from bot.models import TelegramMessage
+from bot.models import Prices
 from bot.models import TelegramUser
 from bot.models import TelegramReferral
 from bot.models import VpnKey
@@ -29,11 +32,12 @@ from bot.models import WithdrawalRequest
 from bot.models import Transaction
 from bot.models import Logging as lg
 
-from bot.main import msg
-from bot.main import markup
+from bot.main.test import msg
+from bot.main.test import markup
 from bot.main.utils import return_matches
 from bot.main.outline_client import create_new_key
 from bot.main.outline_client import delete_user_keys
+from bot.main.vless.MarzbanAPI import MarzbanAPI
 
 log_path = Path(__file__).parent.absolute() / 'log/bot_log.log'
 logger = logging.getLogger(__name__)
@@ -42,11 +46,12 @@ logging.basicConfig(
     level=logging.DEBUG,
     datefmt='%Y.%m.%d %I:%M:%S',
     handlers=[
-        TimedRotatingFileHandler(filename=log_path, when='D', interval=1, backupCount=5),
-        # logging.StreamHandler(stream=sys.stderr)
+        # TimedRotatingFileHandler(filename=log_path, when='D', interval=1, backupCount=5),
+        logging.StreamHandler(stream=sys.stderr)
     ],
 )
 
+# bot = AsyncTeleBot(token=TelegramBot.objects.all().first().token, state_storage=StateMemoryStorage())
 bot = AsyncTeleBot(token='8110135608:AAEBfrwyAXI8znOdrIRbHmX43TR_ArYyflI', state_storage=StateMemoryStorage())
 bot.parse_mode = 'HTML'
 DEBUG = settings.DEBUG
@@ -122,7 +127,12 @@ async def update_user_subscription_status():
                     pass
             elif key.protocol == 'vless':
                 try:
-                    MarzbanAPI().delete_user(username=str(user.user_id))
+                    MarzbanAPI().delete_user(username=str(key.user.user_id))
+                    #  Обновляем счетчик - 1
+                    _server = key.server
+                    _server.keys_generated = _server.keys_generated - 1
+                    _server.save()
+                    key.delete()
                 except:
                     pass
 
@@ -388,6 +398,7 @@ async def callback_query_handlers(call):
 
                     if user.subscription_status:
                         country = return_matches(country_list, data[-1])[0]
+                        print('contry', country)
                         if country:
                             try:
                                 key = VpnKey.objects.filter(user=user, server__country__name=country).last()
@@ -436,22 +447,33 @@ async def callback_query_handlers(call):
                     protocol = call.data.split(':')[1]
                     if user.subscription_status:
                         if protocol == 'outline':
+                            print('outline')
                             try:
                                 #  Удаляем все предыдущие ключи
                                 await delete_user_keys(user=user)
+                                print('delete_user_keys success')
                                 country = call.data.split('_')[-1]
-                                server = Server.objects.filter(country__name=country, keys_generated__lte=200).last()
+                                print('country', country)
+                                server = Server.objects.filter(is_active=True, is_activated=True,country__name=country, keys_generated__lte=200).last()
+                                print('server', server)
                                 logger.info(f"[get_new_key] [SERVER] [{server}]")
                                 key = await create_new_key(server=server, user=user)
+                                print('key', key)
                                 await bot.send_message(call.message.chat.id, text=f'{msg.key_avail}\n<code>{key}</code>', reply_markup=markup.key_menu(country, protocol))
                             except:
                                 logger.error(f'{traceback.format_exc()}')
                         elif protocol == 'vless':
                             try:
                                 #  Удаляем все предыдущие ключи
-                                VpnKey.objects.filter(user=user).delete()
+                                _key = VpnKey.objects.filter(user=user)
+                                #  Обновляем счетчик - 1
+                                _server = _key.first().server
+                                _server.keys_generated = _server.keys_generated - 1
+                                _server.save()
+                                _key.delete()
+
                                 country = call.data.split('_')[-1]
-                                server = Server.objects.filter(country__name=country, keys_generated__lte=200).last()
+                                server = Server.objects.filter(is_active=True, is_activated_vless=True, country__name=country, keys_generated__lte=200).last()
                                 logger.info(f"[get_new_key] [SERVER] [{server}]")
 
                                 MarzbanAPI().create_user(username=str(user.user_id))
@@ -466,7 +488,11 @@ async def callback_query_handlers(call):
                                 key = VpnKey.objects.create(server=server,user=user,key_id=user.user_id,
                                                       name=str(user.user_id),password=str(user.user_id),
                                                       port=1040,method='vless',access_url=key, protocol='vless')
-                                print(key)
+
+                                #  Обновляем счетчик + 1
+                                server.keys_generated = server.keys_generated + 1
+                                server.save()
+
                                 await bot.send_message(call.message.chat.id, text=f'{msg.key_avail}\n<code>{key.access_url}</code>', reply_markup=markup.key_menu(country, protocol))
                             except:
                                 logger.error(f'{traceback.format_exc()}')
@@ -481,7 +507,7 @@ async def callback_query_handlers(call):
                                 #  Удаляем все предыдущие ключи
                                 await delete_user_keys(user=user)
                                 country = call.data.split('_')[-1]
-                                server = Server.objects.filter(country__name=country, keys_generated__lte=200).last()
+                                server = Server.objects.filter(is_active=True, is_activated=True, country__name=country, keys_generated__lte=200).last()
                                 logger.info(f"[swap_key] [SERVER] [{server}]")
                                 key = await create_new_key( server=server, user=user)
                                 await bot.send_message(call.message.chat.id, text=f'{msg.key_avail}\n<code>{key}</code>', reply_markup=markup.key_menu(country, protocol))
@@ -494,21 +520,39 @@ async def callback_query_handlers(call):
 
                             try:
                                 #  Удаляем все предыдущие ключи
-                                VpnKey.objects.filter(user=user).delete()
+                                _key = VpnKey.objects.filter(user=user)
+                                #  Обновляем счетчик - 1
+                                _server = _key.first().server
+                                _server.keys_generated = _server.keys_generated - 1
+                                _server.save()
+                                _key.delete()
+
                                 country = call.data.split('_')[-1]
-                                server = Server.objects.filter(country__name=country, keys_generated__lte=200).last()
+
+                                server = Server.objects.filter(is_active=True, is_activated=True, country__name=country, keys_generated__lte=200).last()
+
                                 logger.info(f"[swap_key] [SERVER] [{server}]")
+
                                 success, result = MarzbanAPI().get_user(username=str(user.user_id))
+
                                 links = result['links']
+
                                 key = "---"
                                 for link in links:
                                     if server.ip_address in link:
                                         key = link
                                         break
+
                                 logger.info(f"VLESS_KEY: {key}")
+
                                 key = VpnKey.objects.create(server=server, user=user, key_id=user.user_id,
                                                             name=str(user.user_id), password=str(user.user_id),
                                                             port=1040, method='vless', access_url=key, protocol='vless')
+
+                                #  Обновляем счетчик + 1
+                                server.keys_generated = server.keys_generated + 1
+                                server.save()
+
                                 await bot.send_message(call.message.chat.id, text=f'{msg.key_avail}\n<code>{key.access_url}</code>', reply_markup=markup.key_menu(country, protocol))
                             except:
                                 logger.error(f'{traceback.format_exc()}')
@@ -543,7 +587,7 @@ async def callback_query_handlers(call):
                             provider_token=f'{payment_token}',
                             currency='RUB',
                             prices=[price],
-                            photo_url='https://bitlaunch.io/blog/content/images/size/w2000/2022/10/Outline-VPN.png',
+                            photo_url='https://domvpn.store/static/images/slider-img2.png',
                             photo_height=512,  # !=0/None or picture won't be shown
                             photo_width=512,
                             photo_size=512,

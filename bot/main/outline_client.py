@@ -67,44 +67,45 @@ async def create_new_key(server: Server, user: TelegramUser) -> str:
         data_limit = data_limit
     except:
         print('no data_limit provided')
+
     data = dict(server.script_out)
-
-    client = OutlineVPN(api_url=data['apiUrl'], cert_sha256=data['certSha256'])
-    key = client.create_key(
-        key_id=f'{str(user.user_id)}:{str(server.id)}' + f'{str(random.randint(1, 100000))}',
-        name=f'{str(user.user_id)}:{server.ip_address}',
-        # data_limit=data_limit
-    )
-    VpnKey.objects.create(
-        server=server,
-        user=user,
-        key_id=f'{key.key_id}',
-        name=key.name,
-        password=key.password,
-        port=key.port,
-        method=key.method,
-        # access_url=f'{key.access_url}',
-        access_url=f'{key.access_url}#VPN',
-        used_bytes=key.used_bytes,
-        data_limit=key.data_limit
-    )
-    """
-    Добавляется запись об увеличении кол-ва сгенерированных ключей на +1
-    """
     try:
-        # keys_generated = Server.objects.filter(id=server.id).first().keys_generated + 1
-        # if DEBUG: print(keys_generated, 'keys_generated')
-        # g = Server.objects.filter(id=server.id).update(keys_generated=keys_generated)
-        # if DEBUG: print(g, 'g')
-        keys_generated = server.keys_generated
-        server.keys_generated = keys_generated + 1
-        server.save()
-        if DEBUG: print(keys_generated, 'keys_generated')
+        client = OutlineVPN(api_url=data['apiUrl'], cert_sha256=data['certSha256'])
+        key = client.create_key(
+            key_id=f'{str(user.user_id)}:{str(server.id)}' + f'{str(random.randint(1, 100000))}',
+            name=f'{str(user.user_id)}:{server.ip_address}',
+        )
 
+        VpnKey.objects.create(
+            server=server,
+            user=user,
+            key_id=f'{key.key_id}',
+            name=key.name,
+            password=key.password,
+            port=key.port,
+            method=key.method,
+            # access_url=f'{key.access_url}',
+            access_url=f'{key.access_url}#VPN',
+            used_bytes=key.used_bytes,
+            data_limit=key.data_limit
+        )
+        """
+        Добавляется запись об увеличении кол-ва сгенерированных ключей на +1
+        """
+        try:
+            keys_generated = server.keys_generated
+            server.keys_generated = keys_generated + 1
+            server.save()
+            if DEBUG: print(keys_generated, 'keys_generated')
+        except:
+            logger.error(traceback.format_exc())
+            print(traceback.format_exc())
+        return f'{key.access_url}#{server.country.name_for_app} VPN'
     except:
-        logger.error(traceback.format_exc())
         print(traceback.format_exc())
-    return f'{key.access_url}#{server.country.name_for_app} VPN'
+
+
+
 
 
 async def delete_user_keys(user: TelegramUser) -> bool:
