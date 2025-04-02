@@ -159,10 +159,17 @@ echo "Script completed successfully."
         logger.info('Нет серверов для инициализации')
 
 
+def update_generated_keys():
+    servers = Server.objects.all()
+    for server in servers:
+        server.keys_generated = server.vpnkey_set.all().count()
+        server.save()
+
 if __name__ == '__main__':
 
     while True:
         init_outline_servers()
         init_vless_servers()
+        update_generated_keys()
         sleep(60)
 

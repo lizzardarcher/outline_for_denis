@@ -25,12 +25,11 @@ def start():
     btn2 = InlineKeyboardButton(text=f'👨 Профиль', callback_data=f'profile')
     btn3 = InlineKeyboardButton(text=f'🆘 Помощь', callback_data=f'help')
     btn4 = InlineKeyboardButton(text=f'ℹ Информация', callback_data=f'common_info')
-    btn5 = InlineKeyboardButton(text=f'💳 Пополнить баланс', callback_data=f'account:top_up_balance')
     btn6 = InlineKeyboardButton(text=f'💲 Приобрести подписку', callback_data=f'account:buy_subscripton')
     btn7 = InlineKeyboardButton(text=f'📲 Скачать приложение', callback_data=f'download_app')
     markup.row(btn1, btn2)
     markup.row(btn4, btn3)
-    markup.row(btn5, btn6)
+    markup.row(btn6)
     markup.row(btn7)
     return markup
 
@@ -92,19 +91,10 @@ def get_avail_location(protocol: str):
 
 def get_subscription():
     markup = InlineKeyboardMarkup()
-    btn1 = InlineKeyboardButton(text=f'💳 Пополнить баланс', callback_data=f'account:top_up_balance')
     btn2 = InlineKeyboardButton(text=f'💲 Приобрести подписку', callback_data=f'account:buy_subscripton')
     btn3 = InlineKeyboardButton(text=f'🆘 Помощь', callback_data=f'popup_help')
-    markup.row(btn1, btn2)
+    markup.row(btn2)
     markup.row(btn3)
-    markup.row(btn_back)
-    return markup
-
-
-def top_up_balance():
-    markup = InlineKeyboardMarkup()
-    btn1 = InlineKeyboardButton(text=f'💳 Пополнить баланс', callback_data=f'account:top_up_balance')
-    markup.row(btn1)
     markup.row(btn_back)
     return markup
 
@@ -128,10 +118,9 @@ def proceed_to_profile():
 
 def my_profile():
     markup = InlineKeyboardMarkup()
-    btn1 = InlineKeyboardButton(text=f'💳 Пополнить баланс', callback_data=f'account:top_up_balance')
     btn2 = InlineKeyboardButton(text=f'💲 Купить подписку', callback_data=f'account:buy_subscripton')
     btn3 = InlineKeyboardButton(text=f'🤝 Реферальная программа', callback_data=f'referral')
-    markup.row(btn1, btn2)
+    markup.row(btn2)
     markup.row(btn3)
     markup.row(btn_back)
     return markup
@@ -153,7 +142,6 @@ def choose_subscription():
     markup.add(InlineKeyboardButton(text=f'🟢 3 месяца ({price.price_2} р)', callback_data=f'account:sub:2'))
     markup.add(InlineKeyboardButton(text=f'🟢 6 месяцев ({price.price_3} р)', callback_data=f'account:sub:3'))
     markup.add(InlineKeyboardButton(text=f'🟢 1 год ({price.price_4} р)', callback_data=f'account:sub:4'))
-    # markup.add(InlineKeyboardButton(text=f'🟢 Пожизненная (2000 р)', callback_data=f'account:sub:5'))
     markup.add(btn_back)
     return markup
 

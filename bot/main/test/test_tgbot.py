@@ -1,7 +1,6 @@
 import asyncio
 import logging
 import random
-import sys
 import traceback
 from pathlib import Path
 from logging.handlers import RotatingFileHandler, TimedRotatingFileHandler
@@ -11,16 +10,14 @@ from datetime import datetime, timedelta, date
 import django_orm
 from django.conf import settings
 from django.utils import timezone
-
 from telebot import asyncio_filters
 from telebot.async_telebot import AsyncTeleBot
 from telebot.asyncio_storage import StateMemoryStorage
 from telebot.asyncio_handler_backends import State, StatesGroup
 from telebot.types import LabeledPrice, InlineKeyboardButton, InlineKeyboardMarkup
 
-from bot.models import TelegramBot
-from bot.models import TelegramMessage
-from bot.models import Prices
+from bot.main.vless.MarzbanAPI import MarzbanAPI
+from bot.models import TelegramBot, Prices, TelegramMessage
 from bot.models import TelegramUser
 from bot.models import TelegramReferral
 from bot.models import VpnKey
@@ -32,22 +29,24 @@ from bot.models import WithdrawalRequest
 from bot.models import Transaction
 from bot.models import Logging as lg
 
-from bot.main.test import msg
-from bot.main.test import markup
+# from bot.main import msg   # LIVE
+# from bot.main import markup   # LIVE
+from bot.main.test import msg   #   TEST
+from bot.main.test import markup   #   TEST
+
 from bot.main.utils import return_matches
 from bot.main.outline_client import create_new_key
 from bot.main.outline_client import delete_user_keys
-from bot.main.vless.MarzbanAPI import MarzbanAPI
 
-log_path = Path(__file__).parent.absolute() / 'log/bot_log.log'
+log_path = Path(__file__).parent.absolute() / '../log/bot_log.log'
 logger = logging.getLogger(__name__)
 logging.basicConfig(
     format='%(asctime)s %(levelname) -8s %(message)s',
     level=logging.DEBUG,
     datefmt='%Y.%m.%d %I:%M:%S',
     handlers=[
-        # TimedRotatingFileHandler(filename=log_path, when='D', interval=1, backupCount=5),
-        logging.StreamHandler(stream=sys.stderr)
+        TimedRotatingFileHandler(filename=log_path, when='D', interval=1, backupCount=5),
+        # logging.StreamHandler(stream=sys.stderr)
     ],
 )
 
@@ -128,10 +127,6 @@ async def update_user_subscription_status():
             elif key.protocol == 'vless':
                 try:
                     MarzbanAPI().delete_user(username=str(key.user.user_id))
-                    #  Обновляем счетчик - 1
-                    _server = key.server
-                    _server.keys_generated = _server.keys_generated - 1
-                    _server.save()
                     key.delete()
                 except:
                     pass
@@ -172,22 +167,23 @@ async def start(message):
                 try:
                     referrer = TelegramUser.objects.get(user_id=referred_by)  # тот, от кого получена ссылка
                     referred = TelegramUser.objects.get(user_id=message.chat.id)  # тот, кто воспользовался ссылкой
+                    try:
+                        TelegramReferral.objects.create(referrer=referrer, referred=referred, level=1)
 
-                    TelegramReferral.objects.create(referrer=referrer, referred=referred, level=1)
-
-                    #  Проверяем есть ли рефералы у того, кто отправил ссылку и получаем их список, если есть
-                    referred_list = [x for x in TelegramReferral.objects.filter(referred=referrer, level__lte=4)]
-                    for r in referred_list:
-                        current_level = r.level  # 1
-                        current_referrer = r.referrer
-                        new_referral = TelegramReferral.objects.create(referrer=current_referrer, referred=referred,
-                                                                       level=current_level + 1)
-                        logger.info(f'Создана новая реферальная связь {new_referral}')
-                        lg.objects.create(log_level='INFO',
-                                          message=f'[BOT] [Создана новая реферальная связь {new_referral}]',
-                                          datetime=datetime.now(),
-                                          user=TelegramUser.objects.get(user_id=message.from_user.id))
-
+                        #  Проверяем есть ли рефералы у того, кто отправил ссылку и получаем их список, если есть
+                        referred_list = [x for x in TelegramReferral.objects.filter(referred=referrer, level__lte=4)]
+                        for r in referred_list:
+                            current_level = r.level  # 1
+                            current_referrer = r.referrer
+                            new_referral = TelegramReferral.objects.create(referrer=current_referrer, referred=referred,
+                                                                           level=current_level + 1)
+                            logger.info(f'Создана новая реферальная связь {new_referral}')
+                            lg.objects.create(log_level='INFO',
+                                              message=f'[BOT] [Создана новая реферальная связь {new_referral}]',
+                                              datetime=datetime.now(),
+                                              user=TelegramUser.objects.get(user_id=message.from_user.id))
+                    except:
+                        logger.error(f'{traceback.format_exc()}')
                 except:
                     logger.error(f'{traceback.format_exc()}')
                     lg.objects.create(log_level='FATAL', message=f'[BOT] [ОШИБКА:\n{traceback.format_exc()}]',
@@ -390,15 +386,14 @@ async def callback_query_handlers(call):
                     await bot.send_message(chat_id=user.user_id, text=msg.trial_key.format(key))
 
             elif 'manage' in data:
-                # await bot.send_message(call.message.chat.id, msg.avail_location_choice, reply_markup=markup.get_avail_location())
                 await bot.send_message(call.message.chat.id, msg.choose_protocol, reply_markup=markup.choose_protocol())
+
             elif 'country' in data:
 
                 if 'outline' in data:
 
                     if user.subscription_status:
                         country = return_matches(country_list, data[-1])[0]
-                        print('contry', country)
                         if country:
                             try:
                                 key = VpnKey.objects.filter(user=user, server__country__name=country).last()
@@ -412,6 +407,7 @@ async def callback_query_handlers(call):
                                 await bot.send_message(call.message.chat.id, text=msg.get_new_key, reply_markup=markup.get_new_key(country, 'outline'))
                     else:
                         await bot.send_message(call.message.chat.id, msg.no_subscription, reply_markup=markup.get_subscription())
+
                 elif 'vless' in data:
 
                     if user.subscription_status:
@@ -433,6 +429,7 @@ async def callback_query_handlers(call):
                     else:
                         await bot.send_message(call.message.chat.id, msg.no_subscription,
                                                reply_markup=markup.get_subscription())
+
             elif 'protocol_outline' in data:
 
                 await bot.send_message(call.message.chat.id, msg.avail_location_choice, reply_markup=markup.get_avail_location('outline'))
@@ -447,18 +444,13 @@ async def callback_query_handlers(call):
                     protocol = call.data.split(':')[1]
                     if user.subscription_status:
                         if protocol == 'outline':
-                            print('outline')
                             try:
                                 #  Удаляем все предыдущие ключи
                                 await delete_user_keys(user=user)
-                                print('delete_user_keys success')
                                 country = call.data.split('_')[-1]
-                                print('country', country)
                                 server = Server.objects.filter(is_active=True, is_activated=True,country__name=country, keys_generated__lte=200).last()
-                                print('server', server)
                                 logger.info(f"[get_new_key] [SERVER] [{server}]")
                                 key = await create_new_key(server=server, user=user)
-                                print('key', key)
                                 await bot.send_message(call.message.chat.id, text=f'{msg.key_avail}\n<code>{key}</code>', reply_markup=markup.key_menu(country, protocol))
                             except:
                                 logger.error(f'{traceback.format_exc()}')
@@ -466,14 +458,10 @@ async def callback_query_handlers(call):
                             try:
                                 #  Удаляем все предыдущие ключи
                                 _key = VpnKey.objects.filter(user=user)
-                                #  Обновляем счетчик - 1
-                                _server = _key.first().server
-                                _server.keys_generated = _server.keys_generated - 1
-                                _server.save()
                                 _key.delete()
 
                                 country = call.data.split('_')[-1]
-                                server = Server.objects.filter(is_active=True, is_activated_vless=True, country__name=country, keys_generated__lte=200).last()
+                                server = Server.objects.filter(is_active=True, is_activated_vless=True,country__name=country, keys_generated__lte=200).last()
                                 logger.info(f"[get_new_key] [SERVER] [{server}]")
 
                                 MarzbanAPI().create_user(username=str(user.user_id))
@@ -488,10 +476,6 @@ async def callback_query_handlers(call):
                                 key = VpnKey.objects.create(server=server,user=user,key_id=user.user_id,
                                                       name=str(user.user_id),password=str(user.user_id),
                                                       port=1040,method='vless',access_url=key, protocol='vless')
-
-                                #  Обновляем счетчик + 1
-                                server.keys_generated = server.keys_generated + 1
-                                server.save()
 
                                 await bot.send_message(call.message.chat.id, text=f'{msg.key_avail}\n<code>{key.access_url}</code>', reply_markup=markup.key_menu(country, protocol))
                             except:
@@ -521,15 +505,11 @@ async def callback_query_handlers(call):
                             try:
                                 #  Удаляем все предыдущие ключи
                                 _key = VpnKey.objects.filter(user=user)
-                                #  Обновляем счетчик - 1
-                                _server = _key.first().server
-                                _server.keys_generated = _server.keys_generated - 1
-                                _server.save()
                                 _key.delete()
 
                                 country = call.data.split('_')[-1]
 
-                                server = Server.objects.filter(is_active=True, is_activated=True, country__name=country, keys_generated__lte=200).last()
+                                server = Server.objects.filter(is_active=True, is_activated_vless=True, country__name=country, keys_generated__lte=200).last()
 
                                 logger.info(f"[swap_key] [SERVER] [{server}]")
 
@@ -549,10 +529,6 @@ async def callback_query_handlers(call):
                                                             name=str(user.user_id), password=str(user.user_id),
                                                             port=1040, method='vless', access_url=key, protocol='vless')
 
-                                #  Обновляем счетчик + 1
-                                server.keys_generated = server.keys_generated + 1
-                                server.save()
-
                                 await bot.send_message(call.message.chat.id, text=f'{msg.key_avail}\n<code>{key.access_url}</code>', reply_markup=markup.key_menu(country, protocol))
                             except:
                                 logger.error(f'{traceback.format_exc()}')
@@ -568,43 +544,37 @@ async def callback_query_handlers(call):
                                            reply_markup=markup.choose_subscription())
 
                 elif 'payment' in data:
-                    if 'ukassa' in data:
-                        await bot.send_message(call.message.chat.id, text=msg.top_up_balance)
-                        TelegramUser.objects.filter(user_id=user.user_id).update(top_up_balance_listener=True)
-                    elif 'usdt' in data:
-                        await bot.send_message(call.message.chat.id, text=msg.usdt_message,
-                                               reply_markup=markup.proceed_to_profile())
-                    elif 'details' in data:
-                        keyboard = InlineKeyboardMarkup()
-                        keyboard.add(InlineKeyboardButton("Оплатить", pay=True))
-                        keyboard.add(InlineKeyboardButton(text=f'🔙 Назад', callback_data=f'back'))
-                        price = LabeledPrice(label='Пополнение баланса', amount=int(data[-2]) * 100)
-                        await bot.send_invoice(
-                            chat_id=call.message.chat.id,
-                            title='Outline VPN Key',
-                            description='Пополнение баланса для генерации ключей Outline',
-                            invoice_payload=f'{str(user.user_id)}:{data[-2]}',
-                            provider_token=f'{payment_token}',
-                            currency='RUB',
-                            prices=[price],
-                            photo_url='https://domvpn.store/static/images/slider-img2.png',
-                            photo_height=512,  # !=0/None or picture won't be shown
-                            photo_width=512,
-                            photo_size=512,
-                            provider_data='',
-                            is_flexible=False,
-                            need_phone_number=True,
-                            send_phone_number_to_provider=True,
-                            reply_markup=keyboard,
-                        )
+                    if 'ukassa' in data:...
+                        # await bot.send_message(call.message.chat.id, text=msg.top_up_balance)
+                        # TelegramUser.objects.filter(user_id=user.user_id).update(top_up_balance_listener=True)
+                    elif 'usdt' in data:...
+                        # await bot.send_message(call.message.chat.id, text=msg.usdt_message,
+                        #                        reply_markup=markup.proceed_to_profile())
+                    elif 'details' in data:...
+                        # keyboard = InlineKeyboardMarkup()
+                        # keyboard.add(InlineKeyboardButton("Оплатить", pay=True))
+                        # keyboard.add(InlineKeyboardButton(text=f'🔙 Назад', callback_data=f'back'))
+                        # price = LabeledPrice(label='Пополнение баланса', amount=int(data[-2]) * 100)
+                        # await bot.send_invoice(
+                        #     chat_id=call.message.chat.id,
+                        #     title='Outline VPN Key',
+                        #     description='Пополнение баланса для генерации ключей Outline',
+                        #     invoice_payload=f'{str(user.user_id)}:{data[-2]}',
+                        #     provider_token=f'{payment_token}',
+                        #     currency='RUB',
+                        #     prices=[price],
+                        #     photo_url='https://domvpn.store/static/images/slider-img2.png',
+                        #     photo_height=512,  # !=0/None or picture won't be shown
+                        #     photo_width=512,
+                        #     photo_size=512,
+                        #     provider_data='',
+                        #     is_flexible=False,
+                        #     need_phone_number=True,
+                        #     send_phone_number_to_provider=True,
+                        #     reply_markup=keyboard,
+                        # )
 
                 elif 'sub' in data:
-                    '''
-                    1 мес - 359 ₽ 229 ₽
-                    3 мес - 890 ₽ 649 ₽
-                    6 мес - 1749 ₽ 1290 ₽
-                    12 мес - 3190 ₽ 2290 ₽
-                    '''
                     user_balance = user.balance
                     price = None
                     days = None
@@ -622,48 +592,43 @@ async def callback_query_handlers(call):
                     elif data[-1] == '4':
                         price = prices.price_4
                         days = 366
+                    #
+                    # if user_balance < price:
+                    #     await bot.send_message(call.message.chat.id, text=msg.low_balance,
+                    #                            reply_markup=markup.top_up_balance())
+                    # else:
+                    #     description = f' <code>{days}</code> за <code>{price}р.</code>'
+                    #     await bot.send_message(call.message.chat.id, text=msg.confirm_subscription.format(description),
+                    #                            reply_markup=markup.confirm_subscription(price=price, days=days))
 
-                    if user_balance < price:
-                        await bot.send_message(call.message.chat.id, text=msg.low_balance,
-                                               reply_markup=markup.top_up_balance())
-                    else:
-                        description = f' <code>{days}</code> за <code>{price}р.</code>'
-                        await bot.send_message(call.message.chat.id, text=msg.confirm_subscription.format(description),
-                                               reply_markup=markup.confirm_subscription(price=price, days=days))
-
-                elif 'confirm_subscription' in data:
-                    user_balance = user.balance
-                    user_subscription_status = user.subscription_status
-                    balance_after = user_balance - int(data[-2])
-                    days = int(data[-1])
-
-                    if user_subscription_status:
-                        new_exp_date = user.subscription_expiration + timedelta(days=days)
-                    else:
-                        new_exp_date = datetime.now() + timedelta(days=days)
-
-                    TelegramUser.objects.filter(user_id=user.user_id).update(
-                        balance=balance_after, subscription_status=True,
-                        subscription_expiration=new_exp_date)
-                    try:
-                        user_balance_total = IncomeInfo.objects.get(pk=1).user_balance_total - int(data[-2])
-                        IncomeInfo.objects.filter(id=1).update(user_balance_total=user_balance_total)
-                    except:
-                        pass
-                    await bot.send_message(call.message.chat.id, text=msg.sub_successful.format(new_exp_date, data[-2]),
-                                           reply_markup=markup.proceed_to_profile())
+                elif 'confirm_subscription' in data:...
+                    # user_balance = user.balance
+                    # user_subscription_status = user.subscription_status
+                    # balance_after = user_balance - int(data[-2])
+                    # days = int(data[-1])
+                    #
+                    # if user_subscription_status:
+                    #     new_exp_date = user.subscription_expiration + timedelta(days=days)
+                    # else:
+                    #     new_exp_date = datetime.now() + timedelta(days=days)
+                    #
+                    # TelegramUser.objects.filter(user_id=user.user_id).update(
+                    #     balance=balance_after, subscription_status=True,
+                    #     subscription_expiration=new_exp_date)
+                    # try:
+                    #     user_balance_total = IncomeInfo.objects.get(pk=1).user_balance_total - int(data[-2])
+                    #     IncomeInfo.objects.filter(id=1).update(user_balance_total=user_balance_total)
+                    # except:
+                    #     pass
+                    # await bot.send_message(call.message.chat.id, text=msg.sub_successful.format(new_exp_date, data[-2]),
+                    #                        reply_markup=markup.proceed_to_profile())
 
             elif 'profile' in data:
-                # try:
-                #     await update_keys_data_limit(user=user)
-                # except:
-                #     print(traceback.format_exc())
                 user_id = user.user_id
                 balance = user.balance
                 income = user.income
                 sub = str(user.subscription_expiration) if user.subscription_status else 'Нет подписки'
                 reg_date = str(user.join_date)
-                data_limit = str(ceil(user.data_limit / (1016 ** 3)))
 
                 await bot.send_message(call.message.chat.id,
                                        text=msg.profile.format(user_id, balance, sub, reg_date, income),

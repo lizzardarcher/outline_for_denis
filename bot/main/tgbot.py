@@ -123,10 +123,6 @@ async def update_user_subscription_status():
             elif key.protocol == 'vless':
                 try:
                     MarzbanAPI().delete_user(username=str(key.user.user_id))
-                    #  Обновляем счетчик - 1
-                    _server = key.server
-                    _server.keys_generated = _server.keys_generated - 1
-                    _server.save()
                     key.delete()
                 except:
                     pass
@@ -167,22 +163,23 @@ async def start(message):
                 try:
                     referrer = TelegramUser.objects.get(user_id=referred_by)  # тот, от кого получена ссылка
                     referred = TelegramUser.objects.get(user_id=message.chat.id)  # тот, кто воспользовался ссылкой
+                    try:
+                        TelegramReferral.objects.create(referrer=referrer, referred=referred, level=1)
 
-                    TelegramReferral.objects.create(referrer=referrer, referred=referred, level=1)
-
-                    #  Проверяем есть ли рефералы у того, кто отправил ссылку и получаем их список, если есть
-                    referred_list = [x for x in TelegramReferral.objects.filter(referred=referrer, level__lte=4)]
-                    for r in referred_list:
-                        current_level = r.level  # 1
-                        current_referrer = r.referrer
-                        new_referral = TelegramReferral.objects.create(referrer=current_referrer, referred=referred,
-                                                                       level=current_level + 1)
-                        logger.info(f'Создана новая реферальная связь {new_referral}')
-                        lg.objects.create(log_level='INFO',
-                                          message=f'[BOT] [Создана новая реферальная связь {new_referral}]',
-                                          datetime=datetime.now(),
-                                          user=TelegramUser.objects.get(user_id=message.from_user.id))
-
+                        #  Проверяем есть ли рефералы у того, кто отправил ссылку и получаем их список, если есть
+                        referred_list = [x for x in TelegramReferral.objects.filter(referred=referrer, level__lte=4)]
+                        for r in referred_list:
+                            current_level = r.level  # 1
+                            current_referrer = r.referrer
+                            new_referral = TelegramReferral.objects.create(referrer=current_referrer, referred=referred,
+                                                                           level=current_level + 1)
+                            logger.info(f'Создана новая реферальная связь {new_referral}')
+                            lg.objects.create(log_level='INFO',
+                                              message=f'[BOT] [Создана новая реферальная связь {new_referral}]',
+                                              datetime=datetime.now(),
+                                              user=TelegramUser.objects.get(user_id=message.from_user.id))
+                    except:
+                        logger.error(f'{traceback.format_exc()}')
                 except:
                     logger.error(f'{traceback.format_exc()}')
                     lg.objects.create(log_level='FATAL', message=f'[BOT] [ОШИБКА:\n{traceback.format_exc()}]',
@@ -430,11 +427,9 @@ async def callback_query_handlers(call):
             elif 'protocol_outline' in data:
 
                 await bot.send_message(call.message.chat.id, msg.avail_location_choice, reply_markup=markup.get_avail_location('outline'))
-
             elif 'protocol_vless' in data:
 
                 await bot.send_message(call.message.chat.id, msg.avail_location_choice, reply_markup=markup.get_avail_location('vless'))
-
             elif 'account' in data:
 
                 if 'get_new_key' in call.data:
@@ -455,10 +450,6 @@ async def callback_query_handlers(call):
                             try:
                                 #  Удаляем все предыдущие ключи
                                 _key = VpnKey.objects.filter(user=user)
-                                #  Обновляем счетчик - 1
-                                _server = _key.first().server
-                                _server.keys_generated = _server.keys_generated - 1
-                                _server.save()
                                 _key.delete()
 
                                 country = call.data.split('_')[-1]
@@ -477,10 +468,6 @@ async def callback_query_handlers(call):
                                 key = VpnKey.objects.create(server=server,user=user,key_id=user.user_id,
                                                       name=str(user.user_id),password=str(user.user_id),
                                                       port=1040,method='vless',access_url=key, protocol='vless')
-
-                                #  Обновляем счетчик + 1
-                                server.keys_generated = server.keys_generated + 1
-                                server.save()
 
                                 await bot.send_message(call.message.chat.id, text=f'{msg.key_avail}\n<code>{key.access_url}</code>', reply_markup=markup.key_menu(country, protocol))
                             except:
@@ -510,10 +497,6 @@ async def callback_query_handlers(call):
                             try:
                                 #  Удаляем все предыдущие ключи
                                 _key = VpnKey.objects.filter(user=user)
-                                #  Обновляем счетчик - 1
-                                _server = _key.first().server
-                                _server.keys_generated = _server.keys_generated - 1
-                                _server.save()
                                 _key.delete()
 
                                 country = call.data.split('_')[-1]
@@ -538,10 +521,6 @@ async def callback_query_handlers(call):
                                                             name=str(user.user_id), password=str(user.user_id),
                                                             port=1040, method='vless', access_url=key, protocol='vless')
 
-                                #  Обновляем счетчик + 1
-                                server.keys_generated = server.keys_generated + 1
-                                server.save()
-
                                 await bot.send_message(call.message.chat.id, text=f'{msg.key_avail}\n<code>{key.access_url}</code>', reply_markup=markup.key_menu(country, protocol))
                             except:
                                 logger.error(f'{traceback.format_exc()}')
@@ -557,17 +536,17 @@ async def callback_query_handlers(call):
                                            reply_markup=markup.choose_subscription())
 
                 elif 'payment' in data:
+
                     if 'ukassa' in data:
                         await bot.send_message(call.message.chat.id, text=msg.top_up_balance)
                         TelegramUser.objects.filter(user_id=user.user_id).update(top_up_balance_listener=True)
-                    elif 'usdt' in data:
-                        await bot.send_message(call.message.chat.id, text=msg.usdt_message,
-                                               reply_markup=markup.proceed_to_profile())
+
                     elif 'details' in data:
                         keyboard = InlineKeyboardMarkup()
                         keyboard.add(InlineKeyboardButton("Оплатить", pay=True))
                         keyboard.add(InlineKeyboardButton(text=f'🔙 Назад', callback_data=f'back'))
                         price = LabeledPrice(label='Пополнение баланса', amount=int(data[-2]) * 100)
+
                         await bot.send_invoice(
                             chat_id=call.message.chat.id,
                             title='Outline VPN Key',

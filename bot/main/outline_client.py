@@ -32,27 +32,6 @@ logging.basicConfig(
 )
 
 
-async def update_keys_data_limit(user: TelegramUser):
-    try:
-        data = VpnKey.objects.filter(user=user).first().server.script_out
-        client = OutlineVPN(api_url=data['apiUrl'], cert_sha256=data['certSha256'])
-        if DEBUG: print(data)
-
-        #  Обновляем запись в ключе
-        key_id = VpnKey.objects.filter(user=user).first().key_id
-        used_bytes = client.get_transferred_data()['bytesTransferredByUserId'][key_id]
-        VpnKey.objects.filter(user=user).update(used_bytes=used_bytes)
-        if DEBUG: print(key_id, used_bytes)
-
-        #  Обновляем data_limit у пользователя
-        data_limit = int(user.data_limit) - int(used_bytes)
-        TelegramUser.objects.filter(user_id=user.user_id).update(data_limit=data_limit)
-        if DEBUG: print(data_limit)
-
-    except:
-        if DEBUG: print(traceback.format_exc())
-
-
 async def create_new_key(server: Server, user: TelegramUser) -> str:
     """
     Создать новый vpn ключ
@@ -89,19 +68,9 @@ async def create_new_key(server: Server, user: TelegramUser) -> str:
             used_bytes=key.used_bytes,
             data_limit=key.data_limit
         )
-        """
-        Добавляется запись об увеличении кол-ва сгенерированных ключей на +1
-        """
-        try:
-            keys_generated = server.keys_generated
-            server.keys_generated = keys_generated + 1
-            server.save()
-            if DEBUG: print(keys_generated, 'keys_generated')
-        except:
-            logger.error(traceback.format_exc())
-            print(traceback.format_exc())
         return f'{key.access_url}#{server.country.name_for_app} VPN'
     except:
+        Logging.objects.create(text=f'User {user.user_id} has failed to create a key on {server.ip_address} server')
         print(traceback.format_exc())
 
 
@@ -131,15 +100,6 @@ async def delete_user_keys(user: TelegramUser) -> bool:
                     client.delete_key(key)
                     keys.remove(key)
                     if DEBUG: print('Ключ Успешно Удалён :: ', key)
-
-                    try:
-                        #  Добавляется запись об уменьшении кол-ва сгенерированных ключей на -1
-                        keys_generated = Server.objects.filter(script_out=data).first().keys_generated - 1
-                        if DEBUG: print(keys_generated, 'keys_generated')
-                        Server.objects.filter(script_out=data).update(keys_generated=keys_generated)
-                    except:
-                        logger.error(traceback.format_exc())
-
                 except:
                     ...
         VpnKey.objects.filter(user=user).delete()
