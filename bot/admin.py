@@ -107,7 +107,7 @@ class LogInline(admin.TabularInline):
 @admin.register(TelegramUser)
 class TelegramUserAdmin(admin.ModelAdmin):
     list_display = (
-        'join_date', 'first_name', 'last_name', 'username', 'subscription_status', 'subscription_expiration', 'balance', 'referral_link')
+        'join_date', 'first_name', 'last_name', 'username', 'subscription_status', 'subscription_expiration', 'balance', 'referral_link', 'payment_method_id')
     list_display_links = (
         'join_date', 'first_name', 'last_name', 'username', 'subscription_status', 'subscription_expiration', 'balance')
     search_fields = ('first_name', 'last_name', 'username', 'user_id')
@@ -374,6 +374,7 @@ class LoggingAdmin(admin.ModelAdmin):
 
     list_display = ('datetime', 'user', 'message', 'get_log_level',)
     list_display_links = ('user', 'message',)
+    search_fields = ('message', )
     ordering = ['-datetime']
     actions = [make_warning, make_debug, make_fatal, make_trace, make_success, make_info]
 

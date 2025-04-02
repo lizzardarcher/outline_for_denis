@@ -25,6 +25,8 @@ class TelegramUser(models.Model):
 
     top_up_balance_listener = models.BooleanField(default=False, verbose_name='Top up balance listener')
     withdrawal_listener = models.BooleanField(default=False, verbose_name='Withdrawal listener')
+    payment_method_id = models.CharField(max_length=1000, blank=True, null=True, default='', verbose_name='Payment Method ID')
+
 
     def __str__(self):
         if not self.last_name:

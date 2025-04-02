@@ -70,36 +70,6 @@ class PaymentSuccessView(TemplateView):
         context = super().get_context_data(**kwargs)
         return context
 
-
-# class PaymentSuccessView(View):
-#     def get(self, request, *args, **kwargs):
-#
-#         # получаем id платежа из сессии
-#         payment = Transaction.objects.filter(user=request.user.profile.telegram_user).last()
-#         payment_id = payment.payment_id
-#         amount = payment.amount
-#         if payment_id is None or amount is None:
-#             messages.error(request, 'Платёж отменен.')
-#             return redirect(reverse('payment_failure'))
-#
-#         # Настройка ЮKassa
-#         Configuration.account_id = settings.YOOKASSA_SHOP_ID
-#         Configuration.secret_key = settings.YOOKASSA_SECRET
-#
-#         # Получаем данные о платеже
-#         try:
-#             payment = Payment.find_one(payment_id)
-#         except Exception as e:
-#             return HttpResponse("Произошла ошибка при оплате. Попробуйте позже.", status=400)
-#
-#         if payment.status == 'succeeded':
-#             del request.session['yookassa_payment_id']
-#             del request.session['yookassa_payment_amount']
-#             return render(request, 'payments/payment_success.html')  # Создайте payment_success.html
-#         else:
-#             return redirect(reverse('payment_failure'))
-
-
 class PaymentFailureView(TemplateView):
     template_name = 'payments/payment_failure.html'
 
@@ -209,3 +179,72 @@ class YookassaWebhookView(View):
             Logging.objects.create(log_level="DANGER",
                                    message=f'[WEB] [Ошибка при приёме вебхука {str(traceback.format_exc())}]',
                                    datetime=datetime.now(), user=self.request.user.profile.telegram_user)
+
+
+@method_decorator(csrf_exempt, name='dispatch')
+class YookassaTGBOTWebhookView(View):
+    def post(self, request, *args, **kwargs):
+
+        try:
+            data = json.loads(request.body)
+        except json.JSONDecodeError:
+            return HttpResponse('Invalid request body', status=400)
+
+        event_type = data.get('event')
+        payment_data = data.get('object')
+        metadata = payment_data.get('metadata')
+        telegram_user_id = int(metadata.get('telegram_user_id'))
+        telegram_user = TelegramUser.objects.get(user_id=telegram_user_id)
+
+        # Обработка события
+        if 'succeeded' in str(event_type) :
+            Logging.objects.create(log_level="SUCCESS", message=f'[BOT] [TEST] [Приём вебхука] [{event_type}]', datetime=datetime.now())
+            try:
+                payment_id = payment_data.get('id')
+                status = payment_data.get('status')
+                payment_method_id = payment_data.get('payment_method').get('id')
+                amount_value = float(payment_data.get('amount').get('value'))
+                transaction = Transaction.objects.filter(payment_id=payment_id).first()
+
+                if transaction.status != 'succeeded' and int(amount_value) > 0:
+                    transaction.status = status
+                    transaction.paid = True
+                    transaction.save()
+
+                    telegram_user.payment_method_id = payment_method_id
+                    telegram_user.save()
+
+                    # income = IncomeInfo.objects.get(id=1)
+                    # income.total_amount = float(income.total_amount) + float(amount_value)
+                    # income.save()
+
+                    Logging.objects.create(log_level="SUCCESS", message=f'[BOT] [TEST] [Платёж  на сумму {str(amount_value)} р. прошёл]', datetime=datetime.now(), user=telegram_user)
+                    return HttpResponse(f'Обновляем баланс пользователя', status=200)
+
+            except Exception as e:
+                Logging.objects.create(log_level="DANGER",
+                                       message=f'[BOT] [TEST] [Ошибка при приёме вебхука {str(traceback.format_exc())}]',
+                                       datetime=datetime.now(), user=telegram_user)
+                return HttpResponse('OK', status=200)
+
+        elif 'canceled' in str(event_type):
+            Logging.objects.create(log_level="WARNING", message=f'[BOT] [Приём вебхука] [{event_type}]', datetime=datetime.now())
+            try:
+                payment_id = payment_data.get('id')
+                status = payment_data.get('status')
+                transaction = Transaction.objects.filter(payment_id=payment_id).first()
+                transaction.status = status
+                transaction.paid = False
+                transaction.save()
+                Logging.objects.create(log_level="WARNING",
+                                       message=f'[BOT] [Платёж  на сумму {str(traceback.format_exc())} р. отменён]',
+                                       datetime=datetime.now(), user=self.request.user.profile.telegram_user)
+            except Exception as e:
+                Logging.objects.create(log_level="DANGER",
+                                       message=f'[BOT] [Ошибка при приёме вебхука {str(traceback.format_exc())}]',
+                                       datetime=datetime.now(), user=self.request.user.profile.telegram_user)
+            return HttpResponse('OK', status=200)
+        else:
+            Logging.objects.create(log_level="DANGER", message=f'[BOT] [Непонятно что] [.......]', datetime=datetime.now())
+            return HttpResponse('OK', status=200)
+
