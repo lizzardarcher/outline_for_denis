@@ -29,9 +29,9 @@ from bot.models import WithdrawalRequest
 from bot.models import Transaction
 from bot.models import Logging as lg
 
-from bot.main import msg
-from bot.main import markup
-from bot.main.utils import return_matches
+from bot.main.utils import msg
+from bot.main.utils import markup
+from bot.main.utils.utils import return_matches
 from bot.main.outline_client import create_new_key
 from bot.main.outline_client import delete_user_keys
 

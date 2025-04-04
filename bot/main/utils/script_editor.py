@@ -1,4 +1,4 @@
-import django_orm
+from bot.main import django_orm
 from bot.models import *
 
 servers = Server.objects.all()

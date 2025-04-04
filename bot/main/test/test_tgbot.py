@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import random
+import sys
 import traceback
 from pathlib import Path
 from logging.handlers import RotatingFileHandler, TimedRotatingFileHandler
@@ -38,7 +39,7 @@ from bot.models import Logging as lg
 from bot.main.test import msg  # TEST
 from bot.main.test import markup  # TEST
 
-from bot.main.utils import return_matches
+from bot.main.utils.utils import return_matches
 from bot.main.outline_client import create_new_key
 from bot.main.outline_client import delete_user_keys
 
@@ -49,8 +50,8 @@ logging.basicConfig(
     level=logging.DEBUG,
     datefmt='%Y.%m.%d %I:%M:%S',
     handlers=[
-        TimedRotatingFileHandler(filename=log_path, when='D', interval=1, backupCount=5),
-        # logging.StreamHandler(stream=sys.stderr)
+        # TimedRotatingFileHandler(filename=log_path, when='D', interval=1, backupCount=5),
+        logging.StreamHandler(stream=sys.stderr)
     ],
 )
 
@@ -653,7 +654,7 @@ async def callback_query_handlers(call):
                             },
                             "confirmation": {
                                 "type": "redirect",
-                                "return_url": f'https://t.me/{BOT_USERNAME}?payment',
+                                "return_url": f'https://t.me/{BOT_USERNAME}?start',
                                 "enforce": False
                             },
                             "capture": True,
