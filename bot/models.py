@@ -26,6 +26,8 @@ class TelegramUser(models.Model):
     top_up_balance_listener = models.BooleanField(default=False, verbose_name='Top up balance listener')
     withdrawal_listener = models.BooleanField(default=False, verbose_name='Withdrawal listener')
     payment_method_id = models.CharField(max_length=1000, blank=True, null=True, default='', verbose_name='Payment Method ID')
+    permission_revoked = models.BooleanField(default=False, verbose_name='Permission Revoked')
+    next_payment_date = models.DateField(default=None, blank=True, null=True, verbose_name='Следующее списание')
 
 
     def __str__(self):
@@ -126,8 +128,6 @@ class Transaction(models.Model):
     paid = models.BooleanField(null=True, blank=True, default=False, verbose_name='Оплачено')
     status = models.CharField(max_length=50, choices=STATUS, default='pending', null=True, blank=True, verbose_name='Статус')
 
-    # def __str__(self):
-    #     return f"Транзакция пользователя - {self.user.username}: {self.amount} от {self.timestamp}"
 
     def __str__(self):
         if self.status == 'pending':

@@ -13,3 +13,4 @@ fontawesomefree
 aiohttp
 
 celery~=5.5.0
+django-celery-beat~=2.7.0

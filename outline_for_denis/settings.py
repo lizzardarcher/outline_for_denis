@@ -121,6 +121,7 @@ CELERY_TASK_ALWAYS_EAGER = True                      ### только для о�
 
 CELERY_IMPORTS = [
     'bot.tasks',
+    'apps.payment.tasks',
 ]
 
 CACHES = {

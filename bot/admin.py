@@ -4,16 +4,20 @@ from django.contrib import admin
 from django.contrib.auth.models import Group, User
 from django.utils.html import format_html
 from django.conf import settings
+from django_celery_beat.models import *
 
 from bot.models import *
 
 DEBUG = settings.DEBUG
 # admin.site.site_url = ''
-admin.site.site_header = "Outline VPN BOT Админ Панель"
-admin.site.site_title = "Outline VPN BOT"
-admin.site.index_title = "Добро пожаловать в Outline VPN BOT Админ Панель"
+admin.site.site_header = "DomVPN BOT Админ Панель"
+admin.site.site_title = "DomVPN BOT"
+admin.site.index_title = "Добро пожаловать в DomVPN BOT Админ Панель"
 admin.site.unregister(Group)
 admin.site.unregister(User)
+admin.site.unregister(CrontabSchedule)
+admin.site.unregister(SolarSchedule)
+admin.site.unregister(ClockedSchedule)
 
 
 class WithdrawalRequestInline(admin.TabularInline):
@@ -107,7 +111,8 @@ class LogInline(admin.TabularInline):
 @admin.register(TelegramUser)
 class TelegramUserAdmin(admin.ModelAdmin):
     list_display = (
-        'join_date', 'first_name', 'last_name', 'username', 'subscription_status', 'subscription_expiration', 'balance', 'referral_link', 'payment_method_id')
+        'join_date', 'first_name', 'last_name', 'username', 'subscription_status',
+        'subscription_expiration', 'balance', 'referral_link', 'payment_method_id', 'permission_revoked')
     list_display_links = (
         'join_date', 'first_name', 'last_name', 'username', 'subscription_status', 'subscription_expiration', 'balance')
     search_fields = ('first_name', 'last_name', 'username', 'user_id')
