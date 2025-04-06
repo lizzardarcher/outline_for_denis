@@ -25,10 +25,12 @@ def start():
     btn2 = InlineKeyboardButton(text=f'👨 Профиль', callback_data=f'profile')
     btn3 = InlineKeyboardButton(text=f'🆘 Помощь', callback_data=f'help')
     btn4 = InlineKeyboardButton(text=f'ℹ Информация', callback_data=f'common_info')
-    btn6 = InlineKeyboardButton(text=f'💲 Приобрести подписку', callback_data=f'account:buy_subscripton')
+    btn5 = InlineKeyboardButton(text=f'✅ Попробовать 3 дня за 20р.', callback_data=f'account:3_days_trial')
+    btn6 = InlineKeyboardButton(text=f'💲 Приобрести подписку', callback_data=f'account:choose_payment')
     btn7 = InlineKeyboardButton(text=f'📲 Скачать приложение', callback_data=f'download_app')
     markup.row(btn1, btn2)
     markup.row(btn4, btn3)
+    markup.row(btn5)
     markup.row(btn6)
     markup.row(btn7)
     return markup
@@ -91,7 +93,7 @@ def get_avail_location(protocol: str):
 
 def get_subscription():
     markup = InlineKeyboardMarkup()
-    btn2 = InlineKeyboardButton(text=f'💲 Приобрести подписку', callback_data=f'account:buy_subscripton')
+    btn2 = InlineKeyboardButton(text=f'💲 Приобрести подписку', callback_data=f'account:choose_payment')
     btn3 = InlineKeyboardButton(text=f'🆘 Помощь', callback_data=f'popup_help')
     markup.row(btn2)
     markup.row(btn3)
@@ -118,7 +120,7 @@ def proceed_to_profile():
 
 def my_profile():
     markup = InlineKeyboardMarkup()
-    btn2 = InlineKeyboardButton(text=f'💲 Купить подписку', callback_data=f'account:buy_subscripton')
+    btn2 = InlineKeyboardButton(text=f'💲 Купить подписку', callback_data=f'account:choose_payment')
     btn3 = InlineKeyboardButton(text=f'🤝 Реферальная программа', callback_data=f'referral')
     markup.row(btn2)
     markup.row(btn3)
@@ -126,11 +128,10 @@ def my_profile():
     return markup
 
 
-def paymemt_menu():
+def payment_menu():
     markup = InlineKeyboardMarkup()
     markup.add(InlineKeyboardButton(text=f'Юкасса (Банковская карта)', callback_data=f'account:payment:ukassa'))
     markup.add(InlineKeyboardButton(text=f'Через сайт (СБП, SperPay, ЮМoney)', url=f'https://domvpn.store/auth/accounts/login/'))
-    # markup.add(InlineKeyboardButton(text=f'USDT', callback_data=f'account:payment:usdt'))
     markup.add(btn_back)
     return markup
 
@@ -138,10 +139,12 @@ def paymemt_menu():
 def choose_subscription():
     markup = InlineKeyboardMarkup()
     price = Prices.objects.get(pk=1)
+    markup.add(InlineKeyboardButton(text=f'🟢 3 дня ({price.price_5} р)', callback_data=f'account:3_days_trial'))
     markup.add(InlineKeyboardButton(text=f'🟢 1 месяц ({price.price_1} р)', callback_data=f'account:sub:1'))
     markup.add(InlineKeyboardButton(text=f'🟢 3 месяца ({price.price_2} р)', callback_data=f'account:sub:2'))
     markup.add(InlineKeyboardButton(text=f'🟢 6 месяцев ({price.price_3} р)', callback_data=f'account:sub:3'))
     markup.add(InlineKeyboardButton(text=f'🟢 1 год ({price.price_4} р)', callback_data=f'account:sub:4'))
+
     markup.add(btn_back)
     return markup
 

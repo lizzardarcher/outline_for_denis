@@ -155,10 +155,9 @@ async def start(message):
                                         username=message.from_user.username,
                                         first_name=message.from_user.first_name,
                                         last_name=message.from_user.last_name,
-                                        data_limit=5368709120 * 100,  # 5 GB at start
-                                        subscription_status=True,
-                                        subscription_expiration=datetime.now() + timedelta(days=3))
-            await bot.send_message(chat_id=message.chat.id, text=msg.new_user_bonus)
+                                        subscription_status=False,
+                                        subscription_expiration=datetime.now() - timedelta(days=1))
+            # await bot.send_message(chat_id=message.chat.id, text=msg.new_user_bonus)
             lg.objects.create(log_level='INFO', message='[BOT] [Создан новый пользователь]', datetime=datetime.now(),
                               user=TelegramUser.objects.get(user_id=message.from_user.id))
         except:
@@ -615,15 +614,10 @@ async def callback_query_handlers(call):
                             await bot.send_message(call.message.chat.id, msg.no_subscription,
                                                    reply_markup=markup.get_subscription())
 
-                elif 'top_up_balance' in data:
-                    await bot.send_message(call.message.chat.id, text=msg.paymemt_menu,
-                                           reply_markup=markup.paymemt_menu())
-
-                elif 'buy_subscripton' in data:
-                    await bot.send_message(call.message.chat.id, text=msg.choose_subscription,
-                                           reply_markup=markup.choose_subscription())
-
-                elif 'sub' in data:
+                elif 'choose_payment' in data:
+                    await bot.send_message(call.message.chat.id, text=msg.payment_menu,
+                                           reply_markup=markup.payment_menu())
+                elif 'sub' in data or '3_days_trial' in data:
                     user_balance = user.balance
                     price = None
                     days = None
@@ -641,11 +635,15 @@ async def callback_query_handlers(call):
                     elif data[-1] == '4':
                         price = prices.price_4
                         days = 366
+                    elif '3_days_trial' in data:
+                        price = 20
+                        days = 3
 
                     try:
+
                         # Настройка ЮKassa
-                        Configuration.account_id = 1022620
-                        Configuration.secret_key = 'test_f77DOK4mGfpKFgjWRwQJA3rHJ1ceNJr4hG7R98-uIt0'
+                        Configuration.account_id = settings.YOOKASSA_SHOP_ID_BOT
+                        Configuration.secret_key = settings.YOOKASSA_SECRET_BOT
 
                         payment = Payment.create({
                             "amount": {
@@ -661,7 +659,7 @@ async def callback_query_handlers(call):
                             "description": f'Подписка DomVPN на {days} дн.',
                             "save_payment_method": True,
                             "metadata": {
-                                'user_id': UserProfile.objects.get(telegram_user_id=call.message.chat.id).user.id,
+                                'user_id': call.message.chat.id,
                                 'telegram_user_id': call.message.chat.id,
                             }
                         }, )
@@ -669,19 +667,23 @@ async def callback_query_handlers(call):
                         Transaction.objects.create(status='pending', paid=False, amount=float(price), user=user,
                                                    currency='RUB', income_info=IncomeInfo.objects.get(pk=1),
                                                    side='Приход средств',
-                                                   description='Пополнение баланса пользователя', payment_id=payment.id)
+                                                   description='Пополнение баланса пользователя',
+                                                   payment_id=payment.id)
                         Logging.objects.create(log_level="INFO",
                                                message=f'[BOT] [Платёжный запрос на сумму {str(price)} р.]',
                                                datetime=datetime.now(), user=user)
 
                         confirmation_url = payment.confirmation.confirmation_url
-                        print(payment.id)
+                        payment_markup = InlineKeyboardMarkup()
+                        payment_markup.add(InlineKeyboardButton(text=f'💳 Оплатить подписку {str(days)} дн. за {str(price)}р.', url=confirmation_url))
+
                         await bot.send_message(call.message.chat.id,
-                                               f"Для подтверждения подписки перейдите по ссылке:\n{confirmation_url}")
-
-
+                                               f"Для оплаты подписки на {days} дн. нажмите на кнопку Оплатить и следуйте инструкциям:",
+                                               reply_markup=payment_markup)
+                        await asyncio.sleep(10)
+                        await bot.send_message(call.message.chat.id, text=msg.after_payment, reply_markup=markup.proceed_to_profile())
                     except Exception as e:
-                        print(f"Ошибка при создании платежа: {e}")
+                        print(f"Ошибка при создании платежа: {traceback.format_exc()}")
                         await bot.send_message(call.message.chat.id,
                                                f"Произошла ошибка при оформлении подписки.  Попробуйте позже. {e}")
                     #
@@ -695,37 +697,7 @@ async def callback_query_handlers(call):
 
                 elif 'payment' in data:
                     if 'ukassa' in data:
-                        ...
-                    # await bot.send_message(call.message.chat.id, text=msg.top_up_balance)
-                    # TelegramUser.objects.filter(user_id=user.user_id).update(top_up_balance_listener=True)
-                    elif 'usdt' in data:
-                        ...
-                    # await bot.send_message(call.message.chat.id, text=msg.usdt_message,
-                    #                        reply_markup=markup.proceed_to_profile())
-                    elif 'details' in data:
-                        ...
-                    # keyboard = InlineKeyboardMarkup()
-                    # keyboard.add(InlineKeyboardButton("Оплатить", pay=True))
-                    # keyboard.add(InlineKeyboardButton(text=f'🔙 Назад', callback_data=f'back'))
-                    # price = LabeledPrice(label='Пополнение баланса', amount=int(data[-2]) * 100)
-                    # await bot.send_invoice(
-                    #     chat_id=call.message.chat.id,
-                    #     title='Outline VPN Key',
-                    #     description='Пополнение баланса для генерации ключей Outline',
-                    #     invoice_payload=f'{str(user.user_id)}:{data[-2]}',
-                    #     provider_token=f'{payment_token}',
-                    #     currency='RUB',
-                    #     prices=[price],
-                    #     photo_url='https://domvpn.store/static/images/slider-img2.png',
-                    #     photo_height=512,  # !=0/None or picture won't be shown
-                    #     photo_width=512,
-                    #     photo_size=512,
-                    #     provider_data='',
-                    #     is_flexible=False,
-                    #     need_phone_number=True,
-                    #     send_phone_number_to_provider=True,
-                    #     reply_markup=keyboard,
-                    # )
+                        await bot.send_message(call.message.chat.id, text=msg.choose_subscription, reply_markup=markup.choose_subscription())
 
                 elif 'confirm_subscription' in data:
                     ...
@@ -755,10 +727,10 @@ async def callback_query_handlers(call):
                 balance = user.balance
                 income = user.income
                 sub = str(user.subscription_expiration) if user.subscription_status else 'Нет подписки'
-                reg_date = str(user.join_date)
+                active = '✅' if user.subscription_status else '❌'
 
                 await bot.send_message(call.message.chat.id,
-                                       text=msg.profile.format(user_id, balance, sub, reg_date, income),
+                                       text=msg.profile.format(user_id, sub, active, income),
                                        reply_markup=markup.my_profile())
 
             elif 'referral' in data:
@@ -826,7 +798,7 @@ async def callback_query_handlers(call):
 if __name__ == '__main__':
     bot.add_custom_filter(asyncio_filters.StateFilter(bot))
     loop = asyncio.get_event_loop()
-    loop.create_task(update_user_subscription_status())  # SUBSCRIPTION REDEEM ON EXPIRATION
-    loop.create_task(send_pending_messages())  # MAILING
-    loop.create_task(bot.polling(non_stop=True, request_timeout=100, timeout=100, skip_pending=True))  # TELEGRAM BOT
+    # loop.create_task(update_user_subscription_status())                                                 # SUBSCRIPTION REDEEM ON EXPIRATION
+    # loop.create_task(send_pending_messages())                                                           # MAILING
+    loop.create_task(bot.polling(non_stop=True, request_timeout=100, timeout=100, skip_pending=True))   # TELEGRAM BOT
     loop.run_forever()

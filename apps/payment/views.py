@@ -1,6 +1,6 @@
 # your_app/views.py
 import traceback
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from django.contrib import messages
 from django.urls import reverse
@@ -14,7 +14,7 @@ from django.utils.decorators import method_decorator
 from yookassa import Configuration, Payment
 import hashlib, hmac, json
 from django.http import HttpResponse
-from bot.models import TelegramUser, Transaction, IncomeInfo, Logging
+from bot.models import TelegramUser, Transaction, IncomeInfo, Logging, Prices, TelegramReferral, ReferralSettings
 
 
 class CreatePaymentView(View):
@@ -211,12 +211,47 @@ class YookassaTGBOTWebhookView(View):
                     transaction.paid = True
                     transaction.save()
 
-                    telegram_user.payment_method_id = payment_method_id
-                    telegram_user.save()
+                    days = 0
+                    if int(amount_value) == Prices.objects.get(id=1).price_1:
+                        days = 31
+                    elif int(amount_value) == Prices.objects.get(id=1).price_2:
+                        days = 93
+                    elif int(amount_value) == Prices.objects.get(id=1).price_3:
+                        days = 184
+                    elif int(amount_value) == Prices.objects.get(id=1).price_4:
+                        days = 366
 
-                    # income = IncomeInfo.objects.get(id=1)
-                    # income.total_amount = float(income.total_amount) + float(amount_value)
-                    # income.save()
+                    if telegram_user.subscription_status:
+                        telegram_user.subscription_expiration = telegram_user.subscription_expiration + timedelta(days=days)
+                        telegram_user.payment_method_id = payment_method_id
+                        telegram_user.save()
+                    else:
+                        telegram_user.subscription_status = True
+                        telegram_user.subscription_expiration = datetime.now() + timedelta(days=days)
+                        telegram_user.payment_method_id = payment_method_id
+                        telegram_user.save()
+
+                    referred_list = [x for x in TelegramReferral.objects.filter(referred=telegram_user)]
+                    if referred_list:
+                        for r in referred_list:
+                            user_to_pay = TelegramUser.objects.filter(user_id=r.referrer.user_id).first()
+                            level = r.level
+                            percent = None
+                            if level == 1:
+                                percent = ReferralSettings.objects.get(pk=1).level_1_percentage
+                            elif level == 2:
+                                percent = ReferralSettings.objects.get(pk=1).level_2_percentage
+                            elif level == 3:
+                                percent = ReferralSettings.objects.get(pk=1).level_3_percentage
+                            elif level == 4:
+                                percent = ReferralSettings.objects.get(pk=1).level_4_percentage
+                            elif level == 5:
+                                percent = ReferralSettings.objects.get(pk=1).level_5_percentage
+                            if percent:
+                                income = float(TelegramUser.objects.get(user_id=user_to_pay.user_id).income) + (
+                                        float(amount_value) * float(percent) / 100)
+                                telegram_user.income=income
+                                telegram_user.save()
 
                     Logging.objects.create(log_level="SUCCESS", message=f'[BOT] [TEST] [Платёж  на сумму {str(amount_value)} р. прошёл]', datetime=datetime.now(), user=telegram_user)
                     return HttpResponse(f'Обновляем баланс пользователя', status=200)

@@ -2,10 +2,11 @@ from datetime import timedelta, datetime
 from decimal import Decimal
 
 from celery import shared_task
+from django.conf import settings
 from django.utils import timezone
 from yookassa import Payment, Configuration
 
-from bot.models import TelegramUser, Prices, Logging, Transaction, IncomeInfo
+from bot.models import TelegramUser, Prices, Logging, Transaction, IncomeInfo, TelegramReferral, ReferralSettings
 
 
 @shared_task
@@ -23,13 +24,13 @@ def attempt_recurring_payment():
 
     for user in users_to_charge:
         try:
-            # Определите сумму списания
+            # Сумма списания
             amount_to_charge = Decimal(Prices.objects.get(pk=1).price_1)
             currency = 'RUB'
 
             # Настройка ЮKassa
-            Configuration.account_id = 1022620
-            Configuration.secret_key = 'test_f77DOK4mGfpKFgjWRwQJA3rHJ1ceNJr4hG7R98-uIt0'
+            Configuration.account_id = settings.YOOKASSA_SHOP_ID_BOT
+            Configuration.secret_key = settings.YOOKASSA_SECRET_BOT
 
             payment = Payment.create({
                 "amount": {
@@ -42,6 +43,7 @@ def attempt_recurring_payment():
             })
 
             if payment.status == 'succeeded':
+
                 # Успешный платеж
                 user.subscription_status = True
                 user.subscription_expiration = timezone.now().date() + timedelta(days=31)
@@ -52,6 +54,29 @@ def attempt_recurring_payment():
                 msg = (
                     f"Автосписание успешно! Пользователь {user.user_id} оплатил с {str(amount_to_charge)} {currency}. "
                     f"Подписка активирована до {user.subscription_expiration}")
+
+                referred_list = [x for x in TelegramReferral.objects.filter(referred=user)]
+                if referred_list:
+                    for r in referred_list:
+                        user_to_pay = TelegramUser.objects.filter(user_id=r.referrer.user_id).first()
+                        level = r.level
+                        percent = None
+                        if level == 1:
+                            percent = ReferralSettings.objects.get(pk=1).level_1_percentage
+                        elif level == 2:
+                            percent = ReferralSettings.objects.get(pk=1).level_2_percentage
+                        elif level == 3:
+                            percent = ReferralSettings.objects.get(pk=1).level_3_percentage
+                        elif level == 4:
+                            percent = ReferralSettings.objects.get(pk=1).level_4_percentage
+                        elif level == 5:
+                            percent = ReferralSettings.objects.get(pk=1).level_5_percentage
+                        if percent:
+                            income = float(TelegramUser.objects.get(user_id=user_to_pay.user_id).income) + (
+                                    float(amount_to_charge) * float(percent) / 100)
+                            user.income = income
+                            user.save()
+
                 Logging.objects.create(log_level="SUCCESS", message=msg, datetime=datetime.now(), user=user)
 
             elif payment.status == 'waiting_for_capture' or payment.status == 'pending':
@@ -147,5 +172,3 @@ def attempt_recurring_payment():
         except Exception as e:
             msg = f"Ошибка при списании с пользователя {user.user_id}: {e}"
             Logging.objects.create(log_level="FATAL", message=msg, datetime=datetime.now(), user=user)
-            # TODO: Отправить уведомление администратору о возникшей ошибке.
-            #  Важно!  Здесь нужно реализовать логику обработки ошибок.  Нельзя просто проигнорировать ошибку.

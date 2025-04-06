@@ -354,6 +354,7 @@ class Prices(models.Model):
     price_2 = models.PositiveIntegerField(null=True, blank=True, verbose_name='price for 3 month')
     price_3 = models.PositiveIntegerField(null=True, blank=True, verbose_name='price for 6 month')
     price_4 = models.PositiveIntegerField(null=True, blank=True, verbose_name='price for 12 month')
+    price_5 = models.PositiveIntegerField(null=True, blank=True, default=20, verbose_name='price for 3 days trial')
 
     def __str__(self):
         return f'{self.price_1} / {self.price_2} / {self.price_3} / {self.price_4}'
