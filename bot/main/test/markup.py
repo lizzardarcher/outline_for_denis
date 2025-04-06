@@ -3,7 +3,7 @@ from telebot.types import InlineKeyboardButton
 from telebot.types import LabeledPrice
 from telebot.types import ShippingOption
 import django_orm
-from bot.models import Prices, Country
+from bot.models import Prices, Country, TelegramUser
 
 # from bot.models import *
 
@@ -67,11 +67,11 @@ def download_app():
 
 def help_markup():
     markup = InlineKeyboardMarkup()
-    markup.add(InlineKeyboardButton(text='Ссылки на скачивание',
-                                    url='https://telegra.ph/VPN--Ssylki-na-skachivanie-11-20'))
-    markup.add(InlineKeyboardButton(text='Условия использования',
-                                    url='https://telegra.ph/Usloviya-polzovaniya-servisom-VPN-TON-11-20'))
+    markup.add(InlineKeyboardButton(text='Ссылки на скачивание', url='https://telegra.ph/VPN--Ssylki-na-skachivanie-11-20'))
+    markup.add(InlineKeyboardButton(text='Условия использования', url='https://telegra.ph/Usloviya-polzovaniya-servisom-VPN-TON-11-20'))
     markup.add(InlineKeyboardButton(text='Инструкция', url='https://telegra.ph/Instrukciya-VPN-11-20'))
+    markup.add(InlineKeyboardButton(text='Договор оферты', url='https://domvpn.store/oferta/'))
+    markup.add(InlineKeyboardButton(text='Политика конфиденциальности', url='https://domvpn.store/policy/'))
     markup.add(btn_back)
     return markup
 
@@ -101,10 +101,9 @@ def get_subscription():
     return markup
 
 
-def confirm_subscription(price: int, days: int):
+def cancel_subscription():
     markup = InlineKeyboardMarkup()
-    btn1 = InlineKeyboardButton(text=f'✅ Подтвердить приобретение подписки',
-                                callback_data=f'account:confirm_subscription:{str(price)}:{str(days)}')
+    btn1 = InlineKeyboardButton(text=f'✅ Подтвердить отмену подписки', callback_data=f'account:cancelled_sbs')
     markup.row(btn1)
     markup.row(btn_back)
     return markup
@@ -118,12 +117,16 @@ def proceed_to_profile():
     return markup
 
 
-def my_profile():
+def my_profile(user: TelegramUser):
     markup = InlineKeyboardMarkup()
     btn2 = InlineKeyboardButton(text=f'💲 Купить подписку', callback_data=f'account:choose_payment')
     btn3 = InlineKeyboardButton(text=f'🤝 Реферальная программа', callback_data=f'referral')
+    btn4 = InlineKeyboardButton(text=f'🛑 Отменить подписку', callback_data=f'account:cancel_subscription')
+    btn5 = InlineKeyboardButton(text=f'Договор оферты', url=f'https://domvpn.store/oferta/')
     markup.row(btn2)
     markup.row(btn3)
+    markup.row(btn4)
+    markup.row(btn5)
     markup.row(btn_back)
     return markup
 
@@ -132,6 +135,7 @@ def payment_menu():
     markup = InlineKeyboardMarkup()
     markup.add(InlineKeyboardButton(text=f'Юкасса (Банковская карта)', callback_data=f'account:payment:ukassa'))
     markup.add(InlineKeyboardButton(text=f'Через сайт (СБП, SperPay, ЮМoney)', url=f'https://domvpn.store/auth/accounts/login/'))
+    markup.add(InlineKeyboardButton(text='Договор оферты', url='https://domvpn.store/oferta/'))
     markup.add(btn_back)
     return markup
 

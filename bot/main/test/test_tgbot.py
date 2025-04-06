@@ -675,63 +675,51 @@ async def callback_query_handlers(call):
 
                         confirmation_url = payment.confirmation.confirmation_url
                         payment_markup = InlineKeyboardMarkup()
-                        payment_markup.add(InlineKeyboardButton(text=f'💳 Оплатить подписку {str(days)} дн. за {str(price)}р.', url=confirmation_url))
-
+                        payment_markup.add(
+                            InlineKeyboardButton(text=f'💳 Оплатить подписку {str(days)} дн. за {str(price)}р.',
+                                                 url=confirmation_url))
+                        payment_markup.add(InlineKeyboardButton(text='Договор оферты', url='https://domvpn.store/oferta/'))
                         await bot.send_message(call.message.chat.id,
                                                f"Для оплаты подписки на {days} дн. нажмите на кнопку Оплатить и следуйте инструкциям:",
                                                reply_markup=payment_markup)
                         await asyncio.sleep(10)
-                        await bot.send_message(call.message.chat.id, text=msg.after_payment, reply_markup=markup.proceed_to_profile())
+                        await bot.send_message(call.message.chat.id, text=msg.after_payment,
+                                               reply_markup=markup.proceed_to_profile())
                     except Exception as e:
                         print(f"Ошибка при создании платежа: {traceback.format_exc()}")
                         await bot.send_message(call.message.chat.id,
                                                f"Произошла ошибка при оформлении подписки.  Попробуйте позже. {e}")
-                    #
-                    # if user_balance < price:
-                    #     await bot.send_message(call.message.chat.id, text=msg.low_balance,
-                    #                            reply_markup=markup.top_up_balance())
-                    # else:
-                    #     description = f' <code>{days}</code> за <code>{price}р.</code>'
-                    #     await bot.send_message(call.message.chat.id, text=msg.confirm_subscription.format(description),
-                    #                            reply_markup=markup.confirm_subscription(price=price, days=days))
 
                 elif 'payment' in data:
                     if 'ukassa' in data:
-                        await bot.send_message(call.message.chat.id, text=msg.choose_subscription, reply_markup=markup.choose_subscription())
+                        await bot.send_message(call.message.chat.id, text=msg.choose_subscription,
+                                               reply_markup=markup.choose_subscription())
 
-                elif 'confirm_subscription' in data:
-                    ...
-                # user_balance = user.balance
-                # user_subscription_status = user.subscription_status
-                # balance_after = user_balance - int(data[-2])
-                # days = int(data[-1])
-                #
-                # if user_subscription_status:
-                #     new_exp_date = user.subscription_expiration + timedelta(days=days)
-                # else:
-                #     new_exp_date = datetime.now() + timedelta(days=days)
-                #
-                # TelegramUser.objects.filter(user_id=user.user_id).update(
-                #     balance=balance_after, subscription_status=True,
-                #     subscription_expiration=new_exp_date)
-                # try:
-                #     user_balance_total = IncomeInfo.objects.get(pk=1).user_balance_total - int(data[-2])
-                #     IncomeInfo.objects.filter(id=1).update(user_balance_total=user_balance_total)
-                # except:
-                #     pass
-                # await bot.send_message(call.message.chat.id, text=msg.sub_successful.format(new_exp_date, data[-2]),
-                #                        reply_markup=markup.proceed_to_profile())
+                elif 'cancel_subscription' in data:
+                    # Отмена подписки
+                    if user.subscription_status:
+                        await bot.send_message(call.message.chat.id, text=msg.cancel_subscription,
+                                               reply_markup=markup.cancel_subscription())
+                    else:
+                        await bot.send_message(call.message.chat.id, text=msg.cancel_subscription_error,
+                                               reply_markup=markup.start())
 
+                elif 'cancelled_sbs' in data:
+                    # Подтверждение отмены подписки
+                    user.payment_method_id = None
+                    user.save()
+                    await bot.send_message(call.message.chat.id, text=msg.cancel_subscription_success,
+                                           reply_markup=markup.start())
             elif 'profile' in data:
                 user_id = user.user_id
                 balance = user.balance
                 income = user.income
-                sub = str(user.subscription_expiration) if user.subscription_status else 'Нет подписки'
+                sub = str(user.subscription_expiration.strftime("%d.%m.%Y")) if user.subscription_status else 'Нет подписки'
                 active = '✅' if user.subscription_status else '❌'
 
                 await bot.send_message(call.message.chat.id,
                                        text=msg.profile.format(user_id, sub, active, income),
-                                       reply_markup=markup.my_profile())
+                                       reply_markup=markup.my_profile(user=user))
 
             elif 'referral' in data:
                 bot_username = TelegramBot.objects.get(pk=1).username
@@ -800,5 +788,5 @@ if __name__ == '__main__':
     loop = asyncio.get_event_loop()
     # loop.create_task(update_user_subscription_status())                                                 # SUBSCRIPTION REDEEM ON EXPIRATION
     # loop.create_task(send_pending_messages())                                                           # MAILING
-    loop.create_task(bot.polling(non_stop=True, request_timeout=100, timeout=100, skip_pending=True))   # TELEGRAM BOT
+    loop.create_task(bot.polling(non_stop=True, request_timeout=100, timeout=100, skip_pending=True))  # TELEGRAM BOT
     loop.run_forever()

@@ -220,6 +220,8 @@ class YookassaTGBOTWebhookView(View):
                         days = 184
                     elif int(amount_value) == Prices.objects.get(id=1).price_4:
                         days = 366
+                    elif int(amount_value) == Prices.objects.get(id=1).price_5:
+                        days = 3
 
                     if telegram_user.subscription_status:
                         telegram_user.subscription_expiration = telegram_user.subscription_expiration + timedelta(days=days)
