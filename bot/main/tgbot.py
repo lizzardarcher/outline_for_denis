@@ -151,8 +151,9 @@ async def start(message):
             await bot.send_message(chat_id=message.chat.id, text=msg.new_user_bonus)
             lg.objects.create(log_level='INFO', message='[BOT] [Создан новый пользователь]', datetime=datetime.now(),
                               user=TelegramUser.objects.get(user_id=message.from_user.id))
-        except:
-            ...
+        except Exception as e:
+            lg.objects.create(log_level='FATAL', message=f'[BOT] [Ошибка при создании нового пользователя] [{traceback.format_exc()}]',
+                              datetime=datetime.now(), user=TelegramUser.objects.get(user_id=message.from_user.id))
         await bot.send_message(chat_id=message.chat.id, text=msg.start_message.format(message.from_user.first_name),
                                reply_markup=markup.get_app_or_start())
 

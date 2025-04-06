@@ -25,7 +25,7 @@ def start():
     btn2 = InlineKeyboardButton(text=f'👨 Профиль', callback_data=f'profile')
     btn3 = InlineKeyboardButton(text=f'🆘 Помощь', callback_data=f'help')
     btn4 = InlineKeyboardButton(text=f'ℹ Информация', callback_data=f'common_info')
-    btn5 = InlineKeyboardButton(text=f'✅ Попробовать 3 дня за 20р.', callback_data=f'account:3_days_trial')
+    btn5 = InlineKeyboardButton(text=f'✅ Попробовать 3 дня за ({Prices.objects.get(pk=1).price_5} р)', callback_data=f'account:sub:3_days_trial')
     btn6 = InlineKeyboardButton(text=f'💲 Приобрести подписку', callback_data=f'account:choose_payment')
     btn7 = InlineKeyboardButton(text=f'📲 Скачать приложение', callback_data=f'download_app')
     markup.row(btn1, btn2)
@@ -131,9 +131,9 @@ def my_profile(user: TelegramUser):
     return markup
 
 
-def payment_menu():
+def payment_menu(payment_type: str):
     markup = InlineKeyboardMarkup()
-    markup.add(InlineKeyboardButton(text=f'Юкасса (Банковская карта)', callback_data=f'account:payment:ukassa'))
+    markup.add(InlineKeyboardButton(text=f'Юкасса (Банковская карта)', callback_data=f'account:payment:ukassa:{payment_type}'))
     markup.add(InlineKeyboardButton(text=f'Через сайт (СБП, SperPay, ЮМoney)', url=f'https://domvpn.store/auth/accounts/login/'))
     markup.add(InlineKeyboardButton(text='Договор оферты', url='https://domvpn.store/oferta/'))
     markup.add(btn_back)
@@ -143,7 +143,7 @@ def payment_menu():
 def choose_subscription():
     markup = InlineKeyboardMarkup()
     price = Prices.objects.get(pk=1)
-    markup.add(InlineKeyboardButton(text=f'🟢 3 дня ({price.price_5} р)', callback_data=f'account:3_days_trial'))
+    markup.add(InlineKeyboardButton(text=f'🟢 3 дня ({price.price_5} р)', callback_data=f'account:sub:3_days_trial'))
     markup.add(InlineKeyboardButton(text=f'🟢 1 месяц ({price.price_1} р)', callback_data=f'account:sub:1'))
     markup.add(InlineKeyboardButton(text=f'🟢 3 месяца ({price.price_2} р)', callback_data=f'account:sub:2'))
     markup.add(InlineKeyboardButton(text=f'🟢 6 месяцев ({price.price_3} р)', callback_data=f'account:sub:3'))

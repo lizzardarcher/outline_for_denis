@@ -70,6 +70,7 @@ class PaymentSuccessView(TemplateView):
         context = super().get_context_data(**kwargs)
         return context
 
+
 class PaymentFailureView(TemplateView):
     template_name = 'payments/payment_failure.html'
 
@@ -181,6 +182,86 @@ class YookassaWebhookView(View):
                                    datetime=datetime.now(), user=self.request.user.profile.telegram_user)
 
 
+#########################################################################
+#########################################################################
+
+class TestCreatePaymentView(View):
+    def post(self, request, *args, **kwargs):
+        try:
+            subscription = request.POST.get('subscription')
+
+            prices = Prices.objects.get(pk=1)
+            amount = 0
+            days = 0
+            if float(subscription) == float(prices.price_1):
+                amount = float(prices.price_1)
+                days = 31
+            elif float(subscription) == float(prices.price_2):
+                amount = float(prices.price_2)
+                days = 93
+            elif float(subscription) == float(prices.price_3):
+                amount = float(prices.price_3)
+                days = 184
+            elif float(subscription) == float(prices.price_4):
+                amount = float(prices.price_4)
+                days = 366
+            elif float(subscription) == float(prices.price_5):
+                amount = float(prices.price_5)
+                days = 3
+
+            # Настройка ЮKassa
+            Configuration.account_id = settings.YOOKASSA_SHOP_ID_BOT
+            Configuration.secret_key = settings.YOOKASSA_SECRET_BOT
+
+            payment = Payment.create({
+                "amount": {
+                    "value": str(amount),
+                    "currency": "RUB"
+                },
+                "confirmation": {
+                    "type": "redirect",
+                    "return_url": f'https://domvpn.store/payment/payment-success/?id=&date={datetime.now()}&amount={amount}',
+                    "enforce": False
+                },
+                "capture": True,
+                "description": f'Подписка DomVPN на {days} дн.',
+                "save_payment_method": True,
+                "metadata": {
+                    'user_id': request.user.id,
+                    'telegram_user_id': request.user.profile.telegram_user.user_id,
+                }
+            }, )
+
+            request.session['yookassa_payment_id'] = payment.id
+            request.session['yookassa_payment_amount'] = float(amount)
+
+            Transaction.objects.create(status='pending', paid=False, amount=amount, user=request.user.profile.telegram_user,
+                                       currency='RUB', income_info=IncomeInfo.objects.get(pk=1), side='Приход средств',
+                                       description='Приобретение подписки', payment_id=payment.id)
+            Logging.objects.create(log_level="INFO", message=f'[WEB] [Платёжный запрос на сумму {str(amount)} р.]',
+                                   datetime=datetime.now(), user=self.request.user.profile.telegram_user)
+
+            # Перенаправляем пользователя на страницу ЮKassa
+            return redirect(payment.confirmation.confirmation_url)
+
+        except Exception as e:
+            Logging.objects.create(log_level="DANGER",
+                                   message=f'[WEB] [Ошибка платёжного запроса {str(traceback.format_exc())}]',
+                                   datetime=datetime.now(), user=self.request.user.profile.telegram_user)
+            return redirect('test_profile')
+
+class TestPaymentSuccessView(TemplateView):
+    template_name = 'payments/payment_success.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        return context
+
+
+class TestPaymentFailureView(TemplateView):
+    template_name = 'payments/payment_failure.html'
+
+
 @method_decorator(csrf_exempt, name='dispatch')
 class YookassaTGBOTWebhookView(View):
     def post(self, request, *args, **kwargs):
@@ -197,8 +278,9 @@ class YookassaTGBOTWebhookView(View):
         telegram_user = TelegramUser.objects.get(user_id=telegram_user_id)
 
         # Обработка события
-        if 'succeeded' in str(event_type) :
-            Logging.objects.create(log_level="SUCCESS", message=f'[BOT] [TEST] [Приём вебхука] [{event_type}]', datetime=datetime.now())
+        if 'succeeded' in str(event_type):
+            Logging.objects.create(log_level="SUCCESS", message=f'[WEB] [TEST] [Приём вебхука] [{event_type}]',
+                                   datetime=datetime.now())
             try:
                 payment_id = payment_data.get('id')
                 status = payment_data.get('status')
@@ -224,7 +306,8 @@ class YookassaTGBOTWebhookView(View):
                         days = 3
 
                     if telegram_user.subscription_status:
-                        telegram_user.subscription_expiration = telegram_user.subscription_expiration + timedelta(days=days)
+                        telegram_user.subscription_expiration = telegram_user.subscription_expiration + timedelta(
+                            days=days)
                         telegram_user.payment_method_id = payment_method_id
                         telegram_user.save()
                     else:
@@ -252,10 +335,12 @@ class YookassaTGBOTWebhookView(View):
                             if percent:
                                 income = float(TelegramUser.objects.get(user_id=user_to_pay.user_id).income) + (
                                         float(amount_value) * float(percent) / 100)
-                                telegram_user.income=income
+                                telegram_user.income = income
                                 telegram_user.save()
 
-                    Logging.objects.create(log_level="SUCCESS", message=f'[BOT] [TEST] [Платёж  на сумму {str(amount_value)} р. прошёл]', datetime=datetime.now(), user=telegram_user)
+                    Logging.objects.create(log_level="SUCCESS",
+                                           message=f'[BOT] [TEST] [Платёж  на сумму {str(amount_value)} р. прошёл]',
+                                           datetime=datetime.now(), user=telegram_user)
                     return HttpResponse(f'Обновляем баланс пользователя', status=200)
 
             except Exception as e:
@@ -265,7 +350,8 @@ class YookassaTGBOTWebhookView(View):
                 return HttpResponse('OK', status=200)
 
         elif 'canceled' in str(event_type):
-            Logging.objects.create(log_level="WARNING", message=f'[BOT] [Приём вебхука] [{event_type}]', datetime=datetime.now())
+            Logging.objects.create(log_level="WARNING", message=f'[WEB] [TEST] [Приём вебхука] [{event_type}]',
+                                   datetime=datetime.now())
             try:
                 payment_id = payment_data.get('id')
                 status = payment_data.get('status')
@@ -274,14 +360,14 @@ class YookassaTGBOTWebhookView(View):
                 transaction.paid = False
                 transaction.save()
                 Logging.objects.create(log_level="WARNING",
-                                       message=f'[BOT] [Платёж  на сумму {str(traceback.format_exc())} р. отменён]',
+                                       message=f'[WEB] [TEST] [Платёж  на сумму {str(traceback.format_exc())} р. отменён]',
                                        datetime=datetime.now(), user=self.request.user.profile.telegram_user)
             except Exception as e:
                 Logging.objects.create(log_level="DANGER",
-                                       message=f'[BOT] [Ошибка при приёме вебхука {str(traceback.format_exc())}]',
+                                       message=f'[WEB] [TEST] [Ошибка при приёме вебхука {str(traceback.format_exc())}]',
                                        datetime=datetime.now(), user=self.request.user.profile.telegram_user)
             return HttpResponse('OK', status=200)
         else:
-            Logging.objects.create(log_level="DANGER", message=f'[BOT] [Непонятно что] [.......]', datetime=datetime.now())
+            Logging.objects.create(log_level="DANGER", message=f'[WEB] [TEST] [Непонятно что] [.......]',
+                                   datetime=datetime.now())
             return HttpResponse('OK', status=200)
-
