@@ -21,14 +21,19 @@ async def create_new_key(server: Server, user: TelegramUser) -> str:
     :return: access_url
     """
     data = dict(server.script_out)
+    Logging.objects.create(log_level='DEBUG', message=f'[Ключ создаётся {data}]', datetime=datetime.now(), user=user)
     try:
         client = OutlineVPN(api_url=data['apiUrl'], cert_sha256=data['certSha256'])
+        Logging.objects.create(log_level='DEBUG', message=f'[Client] {client}', datetime=datetime.now(), user=user)
+
         key = client.create_key(
             key_id=f'{str(user.user_id)}:{str(server.id)}' + f'{str(random.randint(1, 100000))}',
             name=f'{str(user.user_id)}:{server.ip_address}',
         )
 
-        VpnKey.objects.create(
+        Logging.objects.create(log_level='DEBUG', message=f'[Key] {key}', datetime=datetime.now(), user=user)
+
+        vk = VpnKey.objects.create(
             server=server,
             user=user,
             key_id=f'{key.key_id}',
@@ -40,13 +45,10 @@ async def create_new_key(server: Server, user: TelegramUser) -> str:
             used_bytes=key.used_bytes,
         )
 
+        Logging.objects.create(log_level='DEBUG', message=f'[Ключ Создан] {vk}', datetime=datetime.now(), user=user)
         return f'{key.access_url}#{server.country.name_for_app} VPN'
     except:
         Logging.objects.create(text=f'User {user.user_id} has failed to create a key on {server.ip_address} server')
-        print(traceback.format_exc())
-
-
-
 
 
 async def delete_user_keys(user: TelegramUser) -> bool:

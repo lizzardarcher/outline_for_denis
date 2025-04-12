@@ -17,7 +17,7 @@ from telebot.asyncio_handler_backends import State, StatesGroup
 from telebot.types import LabeledPrice, InlineKeyboardButton, InlineKeyboardMarkup
 
 from bot.main.vless.MarzbanAPI import MarzbanAPI
-from bot.models import TelegramBot, Prices, TelegramMessage
+from bot.models import TelegramBot, Prices, TelegramMessage, Logging
 from bot.models import TelegramUser
 from bot.models import TelegramReferral
 from bot.models import VpnKey
@@ -441,8 +441,8 @@ async def callback_query_handlers(call):
                                 #  Удаляем все предыдущие ключи
                                 await delete_user_keys(user=user)
                                 country = call.data.split('_')[-1]
-                                server = Server.objects.filter(is_active=True, is_activated=True,country__name=country, keys_generated__lte=200).last()
-                                logger.info(f"[get_new_key] [SERVER] [{server}]")
+                                server = Server.objects.filter(is_active=True, is_activated=True, country__name=country, keys_generated__lte=200).last()
+                                Logging.objects.create(user=user, message=f"[get_new_key] [SERVER] [{server}] [{country}]")
                                 key = await create_new_key(server=server, user=user)
                                 await bot.send_message(call.message.chat.id, text=f'{msg.key_avail}\n<code>{key}</code>', reply_markup=markup.key_menu(country, protocol))
                             except:

@@ -112,7 +112,7 @@ class LogInline(admin.TabularInline):
 class TelegramUserAdmin(admin.ModelAdmin):
     list_display = (
         'join_date', 'first_name', 'last_name', 'username', 'subscription_status',
-        'subscription_expiration', 'balance', 'referral_link', 'payment_method_id', 'permission_revoked')
+        'subscription_expiration', 'balance', 'referral_link', 'get_payment_method_id', 'permission_revoked')
     list_display_links = (
         'join_date', 'first_name', 'last_name', 'username', 'subscription_status', 'subscription_expiration', 'balance')
     search_fields = ('first_name', 'last_name', 'username', 'user_id')
@@ -123,13 +123,17 @@ class TelegramUserAdmin(admin.ModelAdmin):
     inlines = [TransactionInline, VpnKeyInline, WithdrawalRequestInline, LogInline]
 
     def referral_link(self, obj):
-        """
-        Generates the referral link for the user.
-        """
         referral_url = f"https://t.me/xDomvpn_Bot?start={obj.user_id}"
         return format_html('{}', referral_url, referral_url)
 
-    referral_link.short_description = 'Referral Link'  # Set column header
+    def get_payment_method_id(self, obj):
+        payment_method_id = obj.payment_method_id
+        if payment_method_id:
+            return '✅'
+        else:
+            return '---'
+    referral_link.short_description = 'Referral Link'
+    get_payment_method_id.short_description = 'Payment Method ID'
 
     def has_add_permission(self, request):
         if not DEBUG:
@@ -315,7 +319,7 @@ class ServerAdmin(admin.ModelAdmin):
         'hosting', 'ip_address', 'user', 'password', 'rental_price', 'max_keys', 'get_key_generated', 'is_active', 'is_activated', 'is_activated_vless',
         'country', 'created_at')
     list_display_links = ('hosting', 'ip_address',)
-    inlines = [VpnKeyInline]
+    # inlines = [VpnKeyInline]
     ordering = ('country', 'ip_address')
 
 

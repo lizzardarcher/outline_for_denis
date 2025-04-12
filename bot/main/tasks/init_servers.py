@@ -4,7 +4,7 @@ from time import sleep
 import paramiko
 import django_orm
 from bot.main.vless.MarzbanAPI import MarzbanAPI
-from bot.models import Server
+from bot.models import Server, Logging
 
 
 def find_dict_item(obj, key):
@@ -28,8 +28,7 @@ def init_outline_servers():
     servers = Server.objects.filter(is_active=True, is_activated=False)
     if servers:
         for server in servers:
-
-            # доступ по SSH и получение скрипта для outline VPN
+            Logging.objects.create(log_level='DEBUG', message=f'Initializing server {server.hosting}...')
             try:
                 ssh = paramiko.SSHClient()
                 ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
@@ -40,7 +39,7 @@ def init_outline_servers():
                 open('configfile.txt', 'w').write(out.__str__())
                 ssh.close()
             except Exception as e:
-                ...
+                Logging.objects.create(log_level='ERROR', message=f'{traceback.format_exc()}')
             time.sleep(1)
 
             # Получение apiUrl и certSha256
@@ -48,14 +47,15 @@ def init_outline_servers():
             with open('configfile.txt', 'r') as config_file:
                 config = config_file.read()
                 for line in config.split(' '):
-                    if 'interface' in line:
+                    if 'interface' in str(line):
                         raw = line.split('{')[1].split('}')[0].split(',')
                         data['apiUrl'] = raw[0].split('":"')[-1].replace("'", "").replace('"', '')
                         data['certSha256'] = raw[1].split(':')[-1].replace("'", "").replace('"', '')
-
+            Logging.objects.create(log_level='DEBUG', message=f'Initializing server {server.hosting}...Done')
             server.script_out = data
             server.is_activated = True
             server.save()
+            Logging.objects.create(log_level='INFO', message=f'Server {server.hosting} initialized!')
     else:
         ...
 
@@ -98,6 +98,7 @@ echo "Script completed successfully."
     # servers = Server.objects.filter(ip_address='103.106.3.58')
     if servers:
         for server in servers:
+            Logging.objects.create(log_level='DEBUG', message=f'Initializing server {server.hosting}...')
             try:
                 ssh_client = paramiko.SSHClient()
                 ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
@@ -116,16 +117,21 @@ echo "Script completed successfully."
                     else:
                         server.is_activated_vless = True
                         server.save()
+                        Logging.objects.create(log_level='INFO', message=f'Initializing server {server.hosting}...Done')
                 except:
+                    Logging.objects.create(log_level='DEBUG', message=f'Initializing server {server.hosting}...Failed')
                     print(traceback.format_exc())
 
             except paramiko.AuthenticationException:
+                Logging.objects.create(log_level='ERROR', message=f'Initializing server {server.hosting}...Failed')
                 print("Ошибка аутентификации. Неверное имя пользователя или пароль.")
                 return None
             except paramiko.SSHException as e:
+                Logging.objects.create(log_level='ERROR', message=f'Initializing server {server.hosting}...Failed')
                 print(f"Ошибка SSH: {e}")
                 return None
             except Exception as e:
+                Logging.objects.create(log_level='ERROR', message=f'Initializing server {server.hosting}...Failed')
                 print(f"Произошла ошибка: {e}")
                 return None
     else:

@@ -11,6 +11,8 @@ from pathlib import Path
 import requests
 from urllib3 import PoolManager
 
+from bot.models import Logging
+
 UNABLE_TO_GET_METRICS_ERROR = "Unable to get metrics"
 
 log_path = Path(__file__).parent.parent.absolute() / 'log/bot_log.log'
@@ -162,21 +164,12 @@ class OutlineVPN:
             payload["port"] = port
         if key_id:
             payload["id"] = key_id
+            Logging.objects.create(log_level='INFO', message=f'[payload: {payload}]')
             response = self.session.put(f"{self.api_url}/access-keys/{key_id}", verify=False, json=payload, timeout=10)
         else:
             response = self.session.post(f"{self.api_url}/access-keys", verify=False, json=payload)
 
-        ### Отладка ошибок сервера ###########
-
-        logger.warning(f'[key_id: {key_id}] [method: {method}] [password: {password}] [data_limit: {data_limit}] [port: {port}]')
-        logger.warning(f'[payload: {payload}]')
-        logger.warning(f'[{response.text}]')
-        logger.warning(f'[{response.url}]')
-        logger.warning(f'[{response.status_code}]')
-        logger.warning(f'[{response.content}]')
-        logger.warning(f'[{response.raw}]')
-
-        ######################################
+        Logging.objects.create(log_level='INFO', message=f'[payload: {payload}] [{response.text}] [{response.status_code}]')
 
         if response.status_code == 201:
             key = response.json()

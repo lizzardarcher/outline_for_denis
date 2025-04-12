@@ -195,7 +195,7 @@ class Server(models.Model):
     is_activated_vless = models.BooleanField(default=False, verbose_name='Сервер Активирован для VLESS (не трогать)')
 
     def __str__(self):
-        return f"{self.hosting} root@{self.ip_address} ({self.created_at}) {self.country.name}"
+        return f"{self.hosting} ({self.created_at}) {self.country.name}"
 
     class Meta:
         verbose_name = 'VPN сервер'
