@@ -1,10 +1,13 @@
 <div class="mb-4">
     <div class="card-body">
         <ul class="list-group list-group-flush">
+            <br>
+
             <li class="list-group-item d-flex flex-column flex-lg-row align-items-left justify-content-between mb-4">
                 <div class="d-flex align-items-left mb-2 mb-lg-0">
                     <i class="fa fa-key mr-3 fa-2x" style="color: #13056e"></i> <span>Текущий ключ</span>
                 </div>
+
                 {% if vpn_key.access_url %}
                     <small id="vpnkey"
                            class="d-none d-lg-block text-muted bg-success-subtle rounded p-2"
@@ -21,7 +24,9 @@
                 {% else %}
                     <small class="text-muted">У вас нет VPN ключей.</small>
                 {% endif %}
+
             </li>
+            <br>
 
             <li class="list-group-item d-flex flex-column flex-lg-row align-items-left justify-content-between">
                 <span class="mb-2 mb-lg-0">
@@ -85,14 +90,16 @@
                     </div>
                 </div>
             </li>
+            <br>
 
             <li class="list-group-item d-flex flex-column flex-lg-row align-items-left justify-content-between">
                 <div class="mb-2 mb-lg-0">
                     <i class="fa fa-star mr-3 fa-2x" style="color: #13056e"></i>
-                        <span>Премиум подписка:</span><br>
+                    <span>Премиум подписка:</span><br>
                     <small class="text-muted">Получите неограниченный доступ к нашим серверам</small>
                 </div>
-                <form class="d-flex flex-column align-items-left" action="{% url 'test_create_payment' %}" method="post">
+                <form class="d-flex flex-column align-items-left" id="subscription-form"
+                      action="{% url 'test_create_payment' %}" method="post">
                     {% csrf_token %}
                     <label for="subscription" class="mb-2">Выберите срок:</label>
                     <select class="form-control form-control-sm mb-2" id="subscription" name="subscription">
@@ -102,9 +109,84 @@
                         <option value="{{ subscription.price_3 }}">{{ subscription.price_3 }}₽ на 6 месяцев</option>
                         <option value="{{ subscription.price_4 }}">{{ subscription.price_4 }}₽ на 1 год</option>
                     </select>
-                    <button type="submit" class="btn btn-success btn-sm">Купить подписку</button>
+                    <button type="button" class="btn btn-success btn-sm" data-toggle="modal"
+                            data-target="#confirmPurchaseModal">Купить подписку
+                    </button>
+
+                    <!-- Modal -->
+                    <div class="modal fade" id="confirmPurchaseModal" tabindex="-1" role="dialog"
+                         aria-labelledby="confirmPurchaseModalLabel" aria-hidden="true">
+                        <div class="modal-dialog" role="document">
+                            <div class="modal-content">
+                                <div class="modal-header bg-primary-subtle">
+                                    <h5 class="modal-title" id="confirmPurchaseModalLabel">DomVPN</h5>
+                                </div>
+                                <div class="modal-body">
+                                    <p>Вы собираетесь оформить подписку на <b><span
+                                            id="selectedSubscriptionText"></span></b>
+                                        стоимостью <b><span id="selectedSubscriptionPrice"></span></b> руб.</p>
+                                    <p>Пожалуйста, подтвердите свой выбор и ознакомьтесь с условиями.</p>
+
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" value="" id="agreementCheckbox">
+                                        <label class="form-check-label" for="agreementCheckbox">
+                                            <small>Я подтверждаю, что ознакомился и согласен с <a
+                                                    href="{% url 'oferta' %}">
+                                                условиями подписки</a>. Подписку можно отменить в личном кабинете в
+                                                любой момент.</small>
+                                        </label>
+                                    </div>
+                                </div>
+
+
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary btn-sm" data-dismiss="modal">Отмена
+                                    </button>
+                                    <button type="button" class="btn btn-primary btn-sm" id="confirmPurchaseButton"
+                                            disabled>
+                                        Подтвердить и оплатить
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <script>
+                        document.addEventListener('DOMContentLoaded', function () {
+                            const agreementCheckbox = document.getElementById('agreementCheckbox');
+                            const confirmPurchaseButton = document.getElementById('confirmPurchaseButton');
+                            const subscriptionForm = document.getElementById('subscription-form');
+                            const subscriptionSelect = document.getElementById('subscription');
+                            const selectedSubscriptionPriceElement = document.getElementById('selectedSubscriptionPrice');
+                            const selectedSubscriptionTextElement = document.getElementById('selectedSubscriptionText');
+
+                            function updateSubscriptionInfo() {
+                                const selectedOption = subscriptionSelect.options[subscriptionSelect.selectedIndex];
+                                const selectedValue = selectedOption.value;
+                                const selectedText = selectedOption.text;
+
+                                selectedSubscriptionPriceElement.textContent = selectedValue;
+                                selectedSubscriptionTextElement.textContent = selectedText.replace(selectedValue + '₽ ', ''); // Убираем цену из текста
+                            }
+
+                            // Обновляем информацию при загрузке страницы и при изменении выбора подписки
+                            updateSubscriptionInfo();
+                            subscriptionSelect.addEventListener('change', updateSubscriptionInfo);
+
+
+                            agreementCheckbox.addEventListener('change', function () {
+                                confirmPurchaseButton.disabled = !this.checked;
+                            });
+
+                            confirmPurchaseButton.addEventListener('click', function () {
+                                subscriptionForm.submit();
+                            });
+                        });
+                    </script>
                 </form>
             </li>
+
+
         </ul>
     </div>
 </div>
