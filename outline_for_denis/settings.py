@@ -8,8 +8,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = os.getenv('DJANGO_SECRET_KEY')
 
-DEBUG = True
-# DEBUG = False
+# DEBUG = True
+DEBUG = False
 
 ALLOWED_HOSTS = os.getenv('DJANGO_ALLOWED_HOSTS').split(',')
 CSRF_TRUSTED_ORIGINS = os.getenv('CSRF_TRUSTED_ORIGINS').split(',')
@@ -103,21 +103,21 @@ DATABASES = {
     }
 }
 
-CELERY_BROKER_URL = 'redis://localhost:6379/0'       # URL вашего Redis брокера (по умолчанию localhost:6379)
-CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'   # URL для хранения результатов задач Celery (тоже Redis)
+CELERY_BROKER_URL = 'redis://localhost:6379/0'       # URL Redis брокера
+CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'   # URL для хранения результатов задач Celery
 CELERY_ACCEPT_CONTENT = ['application/json']         # Формат принимаемых сообщений
 CELERY_TASK_SERIALIZER = 'json'                      # Сериализация задач
 CELERY_RESULT_SERIALIZER = 'json'                    # Сериализация результатов
-CELERY_TIMEZONE = 'UTC'                              # Установите вашу временную зону
+CELERY_TIMEZONE = 'UTC'                              # Часовой пояс
 CELERY_TASK_TRACK_STARTED = True                     # Отслеживание состояния задач
 CELERY_TASK_TIME_LIMIT = 30 * 60                     # Ограничение времени выполнения задачи (в секундах, 30 минут)
 
 CELERY_ACKS_LATE = True                              # Подтверждение получения задачи после ее выполнения
 CELERY_PREFETCH_MULTIPLIER = 1                       # Количество задач, получаемых воркером за раз
-CELERYD_CONCURRENCY = 4                              # Количество процессов воркера (зависит от ресурсов сервера)
+CELERYD_CONCURRENCY = 4                              # Количество процессов воркера
 
 CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers:DatabaseScheduler'
-CELERY_BEAT_MAX_LOOP_INTERVAL = 5                    # Проверять каждые 5 секунд (по умолчанию)
+CELERY_BEAT_MAX_LOOP_INTERVAL = 5                    # Проверять каждые 5 секунд
 
 CELERY_TASK_ALWAYS_EAGER = True                      ### только для отладки
 

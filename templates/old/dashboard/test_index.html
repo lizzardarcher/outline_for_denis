@@ -1,0 +1,203 @@
+{% extends 'layouts/base.html' %}
+{% load static %}
+
+{% block title %}Личный кабинет DomVPN{% endblock title %}
+
+{% block content %}
+    <div class="hero_area">
+        <div class="bg-dark">
+            {% include 'home/sections/header.html' %}
+        </div>
+
+        <div class="container-fluid">
+            <div class="row">
+
+                <!-- Боковая панель (скрыта на мобильных) -->
+                <nav id="sidebar" class="col-md-3 col-lg-2 d-md-block bg-light sidebar mt-5">
+                    <div class="position-sticky pt-3">
+                        <ul class="nav flex-column">
+                            <li class="nav-item">
+                                <a class="nav-link active" href="#" data-target="main-info">
+                                    Ключи
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="#" data-target="user-info">
+                                    Профиль
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="#" data-target="servers">
+                                    Серверы
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="#" data-target="referral">
+                                    Реферальная программа
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="#" data-target="bot-info">
+                                    Наш телеграм
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="#" data-target="transactions">
+                                    Платежи
+                                </a>
+                            </li>
+                        </ul>
+                    </div>
+                </nav>
+
+                <!-- Основной контент -->
+                {% include 'includes/messages_success.html' %}
+                <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 mt-5">
+
+                    <div class="mt-5 bg-light p-2 rounded mb-2 ">
+                        <h1 class="h2">Личный кабинет DomVPN</h1>
+                    </div>
+
+                    <div id="user-info" class="content-section">
+                        {% include 'dashboard/test_includes/user-info.html' %}
+                    </div>
+                    <div id="main-info" class="content-section">
+                        {% include 'dashboard/test_includes/main-info.html' %}
+                    </div>
+                    <div id="servers" class="content-section">
+                        {% include 'dashboard/test_includes/servers.html' %}
+                    </div>
+                    <div id="referral" class="content-section">
+                        {% include 'dashboard/test_includes/referral.html' %}
+                    </div>
+                    <div id="transactions" class="content-section">
+                        {% include 'dashboard/test_includes/transactions.html' %}
+                    </div>
+                    <div id="bot-info" class="content-section">
+                        {% include 'dashboard/test_includes/bot-info.html' %}
+                    </div>
+                </main>
+            </div>
+        </div>
+
+    </div>
+
+    {% block extrascript %}
+        <script>
+            document.addEventListener('DOMContentLoaded', function() {
+                const navLinks = document.querySelectorAll('#sidebar .nav-link');
+                const contentSections = document.querySelectorAll('.content-section');
+                const sidebar = document.getElementById('sidebar');
+
+                function setActiveLink(link) {
+                    navLinks.forEach(navLink => {
+                        navLink.classList.remove('active');
+                    });
+                    link.classList.add('active');
+                }
+
+                function showSection(targetId) {
+                    contentSections.forEach(section => {
+                        section.style.display = 'none';
+                    });
+
+                    const targetSection = document.getElementById(targetId);
+                    if (targetSection) {
+                        targetSection.style.display = 'block';
+                    }
+                }
+
+
+                //Обработчик навигации
+                navLinks.forEach(link => {
+                    link.addEventListener('click', function(event) {
+                        event.preventDefault();
+                        const targetId = this.dataset.target;
+                         if (window.innerWidth >= 768) {
+                            showSection(targetId);
+                            setActiveLink(this);
+                         }
+                    });
+                });
+
+                //Скрываем все секции кроме main-info если ширина экрана больше 768px
+                if (window.innerWidth >= 768) {
+                     contentSections.forEach(section => {
+                        if(section.id !== 'main-info') {
+                            section.style.display = 'none';
+                        }
+                    });
+                }
+
+
+                if (navLinks.length > 0) {
+                    setActiveLink(document.querySelector('[data-target="main-info"]'));
+                }
+
+                //Скрыть боковую панель на мобильных устройствах
+                if(window.innerWidth < 768) {
+                    sidebar.style.display = 'none';
+                }
+            });
+        </script>
+    {% endblock extrascript %}
+{% endblock content %}
+
+{% block extrastyle %}
+    <style>
+        .sidebar {
+            position: fixed;
+            top: 0;
+            bottom: 0;
+            left: 0;
+            z-index: 100; /* Behind the navbar */
+            padding: 48px 0
+0; /* Height of navbar */
+            box-shadow: inset -1px 0 0 rgba(0, 0, 0, .1);
+        }
+
+        .sidebar .nav-link {
+            font-weight: 500;
+            color: #333;
+        }
+
+        .sidebar .nav-link.active {
+            color: #007bff;
+        }
+
+        .sidebar-heading {
+            font-size: .75rem;
+            text-transform: uppercase;
+        }
+
+        .content-section {
+            padding: 20px;
+            background-color: #fff;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            margin-bottom: 2rem;
+        }
+
+        .sidebar .nav-link {
+            padding: 0.5rem 1rem; /* Adjust padding for better appearance */
+        }
+
+        .sidebar .nav-item {
+            margin-bottom: 0.25rem; /* Add some spacing between items */
+        }
+
+        /* Для маленьких экранов, скрыть боковую панель */
+        @media (max-width: 767.98px) {
+          .sidebar {
+            display: none;
+          }
+          .main {
+            padding-left: 0;
+          }
+           .content-section {
+               display: block !important;
+           }
+
+        }
+    </style>
+{% endblock extrastyle %}

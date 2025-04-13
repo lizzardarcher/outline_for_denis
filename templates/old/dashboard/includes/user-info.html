@@ -1,0 +1,44 @@
+<!-- Информация о пользователе -->
+    <h4>Пользователь</h4>
+    <img src="{% if request.user.profile.telegram_user.photo_url %}{{ request.user.profile.telegram_user.photo_url }}
+              {% else %}https://bootdey.com/img/Content/avatar/avatar7.png
+              {% endif %}"
+         alt="User Avatar" class="img-fluid rounded-circle mb-3" style="width: 100px; height: 100px;">
+    <p>
+        <i class="fa fa-user"></i>
+        {% if request.user.profile.telegram_user.first_name %}
+            {{ request.user.profile.telegram_user.first_name }}<br>
+        {% endif %}
+        {% if request.user.profile.telegram_user.last_name %}
+            {{ request.user.profile.telegram_user.last_name }}<br>
+        {% endif %}
+        <i class="fa fa-id-badge"></i> ID: {{ request.user.profile.telegram_user.user_id }}<br>
+        {% if request.user.profile.telegram_user.username %}
+            <i class="fa fa-id-card"></i>
+            {% if '@' in request.user.profile.telegram_user.username %}
+                <a href="" >{{ request.user.profile.telegram_user.username }}</a><br>
+            {% else %}
+                <a href="https://t.me/{{ request.user.profile.telegram_user.username }}" target="_blank">
+                    @{{ request.user.profile.telegram_user.username }}</a><br>
+            {% endif %}
+        {% endif %}
+        {% if request.user.email %}
+            <a href="{% url 'password_change' %}" class="btn btn-outline-secondary">Изменить пароль</a><br>
+        {% endif %}
+    </p>
+    <hr>
+    <div>
+        <p><strong>Баланс:</strong> <span class="badge bg-secondary">{% if request.user.profile.telegram_user.balance %}
+            {{ request.user.profile.telegram_user.balance }}{% else %}0.00{% endif %} ₽</span></p>
+        <p><strong>Активен с :</strong> <span class="">{{ request.user.profile.telegram_user.join_date }}</span></p>
+        <p><strong>Подписка до:</strong> {{ request.user.profile.telegram_user.subscription_expiration }}
+            {% if request.user.profile.telegram_user.subscription_status %}
+                <span class="badge bg-success">Активна</span>
+            {% else %}
+                <span class="badge bg-warning">Неактивна</span>
+            {% endif %}
+        </p>
+        <p><strong>Доход от реферальной программы:</strong> <span
+                class="badge bg-secondary">{% if request.user.profile.telegram_user.income %}
+            {{ request.user.profile.telegram_user.income }}{% else %}0.00{% endif %} ₽</span></p>
+    </div>

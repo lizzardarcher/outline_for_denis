@@ -99,7 +99,7 @@
                     <small class="text-muted">Получите неограниченный доступ к нашим серверам</small>
                 </div>
                 <form class="d-flex flex-column align-items-left" id="subscription-form"
-                      action="{% url 'test_create_payment' %}" method="post">
+                      action="{% url 'create_payment' %}" method="post">
                     {% csrf_token %}
                     <label for="subscription" class="mb-2">Выберите срок:</label>
                     <select class="form-control form-control-sm mb-2" id="subscription" name="subscription">

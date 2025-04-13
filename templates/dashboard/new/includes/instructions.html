@@ -1,0 +1,9 @@
+<div class="col-md-4 stat-block">
+    <h3><i class="fa fa-server"></i> Инструкции</h3>
+    <ul>{% for server in servers %}
+        <li class="m-2"><span class="bg-success-subtle rounded p-1">{{ server }}</span></li>
+    {% empty %}
+        ---
+    {% endfor %}
+    </ul>
+</div>

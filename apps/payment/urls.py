@@ -1,14 +1,16 @@
 # your_app/urls.py
 from django.urls import path
-from . import views
-
+from .views import views_no_sub, views_sub
 urlpatterns = [
-    path('create-payment/', views.CreatePaymentView.as_view(), name='create_payment'),
-    path('payment-success/', views.PaymentSuccessView.as_view(), name='payment_success'),
-    path('payment-failure/', views.PaymentFailureView.as_view(), name='payment_failure'),
-    path('yookassa-webhook/', views.YookassaWebhookView.as_view(), name='yookassa_webhook'),
-    path('test-create-payment/', views.TestCreatePaymentView.as_view(), name='test_create_payment'),
-    path('test-payment-success/', views.TestPaymentSuccessView.as_view(), name='test_payment_success'),
-    path('test-payment-failure/', views.TestPaymentFailureView.as_view(), name='test_payment_failure'),
-    path('bot/yookassa-webhook/', views.YookassaTGBOTWebhookView.as_view(), name='yookassa_tgbot_webhook')
+    path('create-payment/',   views_no_sub.CreatePaymentView.as_view(), name='create_payment'),
+    path('payment-success/',  views_no_sub.PaymentSuccessView.as_view(), name='payment_success'),
+    path('payment-failure/',  views_no_sub.PaymentFailureView.as_view(), name='payment_failure'),
+    path('yookassa-webhook/', views_no_sub.YookassaWebhookView.as_view(), name='yookassa_webhook'),
+
+    # path('create-payment/', views_sub.CreatePaymentView.as_view(), name='create_payment'),
+    # path('payment-success/', views_sub.PaymentSuccessView.as_view(), name='payment_success'),
+    # path('payment-failure/', views_sub.PaymentFailureView.as_view(), name='payment_failure'),
+    # path('bot/yookassa-webhook/', views_sub.YookassaTGBOTWebhookView.as_view(), name='yookassa_tgbot_webhook'),
+    # path('yookassa-webhook/', views_no_sub.YookassaWebhookView.as_view(), name='yookassa_webhook'),
+
 ]
