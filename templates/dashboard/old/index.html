@@ -1,0 +1,69 @@
+{% extends 'layouts/base.html' %}
+{% load static %}
+
+{% block title %}Главная{% endblock title %}
+
+{% block content %}
+    <div class="hero_area">
+        <div class="bg-dark">
+            {% include 'home/sections/header.html' %}
+        </div>
+
+        <div id="responsiveMargin" class="m-1">
+
+            {% include 'includes/messages_success.html' %}
+            <div class="row mt-5">
+                <div class="col-sm-12 col-md-2 bg-light rounded p-4 mt-2">
+                    <br><br>
+                    {% include 'dashboard/includes/servers.html' %}
+                </div>
+                <div class="col-sm-12 col-md-7 bg-light rounded p-4 mt-2">
+                    {% include 'dashboard/includes/main-info.html' %}
+                </div>
+                <div class="col-sm-12 col-md-3 bg-light rounded p-4 mt-2">
+                    <br><br><br><br>
+                    {% include 'dashboard/includes/user-info.html' %}
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-sm-12 col-md-2 p-2 bg-light rounded p-4 mt-2">
+                    {% include 'dashboard/includes/transactions.html' %}
+                </div>
+                <div class="col-1 bg-light rounded p-4 mt-2"></div>
+                
+                <div class="col-sm-12 col-md-5 p-2 bg-light rounded p-4 mt-2">
+                    {% include 'dashboard/includes/referral.html' %}
+                </div>
+                <div class="col-1 bg-light rounded p-4 mt-2"></div>
+                
+                <div class="col-sm-12 col-md-3 p-2 bg-light rounded p-4 mt-2">
+                    {% include 'dashboard/includes/bot-info.html' %}
+                </div>
+                <div class="col-1 bg-light rounded "></div>
+            </div>
+
+
+        </div>
+    </div>
+
+    {% include 'home/sections/info.html' %}
+    {% include 'home/sections/footer.html' %}
+{% endblock content %}
+
+{% block extrascript %}
+    <script>
+        function updateMargin() {
+            const div = document.getElementById('responsiveMargin');
+            if (window.innerWidth < 768) {
+                div.className = 'm-1'; // Mobile (or smaller screen)
+            } else {
+                div.className = 'm-5'; // Larger screen
+            }
+        }
+        updateMargin();
+        window.addEventListener('resize', updateMargin);
+    </script>
+{% endblock extrascript %}
+
+

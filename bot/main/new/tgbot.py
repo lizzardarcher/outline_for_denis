@@ -3,9 +3,6 @@ import logging
 import random
 import sys
 import traceback
-from pathlib import Path
-from logging.handlers import RotatingFileHandler, TimedRotatingFileHandler
-from math import ceil
 from datetime import datetime, timedelta, date
 
 from yookassa import Configuration, Payment
@@ -17,25 +14,22 @@ from telebot import asyncio_filters
 from telebot.async_telebot import AsyncTeleBot
 from telebot.asyncio_storage import StateMemoryStorage
 from telebot.asyncio_handler_backends import State, StatesGroup
-from telebot.types import LabeledPrice, InlineKeyboardButton, InlineKeyboardMarkup
-
-import yookassa
+from telebot.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 from bot.main.vless.MarzbanAPI import MarzbanAPI
-from bot.models import TelegramBot, Prices, TelegramMessage, Logging, UserProfile
+from bot.models import TelegramBot, Prices, TelegramMessage, Logging
 from bot.models import TelegramUser
 from bot.models import TelegramReferral
 from bot.models import VpnKey
 from bot.models import Server
 from bot.models import Country
 from bot.models import IncomeInfo
-from bot.models import ReferralSettings
 from bot.models import WithdrawalRequest
 from bot.models import Transaction
 from bot.models import Logging as lg
 
-from bot.main.utils import msg   # LIVE
-from bot.main.utils import markup   # LIVE
+from bot.main.utils import msg
+from bot.main.utils import markup
 
 from bot.main.utils.utils import return_matches
 from bot.main.outline_client import create_new_key
@@ -53,7 +47,6 @@ logging.basicConfig(
 )
 
 bot = AsyncTeleBot(token=TelegramBot.objects.all().first().token, state_storage=StateMemoryStorage())
-# bot = AsyncTeleBot(token='8110135608:AAEBfrwyAXI8znOdrIRbHmX43TR_ArYyflI', state_storage=StateMemoryStorage())
 bot.parse_mode = 'HTML'
 DEBUG = settings.DEBUG
 BOT_USERNAME = 'xDomvpn_Bot'
@@ -200,52 +193,6 @@ async def got_payment(message):
     """
     print(message)
     await bot.send_message(chat_id=message.chat.id, text='Success', reply_markup=markup.back())
-
-    # payment = message.successful_payment
-    # logger.info(f'[{message.chat.first_name} : {message.chat.username} : {message.chat.id}] '
-    #             f'[successful payment: {str(int(payment.total_amount) / 100)} {payment.currency} | {payment}]')
-    #
-    # user = TelegramUser.objects.get(user_id=message.chat.id)
-    # amount = float(message.successful_payment.total_amount / 100)
-    #
-    # lg.objects.create(log_level='SUCCESS', message=f'[BOT] [Пользователь успешно пополнил баланс на {str(amount)}P.]',
-    #                   datetime=datetime.now(), user=user)
-    #
-    # currency = message.successful_payment.currency
-    # await bot.send_message(chat_id=message.chat.id, text=msg.payment_successful.format(amount, currency))
-    # await bot.send_message(chat_id=message.chat.id, text=msg.main_menu_choice, reply_markup=markup.start())
-    # balance = float(TelegramUser.objects.get(user_id=message.chat.id).balance) + amount
-    # TelegramUser.objects.filter(user_id=message.chat.id).update(balance=balance)
-    #
-    # income = float(IncomeInfo.objects.get(pk=1).total_amount)  # Общий доход проекта
-    # users_balance = float(IncomeInfo.objects.get(pk=1).user_balance_total)  # Общий баланс всех пользователей
-    # IncomeInfo.objects.all().update(total_amount=income + amount, user_balance_total=users_balance + amount)
-    # Transaction.objects.create(user=user, income_info=IncomeInfo.objects.get(pk=1), timestamp=datetime.now(),
-    #                            currency=currency, amount=amount, side='Приход средств', paid=True, status='succeeded')
-    #
-    # referred_list = [x for x in TelegramReferral.objects.filter(referred=user)]
-    # if referred_list:
-    #     for r in referred_list:
-    #         user_to_pay = TelegramUser.objects.filter(user_id=r.referrer.user_id)[0]
-    #         level = r.level
-    #         percent = None
-    #         if level == 1:
-    #             percent = ReferralSettings.objects.get(pk=1).level_1_percentage
-    #         elif level == 2:
-    #             percent = ReferralSettings.objects.get(pk=1).level_2_percentage
-    #         elif level == 3:
-    #             percent = ReferralSettings.objects.get(pk=1).level_3_percentage
-    #         elif level == 4:
-    #             percent = ReferralSettings.objects.get(pk=1).level_4_percentage
-    #         elif level == 5:
-    #             percent = ReferralSettings.objects.get(pk=1).level_5_percentage
-    #         if percent:
-    #             income = float(TelegramUser.objects.get(user_id=user_to_pay.user_id).income) + (
-    #                     amount * float(percent) / 100)
-    #             TelegramUser.objects.filter(user_id=user_to_pay.user_id).update(income=income)
-    #             await bot.send_message(user_to_pay.user_id,
-    #                                    text=msg.income_from_referral.format(str(amount * float(percent) / 100)),
-    #                                    reply_markup=markup.start())
 
 
 ### РАСЫЛКА ############################################################################################################

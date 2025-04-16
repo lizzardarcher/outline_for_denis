@@ -1,0 +1,151 @@
+<!-- Основная часть -->
+    <h1 class="text-center">Добро пожаловать в DomVPN</h1>
+    <p class="text-center">Здесь вы можете приобрести ключи Vless и Outline</p>
+    <div class="card mb-4">
+        <div class="card-header">
+            Главная
+        </div>
+        <div class="card-body">
+            <ul class="list-group list-group-flush">
+                <li class="list-group-item mb-4">
+                    <i class="fa fa-key text-warning"></i> Текущий ключ
+                    {% if vpn_key.access_url %}
+                        <small id="vpnkey"
+                               class="d-none d-lg-block text-muted float-end bg-success-subtle rounded p-1"
+                               style="cursor: pointer;"
+                               onclick="copyToClipboardKey('{{ vpn_key.access_url }}')">
+                            {{ vpn_key.access_url|truncatechars:50 }} {{ vpn_key.server.country.name_for_app }}
+                        </small>
+                        <small id="vpnkey-sm"
+                               class="d-sm-block d-md-none text-muted float-end bg-success-subtle rounded p-1"
+                               style="cursor: pointer;"
+                               onclick="copyToClipboardKeySM('{{ vpn_key.access_url }}')">
+                            Нажми, чтобы скопировать {{ vpn_key.server.country.name_for_app }}
+                        </small>
+                    {% else %}
+                        <small class="text-muted float-end">У вас нет VPN ключей.</small>
+                    {% endif %}
+
+                </li>
+                <li class="list-group-item mb-4">
+                    {% if vpn_key %}
+                        <span class="text-muted">Выберите локацию и протокол</span>
+                    {% else %}
+                        {{ vpn_key.protocol|upper }} {{ vpn_key.server.country.name_for_app }}
+                    {% endif %}
+                    {% if request.user.profile.telegram_user.subscription_status %}
+                        {% if vpn_key.access_url %}
+                            <!-- Button trigger modal -->
+                            <button type="button" class="btn btn-outline-warning text-muted float-end"
+                                    data-toggle="modal"
+                                    data-target="#change_key">
+                                <i class="fa fa-refresh"></i> Сменить локацию/Протокол
+                            </button>
+                        {% else %}
+                            <button type="button" class="btn btn-outline-info text-muted float-end" data-toggle="modal"
+                                    data-target="#change_key">
+                                <i class="fa fa-get-pocket"></i>Создать новый
+                            </button>
+                        {% endif %}
+                    {% else %}
+                        <button type="button" class="btn btn-outline-info text-muted float-end">
+                            <i class="fa fa-key"></i> Необходимо оплатить подписку, чтобы создать новый ключ
+                        </button>
+                    {% endif %}
+                    <!-- Modal -->
+                    <div class="modal fade" id="change_key" tabindex="-1" role="dialog"
+                         aria-labelledby="change_keyLabel" aria-hidden="true">
+                        <div class="modal-dialog" role="document">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title" id="change_keyLabel">Доступные сервера</h5>
+                                </div>
+                                <div class="modal-body">
+                                    <form action="{% url 'get_new_key' %}">
+                                        <label for="country">Выберите страну:</label>
+                                        <select class="form-control" id="country" name="country">
+                                            {% for country in countries %}
+                                                <option value="{{ country.name }}">{{ country.name_for_app }}</option>
+                                            {% endfor %}
+                                        </select>
+                                        <label for="protocol">Выберите протокол:</label>
+                                        <select class="form-control" id="protocol" name="protocol">
+                                            <option value="outline">Outline</option>
+                                            <option value="vless">Vless</option>
+                                        </select>
+                                        <div class="modal-footer">
+                                            <button type="button" class="btn btn-secondary" data-dismiss="modal">
+                                                Отмена
+                                            </button>
+                                            <button type="submit" class="btn btn-primary">Подтвердить</button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </li>
+                <li class="list-group-item">
+                    Баланс<br>
+                    <small class="text-muted">Пополните баланс для активации подписки</small>
+                    <form class="text-muted float-end" method="post" action="{% url 'create_payment' %}">
+                        {% csrf_token %}
+                        <label for="amount" >Введите сумму для пополнения:</label>
+                        <input class="form-control mt-1 mb-2" id="amount" name="amount" type="number" placeholder=""/>
+                        <button type="submit" class="btn btn-outline-success text-muted float-end"><i
+                                class="fa fa-money"></i>
+                            Пополнить
+                        </button>
+                    </form>
+                </li>
+                <li class="list-group-item">
+                    Приобрести подписку<br>
+                    <small class="text-muted">Средства спишутся с вашего баланса</small>
+                    <form class="text-muted float-end" action="{% url 'update_subscription' request.user.profile.telegram_user.user_id %}">
+                        <label for="subscription">Выберите Подписку:</label>
+                        <select class="form-control mt-1 mb-1" id="subscription" name="subscription">
+                            <option value="{{ subscription.price_1 }}">{{ subscription.price_1 }}₽ на 1 месяц</option>
+                            <option value="{{ subscription.price_2 }}">{{ subscription.price_2 }}₽ на 3 месяца</option>
+                            <option value="{{ subscription.price_3 }}">{{ subscription.price_3 }}₽ на 6 месяцев</option>
+                            <option value="{{ subscription.price_4 }}">{{ subscription.price_4 }}₽ на 1 год</option>
+                        </select>
+                        <button type="submit" class="btn btn-outline-primary">Приобрести</button>
+                    </form>
+                </li>
+            </ul>
+        </div>
+    </div>
+
+<script>
+    function copyToClipboardKey(text) {
+        navigator.clipboard.writeText(text)
+            .then(() => {
+                //  alert("Текст скопирован в буфер обмена!");
+                document.getElementById('vpnkey').innerHTML = "Скопировано!";
+                setTimeout(() => {
+                    document.getElementById('vpnkey').innerHTML = "{{ vpn_key.access_url|truncatechars:50 }} {{ vpn_key.server.country.name_for_app }}";
+                }, 2000);
+            })
+            .catch(err => {
+                console.error('Ошибка при копировании: ', err);
+                alert("Не удалось скопировать текст.");
+            });
+    }
+
+    function copyToClipboardKeySM(text) {
+        navigator.clipboard.writeText(text)
+            .then(() => {
+                //  alert("Текст скопирован в буфер обмена!");
+                document.getElementById('vpnkey-sm').innerHTML = "Скопировано!";
+                setTimeout(() => {
+                    document.getElementById('vpnkey-sm').innerHTML = "Нажми, чтобы скопировать {{ vpn_key.server.country.name_for_app }}";
+                }, 2000);
+            })
+            .catch(err => {
+                console.error('Ошибка при копировании: ', err);
+                alert("Не удалось скопировать текст.");
+            });
+    }
+</script>
+
+
