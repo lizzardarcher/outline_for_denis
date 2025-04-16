@@ -203,9 +203,10 @@ class YookassaTGBOTWebhookView(View):
             return HttpResponse('OK', status=200)
 
 
-
+@method_decorator(csrf_exempt, name='dispatch')
 class YookassaSiteWebhookView(View):
     def post(self, request, *args, **kwargs):
+        # Logging.objects.create(log_level="WARNING", message=f'[WEB] [Приём вебхука] [{str(request.body)}]', datetime=datetime.now())
 
         try:
             data = json.loads(request.body)
