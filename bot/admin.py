@@ -112,11 +112,11 @@ class LogInline(admin.TabularInline):
 class TelegramUserAdmin(admin.ModelAdmin):
     list_display = (
         'join_date', 'first_name', 'last_name', 'username', 'subscription_status',
-        'subscription_expiration', 'balance', 'referral_link', 'get_payment_method_id', 'permission_revoked')
+        'subscription_expiration', 'balance', 'referral_link', 'get_payment_method_id', 'permission_revoked', 'income')
     list_display_links = (
-        'join_date', 'first_name', 'last_name', 'username', 'subscription_status', 'subscription_expiration', 'balance')
+        'join_date', 'first_name', 'last_name', 'username', 'subscription_status', 'subscription_expiration', 'balance', 'income')
     search_fields = ('first_name', 'last_name', 'username', 'user_id')
-    readonly_fields = ('join_date', 'first_name', 'last_name', 'username', 'user_id', 'income', 'payment_method_id')
+    readonly_fields = ('join_date', 'first_name', 'last_name', 'username', 'user_id',)
     exclude = ('data_limit', 'is_banned', 'top_up_balance_listener', 'withdrawal_listener')
     ordering = ('-subscription_status', '-join_date',)
     empty_value_display = '---'
@@ -175,7 +175,8 @@ class TelegramBotAdmin(admin.ModelAdmin):
 @admin.register(TelegramReferral)
 class TelegramReferralAdmin(admin.ModelAdmin):
     list_display = ('referrer', 'referred', 'level')
-
+    search_fields = ('referrer__username', 'referred__username', 'referrer__first_name', 'referred__first_name',
+                     'referrer__last_name', 'referred__last_name', 'referrer__user_id', 'referred__user_id')
     def has_add_permission(self, request):
         if not DEBUG:
             return False

@@ -66,7 +66,7 @@ class CancelSubscriptionView(LoginRequiredMixin, TemplateView):
         user.payment_method_id = None
         user.save()
         messages.success(request, f'Подписка отменена! Ежемесячная оплата отменена.')
-        return redirect('test_profile')
+        return redirect('profile')
 
 class CreateNewKeyView(LoginRequiredMixin, TemplateView):
 

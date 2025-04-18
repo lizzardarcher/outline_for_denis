@@ -51,20 +51,35 @@
                 </nav>
 
                 <!-- Основной контент -->
-                {% include 'includes/messages_success.html' %}
+
                 <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 mt-5">
+
+                    {% if messages %}
+                        <div class="col-sm-12 col-6">
+                            {% for message in messages %}
+                                <div class="mt-5 alert {% if message.tags == 'error' %}alert-danger{% elif message.tags == 'success' %}alert-success{% endif %} alert-dismissible text-dark"
+                                     role="alert">
+                                    {{ message|safe }}
+                                    <button type="button" class="btn-close text-lg py-3 opacity-10"
+                                            data-bs-dismiss="alert"
+                                            aria-label="Close">
+                                    </button>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
 
                     <div class="mt-5 bg-light p-2 rounded mb-2 ">
                         <h1 class="h2">Личный кабинет DomVPN</h1>
                     </div>
-{#                    <div class="container">#}
-{#                        <div class="alert alert-warning alert-dismissible fade show" role="alert">#}
-{#                            <strong>Внимание!</strong> В настоящее время оплата на сайте временно недоступна.#}
-{#                            Для приобретения подписки, пожалуйста, перейдите в Telegram-бот <a#}
-{#                                href="https://t.me/xDomvpn_Bot" class="alert-link" target="_blank">@xDomvpn_Bot</a>.#}
-{#                            Приносим извинения за доставленные неудобства. Спасибо за понимание.#}
-{#                        </div>#}
-{#                    </div>#}
+                    {#                    <div class="container">#}
+                    {#                        <div class="alert alert-warning alert-dismissible fade show" role="alert">#}
+                    {#                            <strong>Внимание!</strong> В настоящее время оплата на сайте временно недоступна.#}
+                    {#                            Для приобретения подписки, пожалуйста, перейдите в Telegram-бот <a#}
+                    {#                                href="https://t.me/xDomvpn_Bot" class="alert-link" target="_blank">@xDomvpn_Bot</a>.#}
+                    {#                            Приносим извинения за доставленные неудобства. Спасибо за понимание.#}
+                    {#                        </div>#}
+                    {#                    </div>#}
                     <div id="user-info" class="content-section">
                         {% include 'dashboard/includes/user-info.html' %}
                     </div>
