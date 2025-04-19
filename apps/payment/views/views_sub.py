@@ -139,10 +139,12 @@ class YookassaTGBOTWebhookView(View):
                         telegram_user.subscription_expiration = telegram_user.subscription_expiration + timedelta(
                             days=days)
                         telegram_user.payment_method_id = payment_method_id
+                        telegram_user.permission_revoked = False
                         telegram_user.save()
                     else:
                         telegram_user.subscription_status = True
                         telegram_user.subscription_expiration = datetime.now() + timedelta(days=days)
+                        telegram_user.permission_revoked = False
                         telegram_user.payment_method_id = payment_method_id
                         telegram_user.save()
 
@@ -250,11 +252,13 @@ class YookassaSiteWebhookView(View):
                     if telegram_user.subscription_status:
                         telegram_user.subscription_expiration = telegram_user.subscription_expiration + timedelta(
                             days=days)
+                        telegram_user.permission_revoked = False
                         telegram_user.payment_method_id = payment_method_id
                         telegram_user.save()
                     else:
                         telegram_user.subscription_status = True
                         telegram_user.subscription_expiration = datetime.now() + timedelta(days=days)
+                        telegram_user.permission_revoked = False
                         telegram_user.payment_method_id = payment_method_id
                         telegram_user.save()
 

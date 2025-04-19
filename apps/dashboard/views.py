@@ -64,6 +64,7 @@ class CancelSubscriptionView(LoginRequiredMixin, TemplateView):
     def get(self, request, *args, **kwargs):
         user = TelegramUser.objects.filter(user_id=self.request.user.profile.telegram_user.user_id).first()
         user.payment_method_id = None
+        user.permission_revoked = True
         user.save()
         messages.success(request, f'Подписка отменена! Ежемесячная оплата отменена.')
         return redirect('profile')
