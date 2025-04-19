@@ -384,7 +384,7 @@ class LoggingAdmin(admin.ModelAdmin):
 
     list_display = ('datetime', 'user', 'message', 'get_log_level',)
     list_display_links = ('user', 'message',)
-    search_fields = ('message', )
+    search_fields = ('message', 'user__username',)
     ordering = ['-datetime']
     actions = [make_warning, make_debug, make_fatal, make_trace, make_success, make_info]
 

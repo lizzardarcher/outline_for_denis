@@ -33,9 +33,6 @@ def create_new_key(server: Server, user: TelegramUser) -> str:
         used_bytes=key.used_bytes,
         data_limit=key.data_limit
     )
-    keys_generated = server.keys_generated
-    server.keys_generated = keys_generated + 1
-    server.save()
     Logging.objects.create(log_level='INFO', message=f'[WEB] [Новый Ключ Создан]', datetime=datetime.now(), user=user)
     return f'{key.access_url}#{server.country.name_for_app} VPN'
 
@@ -51,13 +48,6 @@ def delete_user_keys(user: TelegramUser):
                 keys.remove(key)
                 Logging.objects.create(log_level='WARNING', message='[WEB] [Недействительный Ключ Удалён]',
                                        datetime=datetime.now(), user=user)
-                try:
-                    #  Добавляется запись об уменьшении кол-ва сгенерированных ключей на 1
-                    keys_generated = Server.objects.filter(script_out=data).first().keys_generated - 1
-                    Server.objects.filter(script_out=data).update(keys_generated=keys_generated)
-                except:
-                    Logging.objects.create(log_level='ERROR', message=f'{traceback.format_exc()}',
-                                           datetime=datetime.now(), user=user)
             except:
                 Logging.objects.create(log_level='ERROR', message=f'{traceback.format_exc()}', datetime=datetime.now(),
                                        user=user)

@@ -78,31 +78,32 @@ class CreateNewKeyView(LoginRequiredMixin, TemplateView):
             return redirect('profile')
 
         country = get_object_or_404(Country, name=country_name)
-        server = Server.objects.filter(is_active=True, is_activated=True, country=country, keys_generated__lte=200).first()
 
-        if not server:
-            messages.error(request, f"Ошибка создания ключа! Нет доступных серверов для страны '{country.name}'.")
-            return redirect('profile')
 
         user_profile = get_object_or_404(UserProfile, user=request.user)
         user = user_profile.telegram_user
 
         if protocol == 'outline':
-            delete_user_keys(user=user)  # Удаляем текущие ключи outline
+            server = Server.objects.filter(is_active=True, is_activated=True, country=country,
+                                           keys_generated__lte=200).first()
+            if not server:
+                messages.error(request, f"Ошибка создания ключа! Нет доступных серверов для страны '{country.name}'.")
+                return redirect('profile')
+
+            delete_user_keys(user=user)               # Удаляем текущие ключи outline
             create_new_key(server=server, user=user)  # Генерируем новый ключ outline
             messages.success(request, f'Новый ключ создан!')
             Logging.objects.create(log_level=" INFO", message=f'[WEB] [Новый ключ создан]', datetime=datetime.now(), user=self.request.user.profile.telegram_user)
         elif protocol == 'vless':
 
-            server = Server.objects.filter(is_active=True, is_activated_vless=True, country=country, keys_generated__lte=200).last()
+            server = Server.objects.filter(is_active=True, is_activated_vless=True, country=country,
+                                           keys_generated__lte=200).first()
+            if not server:
+                messages.error(request, f"Ошибка создания ключа! Нет доступных серверов для страны '{country.name}'.")
+                return redirect('profile')
 
-            #  Удаляем все предыдущие ключи
-            _key = VpnKey.objects.filter(user=user)
-            #  Обновляем счетчик - 1
-            _server = _key.first().server
-            _server.keys_generated = _server.keys_generated - 1
-            _server.save()
-            _key.delete()
+
+            VpnKey.objects.filter(user=user).delete() #  Удаляем все предыдущие ключи
 
             MarzbanAPI().create_user(username=str(user.user_id)) # Генерируем новый ключ vless
             success, result = MarzbanAPI().get_user(username=str(user.user_id))
@@ -112,17 +113,14 @@ class CreateNewKeyView(LoginRequiredMixin, TemplateView):
                 if server.ip_address in link:
                     key = link
                     break
-            key = VpnKey.objects.create(server=server, user=user, key_id=user.user_id,
+
+            VpnKey.objects.create(server=server, user=user, key_id=user.user_id,
                                         name=str(user.user_id), password=str(user.user_id),
                                         port=1040, method='vless', access_url=key, protocol='vless')
-            #  Обновляем счетчик + 1
-            server.keys_generated = server.keys_generated + 1
-            server.save()
 
             messages.success(request, f'Новый ключ создан!')
             Logging.objects.create(log_level=" INFO", message=f'[WEB] [Новый ключ создан]', datetime=datetime.now(), user=self.request.user.profile.telegram_user)
         return redirect('profile')
-
 
 class UpdateSubscriptionView(LoginRequiredMixin, TemplateView):
     def get(self, request, *args, **kwargs):
