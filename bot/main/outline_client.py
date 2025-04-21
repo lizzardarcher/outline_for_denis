@@ -75,3 +75,29 @@ async def delete_user_keys(user: TelegramUser) -> bool:
         return True
     except Exception as e:
         return False
+
+
+def sync_delete_user_keys(user: TelegramUser) -> bool:
+    """
+    Delete all vpn-keys associated with user
+    :param user: TelegramUser from models
+    :return: True if deletion was successful, False otherwise
+    """
+    try:
+        servers = [x.server.script_out for x in VpnKey.objects.filter(user=user)]
+        keys = [key.key_id for key in VpnKey.objects.filter(user=user)]
+
+        for data in servers:
+            client = OutlineVPN(api_url=data['apiUrl'], cert_sha256=data['certSha256'])
+            for key in keys:
+                try:
+                    client.delete_key(key)
+                    keys.remove(key)
+                except:
+                    ...
+        VpnKey.objects.filter(user=user).delete()
+        Logging.objects.create(log_level='WARNING', message='[BOT] [Недействительный Ключ Удалён]', datetime=datetime.now(),
+                               user=user)
+        return True
+    except Exception as e:
+        return False

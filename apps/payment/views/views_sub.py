@@ -1,5 +1,6 @@
 import traceback
 from datetime import datetime, timedelta
+from decimal import Decimal
 
 from django.contrib import messages
 from django.urls import reverse
@@ -148,27 +149,53 @@ class YookassaTGBOTWebhookView(View):
                         telegram_user.payment_method_id = payment_method_id
                         telegram_user.save()
 
-                    referred_list = [x for x in TelegramReferral.objects.filter(referred=telegram_user)]
+                    # referred_list = [x for x in TelegramReferral.objects.filter(referred=telegram_user)]
+                    # if referred_list:
+                    #     for r in referred_list:
+                    #         user_to_pay = TelegramUser.objects.filter(user_id=r.referrer.user_id).first()
+                    #         level = r.level
+                    #         percent = None
+                    #         if level == 1:
+                    #             percent = ReferralSettings.objects.get(pk=1).level_1_percentage
+                    #         elif level == 2:
+                    #             percent = ReferralSettings.objects.get(pk=1).level_2_percentage
+                    #         elif level == 3:
+                    #             percent = ReferralSettings.objects.get(pk=1).level_3_percentage
+                    #         elif level == 4:
+                    #             percent = ReferralSettings.objects.get(pk=1).level_4_percentage
+                    #         elif level == 5:
+                    #             percent = ReferralSettings.objects.get(pk=1).level_5_percentage
+                    #         if percent:
+                    #             income = float(TelegramUser.objects.get(user_id=user_to_pay.user_id).income) + (
+                    #                     float(amount_value) * float(percent) / 100)
+                    #             telegram_user.income = income
+                    #             telegram_user.save()
+
+                    REFERRAL_PERCENTAGES = {
+                        1: ReferralSettings.objects.get(pk=1).level_1_percentage,
+                        2: ReferralSettings.objects.get(pk=1).level_2_percentage,
+                        3: ReferralSettings.objects.get(pk=1).level_3_percentage,
+                        4: ReferralSettings.objects.get(pk=1).level_4_percentage,
+                        5: ReferralSettings.objects.get(pk=1).level_5_percentage,
+                    }
+
+                    referred_list = TelegramReferral.objects.filter(referred=telegram_user).select_related('referrer')
                     if referred_list:
+                        user_ids_to_pay = [r.referrer.user_id for r in referred_list]
+                        # Prefetch all the user objects in one call!
+                        users_to_pay = {u.user_id: u for u in TelegramUser.objects.filter(user_id__in=user_ids_to_pay)}
+
                         for r in referred_list:
-                            user_to_pay = TelegramUser.objects.filter(user_id=r.referrer.user_id).first()
                             level = r.level
-                            percent = None
-                            if level == 1:
-                                percent = ReferralSettings.objects.get(pk=1).level_1_percentage
-                            elif level == 2:
-                                percent = ReferralSettings.objects.get(pk=1).level_2_percentage
-                            elif level == 3:
-                                percent = ReferralSettings.objects.get(pk=1).level_3_percentage
-                            elif level == 4:
-                                percent = ReferralSettings.objects.get(pk=1).level_4_percentage
-                            elif level == 5:
-                                percent = ReferralSettings.objects.get(pk=1).level_5_percentage
+                            user_to_pay = users_to_pay.get(r.referrer.user_id)  # Access pre-fetched user
+                            if not user_to_pay:
+                                continue
+                            percent = REFERRAL_PERCENTAGES.get(level)
                             if percent:
-                                income = float(TelegramUser.objects.get(user_id=user_to_pay.user_id).income) + (
-                                        float(amount_value) * float(percent) / 100)
-                                telegram_user.income = income
-                                telegram_user.save()
+                                income = Decimal(user_to_pay.income) + (
+                                        Decimal(amount_value) * Decimal(percent) / 100)
+                                user_to_pay.income = income
+                                user_to_pay.save()  # Save the user to pay not the original user
 
                     Logging.objects.create(log_level="SUCCESS",
                                            message=f'[BOT] [Платёж  на сумму {str(amount_value)} р. прошёл]',
@@ -262,27 +289,53 @@ class YookassaSiteWebhookView(View):
                         telegram_user.payment_method_id = payment_method_id
                         telegram_user.save()
 
-                    referred_list = [x for x in TelegramReferral.objects.filter(referred=telegram_user)]
+                    # referred_list = [x for x in TelegramReferral.objects.filter(referred=telegram_user)]
+                    # if referred_list:
+                    #     for r in referred_list:
+                    #         user_to_pay = TelegramUser.objects.filter(user_id=r.referrer.user_id).first()
+                    #         level = r.level
+                    #         percent = None
+                    #         if level == 1:
+                    #             percent = ReferralSettings.objects.get(pk=1).level_1_percentage
+                    #         elif level == 2:
+                    #             percent = ReferralSettings.objects.get(pk=1).level_2_percentage
+                    #         elif level == 3:
+                    #             percent = ReferralSettings.objects.get(pk=1).level_3_percentage
+                    #         elif level == 4:
+                    #             percent = ReferralSettings.objects.get(pk=1).level_4_percentage
+                    #         elif level == 5:
+                    #             percent = ReferralSettings.objects.get(pk=1).level_5_percentage
+                    #         if percent:
+                    #             income = float(TelegramUser.objects.get(user_id=user_to_pay.user_id).income) + (
+                    #                     float(amount_value) * float(percent) / 100)
+                    #             telegram_user.income = income
+                    #             telegram_user.save()
+
+                    REFERRAL_PERCENTAGES = {
+                        1: ReferralSettings.objects.get(pk=1).level_1_percentage,
+                        2: ReferralSettings.objects.get(pk=1).level_2_percentage,
+                        3: ReferralSettings.objects.get(pk=1).level_3_percentage,
+                        4: ReferralSettings.objects.get(pk=1).level_4_percentage,
+                        5: ReferralSettings.objects.get(pk=1).level_5_percentage,
+                    }
+
+                    referred_list = TelegramReferral.objects.filter(referred=telegram_user).select_related('referrer')
                     if referred_list:
+                        user_ids_to_pay = [r.referrer.user_id for r in referred_list]
+                        # Prefetch all the user objects in one call!
+                        users_to_pay = {u.user_id: u for u in TelegramUser.objects.filter(user_id__in=user_ids_to_pay)}
+
                         for r in referred_list:
-                            user_to_pay = TelegramUser.objects.filter(user_id=r.referrer.user_id).first()
                             level = r.level
-                            percent = None
-                            if level == 1:
-                                percent = ReferralSettings.objects.get(pk=1).level_1_percentage
-                            elif level == 2:
-                                percent = ReferralSettings.objects.get(pk=1).level_2_percentage
-                            elif level == 3:
-                                percent = ReferralSettings.objects.get(pk=1).level_3_percentage
-                            elif level == 4:
-                                percent = ReferralSettings.objects.get(pk=1).level_4_percentage
-                            elif level == 5:
-                                percent = ReferralSettings.objects.get(pk=1).level_5_percentage
+                            user_to_pay = users_to_pay.get(r.referrer.user_id)  # Access pre-fetched user
+                            if not user_to_pay:
+                                continue
+                            percent = REFERRAL_PERCENTAGES.get(level)
                             if percent:
-                                income = float(TelegramUser.objects.get(user_id=user_to_pay.user_id).income) + (
-                                        float(amount_value) * float(percent) / 100)
-                                telegram_user.income = income
-                                telegram_user.save()
+                                income = Decimal(user_to_pay.income) + (
+                                            Decimal(amount_value) * Decimal(percent) / 100)
+                                user_to_pay.income = income
+                                user_to_pay.save()  # Save the user to pay not the original user
 
                     Logging.objects.create(log_level="SUCCESS",
                                            message=f'[WEB] [Платёж  на сумму {str(amount_value)} р. прошёл]',

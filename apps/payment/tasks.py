@@ -49,33 +49,60 @@ def attempt_recurring_payment():
                 user.subscription_expiration = timezone.now().date() + timedelta(days=31)
                 user.save()
                 Transaction.objects.create(user=user, amount=amount_to_charge, currency=currency,
-                                           side='Приход средств', status='succeeded', paid=True,
+                                           side='Автосписание приход', status='succeeded', paid=True,
                                            income_info=IncomeInfo.objects.get(pk=1))
                 msg = (
                     f"Автосписание успешно! Пользователь {user.user_id} оплатил с {str(amount_to_charge)} {currency}. "
-                    f"Подписка активирована до {user.subscription_expiration}")
+                       f""f"Подписка активирована до {user.subscription_expiration}"
+                )
 
-                referred_list = [x for x in TelegramReferral.objects.filter(referred=user)]
+                # referred_list = TelegramReferral.objects.filter(referred=user)
+                # if referred_list:
+                #     for r in referred_list:
+                #         user_to_pay = TelegramUser.objects.filter(user_id=r.referrer.user_id).first()
+                #         level = r.level
+                #         percent = None
+                #         if level == 1:
+                #             percent = ReferralSettings.objects.get(pk=1).level_1_percentage
+                #         elif level == 2:
+                #             percent = ReferralSettings.objects.get(pk=1).level_2_percentage
+                #         elif level == 3:
+                #             percent = ReferralSettings.objects.get(pk=1).level_3_percentage
+                #         elif level == 4:
+                #             percent = ReferralSettings.objects.get(pk=1).level_4_percentage
+                #         elif level == 5:
+                #             percent = ReferralSettings.objects.get(pk=1).level_5_percentage
+                #         if percent:
+                #             income = float(TelegramUser.objects.get(user_id=user_to_pay.user_id).income) + (
+                #                     float(amount_to_charge) * float(percent) / 100)
+                #             user.income = income
+                #             user.save()
+
+
+                REFERRAL_PERCENTAGES = {
+                    1: ReferralSettings.objects.get(pk=1).level_1_percentage,
+                    2: ReferralSettings.objects.get(pk=1).level_2_percentage,
+                    3: ReferralSettings.objects.get(pk=1).level_3_percentage,
+                    4: ReferralSettings.objects.get(pk=1).level_4_percentage,
+                    5: ReferralSettings.objects.get(pk=1).level_5_percentage,
+                }
+
+                referred_list = TelegramReferral.objects.filter(referred=user).select_related('referrer')
                 if referred_list:
+                    user_ids_to_pay = [r.referrer.user_id for r in referred_list]
+                    # Prefetch all the user objects in one call!
+                    users_to_pay = {u.user_id: u for u in TelegramUser.objects.filter(user_id__in=user_ids_to_pay)}
+
                     for r in referred_list:
-                        user_to_pay = TelegramUser.objects.filter(user_id=r.referrer.user_id).first()
                         level = r.level
-                        percent = None
-                        if level == 1:
-                            percent = ReferralSettings.objects.get(pk=1).level_1_percentage
-                        elif level == 2:
-                            percent = ReferralSettings.objects.get(pk=1).level_2_percentage
-                        elif level == 3:
-                            percent = ReferralSettings.objects.get(pk=1).level_3_percentage
-                        elif level == 4:
-                            percent = ReferralSettings.objects.get(pk=1).level_4_percentage
-                        elif level == 5:
-                            percent = ReferralSettings.objects.get(pk=1).level_5_percentage
+                        user_to_pay = users_to_pay.get(r.referrer.user_id)  # Access pre-fetched user
+                        if not user_to_pay:
+                            continue
+                        percent = REFERRAL_PERCENTAGES.get(level)
                         if percent:
-                            income = float(TelegramUser.objects.get(user_id=user_to_pay.user_id).income) + (
-                                    float(amount_to_charge) * float(percent) / 100)
-                            user.income = income
-                            user.save()
+                            income = Decimal(user_to_pay.income) + (Decimal(amount_to_charge) * Decimal(percent) / 100)
+                            user_to_pay.income = income
+                            user_to_pay.save()  # Save the user to pay not the original user
 
                 Logging.objects.create(log_level="SUCCESS", message=msg, datetime=datetime.now(), user=user)
 
@@ -88,33 +115,26 @@ def attempt_recurring_payment():
                 # Платеж отменен
                 cancellation_details = payment.cancellation_details
                 reason = cancellation_details.reason if cancellation_details else "Unknown reason"
+                user.payment_method_id = ''
+                user.save()
 
                 # Обработка различных причин отмены
-                message = f"Платеж отменен для пользователя {user.user_id}. Причина: {reason}. "  # Базовое сообщение
+                message = f"Платеж отменен для пользователя {user.user_id}. Причина: {reason}. "
 
                 if reason == 'insufficient_funds':
                     message += "Недостаточно средств для списания. Пополните баланс."
 
                 elif reason == 'payment_method_restricted':
                     message += "Операции с платежным средством запрещены (карта заблокирована и т.п.). Обратитесь в банк."
-                    user.payment_method_id = None
-                    user.save()
 
                 elif reason == 'permission_revoked':
                     message += "Вы отозвали разрешение на подписку. Подтвердите подписку заново."
-                    user.payment_method_id = None
-                    user.permission_revoked = True
-                    user.save()
 
                 elif reason == 'card_expired':
                     message += "Истек срок действия карты. Обновите данные карты."
-                    user.payment_method_id = None
-                    user.save()
 
                 elif reason == 'country_forbidden':
                     message += "Нельзя заплатить банковской картой, выпущенной в этой стране. Используйте другую карту."
-                    user.payment_method_id = None
-                    user.save()
 
                 elif reason == 'fraud_suspected':
                     message += "Платеж заблокирован из-за подозрения в мошенничестве. Свяжитесь с банком."
@@ -162,13 +182,16 @@ def attempt_recurring_payment():
 
                 msg = message
                 #  Отправляем сообщение пользователю
-                # send_telegram_message(user.user_id, message) # Отправляем сообщение пользователю
                 Logging.objects.create(log_level="WARNING", message=msg, datetime=datetime.now(), user=user)
 
-            else:  # Другие статусы (например, 'waiting_for_capture')
+            else:
                 msg = f"Неизвестный статус платежа {payment.status} для пользователя {user.user_id}."
+                user.payment_method_id = ''
+                user.save()
                 Logging.objects.create(log_level="WARNING", message=msg, datetime=datetime.now(), user=user)
 
         except Exception as e:
+            user.payment_method_id = ''
+            user.save()
             msg = f"Ошибка при списании с пользователя {user.user_id}: {e}"
             Logging.objects.create(log_level="FATAL", message=msg, datetime=datetime.now(), user=user)

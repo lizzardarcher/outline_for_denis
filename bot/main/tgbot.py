@@ -689,7 +689,7 @@ async def callback_query_handlers(call):
 if __name__ == '__main__':
     bot.add_custom_filter(asyncio_filters.StateFilter(bot))
     loop = asyncio.get_event_loop()
-    loop.create_task(update_user_subscription_status())                                                 # SUBSCRIPTION REDEEM ON EXPIRATION
+    # loop.create_task(update_user_subscription_status())                                                 # SUBSCRIPTION REDEEM ON EXPIRATION
     loop.create_task(send_pending_messages())                                                           # MAILING
     loop.create_task(bot.polling(non_stop=True, request_timeout=100, timeout=100, skip_pending=True))  # TELEGRAM BOT
     loop.run_forever()
