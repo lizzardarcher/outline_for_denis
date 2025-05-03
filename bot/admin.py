@@ -192,7 +192,7 @@ class TelegramReferralAdmin(admin.ModelAdmin):
 
 @admin.register(Transaction)
 class TransactionAdmin(admin.ModelAdmin):
-    list_display = ('timestamp', 'amount', 'currency', 'status', 'user', 'side')
+    list_display = ('timestamp', 'amount', 'currency', 'status','description','paid','payment_id',  'user', 'side')
     list_display_links = ('user',)
     ordering = ['-timestamp']
 

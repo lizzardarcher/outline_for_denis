@@ -15,9 +15,9 @@ import datetime
 # vk = VpnKey.objects.filter(server=None).delete()
 # print(vk)
 
-# users = TelegramUser.objects.all()
-#
-# for user in users:
-#     if user.income > 800:
-#         user.income = 0
-#         user.save()
+users = TelegramUser.objects.all()
+
+for user in users:
+    if user.income > 150 and user.username != 'denis_zhokhov':
+        user.income = 0
+        user.save()

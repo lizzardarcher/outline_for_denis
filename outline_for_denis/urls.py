@@ -28,7 +28,7 @@ urlpatterns = [
     path('', include('bot.urls')),
     path('dashboard/', include('apps.dashboard.urls')),
     path('payment/', include('apps.payment.urls')),
-    path('admin/', admin.site.urls),
+    path('admindomvpnx/', admin.site.urls),
 
 ]
 urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)

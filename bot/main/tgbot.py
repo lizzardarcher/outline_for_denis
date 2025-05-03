@@ -186,6 +186,11 @@ async def start(message):
                                reply_markup=markup.get_app_or_start())
 
 
+@bot.message_handler(commands=['menu'])
+async def menu(message):
+    await bot.send_message(chat_id=message.chat.id, text=msg.start_message.format(message.from_user.first_name),
+                           reply_markup=markup.start())
+
 
 @bot.message_handler(commands=['payment'])
 async def got_payment(message):
