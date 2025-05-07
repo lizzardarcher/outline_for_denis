@@ -4,11 +4,12 @@ from celery import shared_task
 from django.utils import timezone
 
 from telebot import TeleBot
+from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 from bot.main.outline_client import sync_delete_user_keys
 from bot.main.utils import msg
 from bot.main.vless.MarzbanAPI import MarzbanAPI
-from bot.models import Logging, Transaction, IncomeInfo, TelegramUser, TelegramBot, VpnKey
+from bot.models import Logging, Transaction, IncomeInfo, TelegramUser, TelegramBot, VpnKey, TelegramMessage
 from bot.models import Server
 
 @shared_task
@@ -88,3 +89,32 @@ def update_user_subscription_status():
             except Exception:
                 pass
 
+@shared_task
+def message_sender():
+    messages = TelegramMessage.objects.filter(status='not_sent')
+    bot = TeleBot(token=TelegramBot.objects.all().first().token)
+    _markup = InlineKeyboardMarkup().add(InlineKeyboardButton(text=f'💡 Управление VPN', callback_data=f'manage'))
+    counter = 0
+    for message in messages:
+
+        users = []
+
+        if message.send_to_subscribed:
+            users += TelegramUser.objects.filter(subscription_status=True)
+        elif message.send_to_notsubscribed:
+            users += TelegramUser.objects.filter(subscription_status=False)
+        else:
+            users += TelegramUser.objects.all()
+
+        for user in users:
+            try:
+                bot.send_message(chat_id=user.user_id, text=message.text, reply_markup=_markup)
+                counter += 1
+                message.counter = counter
+                message.save()
+            except Exception as e:
+                ...
+
+        message.status = 'sent'
+        message.counter = counter
+        message.save()

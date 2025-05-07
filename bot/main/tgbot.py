@@ -78,7 +78,7 @@ async def send_pending_messages():
 
             for user in users:
                 try:
-                    await bot.send_message(chat_id=user.user_id, text=message.text)
+                    await bot.send_message(chat_id=user.user_id, text=message.text, reply_markup=markup.for_sender())
                     counter += 1
                     message.counter = counter
                     message.save()
@@ -623,7 +623,7 @@ async def callback_query_handlers(call):
                 user_id = user.user_id
                 income = user.income
                 sub = str(user.subscription_expiration.strftime("%d.%m.%Y")) if user.subscription_status else 'Нет подписки'
-                active = '✅' if user.subscription_status else '❌'
+                active = '📌  <b>Подписка:</b> ✅' if user.payment_method_id else ''
 
                 await bot.send_message(call.message.chat.id,
                                        text=msg.profile.format(user_id, sub, active, income),

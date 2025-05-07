@@ -88,7 +88,7 @@ class MarzbanAPI:
         except Exception as e:
             return False, str(e)  # Обрабатываем любые другие исключения
 
-    def create_user(self, username, data_limit=1024 * 1024 * 1024 * 300, data_limit_reset_strategy="no_reset", expire=0,
+    def create_user(self, username, data_limit=0, data_limit_reset_strategy="no_reset", expire=0,
                     inbounds=None, next_plan=None, note="", on_hold_expire_duration=0,
                     on_hold_timeout=None, proxies=None, status="active"):
         """

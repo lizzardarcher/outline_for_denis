@@ -82,6 +82,13 @@ def back():
     return markup
 
 
+def for_sender():
+    markup = InlineKeyboardMarkup()
+    btn1 = InlineKeyboardButton(text=f'💡 Управление VPN', callback_data=f'manage')
+    markup.add(btn1)
+    return markup
+
+
 def get_avail_location(protocol: str):
     markup = InlineKeyboardMarkup()
     countries = Country.objects.filter(is_active=True)
@@ -135,7 +142,7 @@ def payment_menu(payment_type: str):
     markup = InlineKeyboardMarkup()
     markup.add(InlineKeyboardButton(text=f'Юкасса (СБП, Банковская карта)', callback_data=f'account:payment:ukassa:{payment_type}'))
     # markup.add(InlineKeyboardButton(text=f'Через сайт (СБП, SperPay, ЮМoney)', url=f'https://domvpn.store/auth/accounts/login/'))
-    markup.add(InlineKeyboardButton(text='Договор оферты', url='https://domvpn.store/oferta/'))
+    markup.add(InlineKeyboardButton(text='Оплачивая подписку я соглашаюсь с договором офертой', url='https://domvpn.store/oferta/'))
     markup.add(btn_back)
     return markup
 
