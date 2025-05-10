@@ -164,12 +164,9 @@ class OutlineVPN:
             payload["port"] = port
         if key_id:
             payload["id"] = key_id
-            Logging.objects.create(log_level='INFO', message=f'[payload: {payload}]')
             response = self.session.put(f"{self.api_url}/access-keys/{key_id}", verify=False, json=payload, timeout=10)
         else:
             response = self.session.post(f"{self.api_url}/access-keys", verify=False, json=payload)
-
-        Logging.objects.create(log_level='INFO', message=f'[payload: {payload}] [{response.text}] [{response.status_code}]')
 
         if response.status_code == 201:
             key = response.json()
