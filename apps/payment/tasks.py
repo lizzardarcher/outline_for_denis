@@ -56,29 +56,6 @@ def attempt_recurring_payment():
                        f""f"Подписка активирована до {user.subscription_expiration}"
                 )
 
-                # referred_list = TelegramReferral.objects.filter(referred=user)
-                # if referred_list:
-                #     for r in referred_list:
-                #         user_to_pay = TelegramUser.objects.filter(user_id=r.referrer.user_id).first()
-                #         level = r.level
-                #         percent = None
-                #         if level == 1:
-                #             percent = ReferralSettings.objects.get(pk=1).level_1_percentage
-                #         elif level == 2:
-                #             percent = ReferralSettings.objects.get(pk=1).level_2_percentage
-                #         elif level == 3:
-                #             percent = ReferralSettings.objects.get(pk=1).level_3_percentage
-                #         elif level == 4:
-                #             percent = ReferralSettings.objects.get(pk=1).level_4_percentage
-                #         elif level == 5:
-                #             percent = ReferralSettings.objects.get(pk=1).level_5_percentage
-                #         if percent:
-                #             income = float(TelegramUser.objects.get(user_id=user_to_pay.user_id).income) + (
-                #                     float(amount_to_charge) * float(percent) / 100)
-                #             user.income = income
-                #             user.save()
-
-
                 REFERRAL_PERCENTAGES = {
                     1: ReferralSettings.objects.get(pk=1).level_1_percentage,
                     2: ReferralSettings.objects.get(pk=1).level_2_percentage,
@@ -90,35 +67,31 @@ def attempt_recurring_payment():
                 referred_list = TelegramReferral.objects.filter(referred=user).select_related('referrer')
                 if referred_list:
                     user_ids_to_pay = [r.referrer.user_id for r in referred_list]
-                    # Prefetch all the user objects in one call!
                     users_to_pay = {u.user_id: u for u in TelegramUser.objects.filter(user_id__in=user_ids_to_pay)}
 
                     for r in referred_list:
                         level = r.level
-                        user_to_pay = users_to_pay.get(r.referrer.user_id)  # Access pre-fetched user
+                        user_to_pay = users_to_pay.get(r.referrer.user_id)
                         if not user_to_pay:
                             continue
                         percent = REFERRAL_PERCENTAGES.get(level)
                         if percent:
                             income = Decimal(user_to_pay.income) + (Decimal(amount_to_charge) * Decimal(percent) / 100)
                             user_to_pay.income = income
-                            user_to_pay.save()  # Save the user to pay not the original user
+                            user_to_pay.save()
 
                 Logging.objects.create(log_level="SUCCESS", message=msg, datetime=datetime.now(), user=user)
 
             elif payment.status == 'waiting_for_capture' or payment.status == 'pending':
-                # Платеж в процессе обработки
                 msg = f"Платеж для пользователя {user.user_id} в статусе {payment.status}. Требуется дополнительная проверка."
                 Logging.objects.create(log_level="WARNING", message=msg, datetime=datetime.now(), user=user)
 
             elif payment.status == 'canceled':
-                # Платеж отменен
                 cancellation_details = payment.cancellation_details
                 reason = cancellation_details.reason if cancellation_details else "Unknown reason"
                 user.payment_method_id = ''
                 user.save()
 
-                # Обработка различных причин отмены
                 message = f"Платеж отменен для пользователя {user.user_id}. Причина: {reason}. "
 
                 if reason == 'insufficient_funds':
@@ -181,7 +154,6 @@ def attempt_recurring_payment():
                     message += f"Неизвестная причина: {reason}"
 
                 msg = message
-                #  Отправляем сообщение пользователю
                 Logging.objects.create(log_level="WARNING", message=msg, datetime=datetime.now(), user=user)
 
             else:

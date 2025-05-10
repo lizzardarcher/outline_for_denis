@@ -12,30 +12,6 @@ from bot.models import VpnKey, Server, TelegramUser, Country, Prices, UserProfil
     Transaction, Logging
 
 
-# class ProfileView(LoginRequiredMixin, SuccessMessageMixin, TemplateView):
-#     template_name = 'dashboard/index.html'
-#
-#     def get_context_data(self, **kwargs):
-#         context = super().get_context_data(**kwargs)
-#         context['servers'] = Server.objects.filter(is_active=True).values_list('country__name_for_app',
-#                                                                                flat=True).distinct()
-#         try:
-#             context['vpn_key'] = VpnKey.objects.select_related('user').get(user=self.request.user.profile.telegram_user)
-#         except VpnKey.DoesNotExist:
-#             ...
-#         context['total_users'] = TelegramUser.objects.count()
-#         context['countries'] = Country.objects.filter(is_active=True)
-#         context['subscription'] = Prices.objects.get(id=1)
-#         context['referral'] = ReferralSettings.objects.get(pk=1)
-#         context['inv_1_lvl'] = TelegramReferral.objects.filter(referrer=self.request.user.profile.telegram_user, level=1).__len__()
-#         context['inv_2_lvl'] = TelegramReferral.objects.filter(referrer=self.request.user.profile.telegram_user, level=2).__len__()
-#         context['inv_3_lvl'] = TelegramReferral.objects.filter(referrer=self.request.user.profile.telegram_user, level=3).__len__()
-#         context['inv_4_lvl'] = TelegramReferral.objects.filter(referrer=self.request.user.profile.telegram_user, level=4).__len__()
-#         context['inv_5_lvl'] = TelegramReferral.objects.filter(referrer=self.request.user.profile.telegram_user, level=5).__len__()
-#         context['transactions'] = Transaction.objects.filter(user=self.request.user.profile.telegram_user).order_by('-timestamp')[:7]
-#         return context
-
-
 class ProfileView(LoginRequiredMixin, SuccessMessageMixin, TemplateView):
     template_name = 'dashboard/index.html'
 
@@ -86,7 +62,7 @@ class CreateNewKeyView(LoginRequiredMixin, TemplateView):
 
         if protocol == 'outline':
             server = Server.objects.filter(is_active=True, is_activated=True, country=country,
-                                           keys_generated__lte=200).first()
+                                           keys_generated__lte=200).order_by('keys_generated').first()
             if not server:
                 messages.error(request, f"Ошибка создания ключа! Нет доступных серверов для страны '{country.name}'.")
                 return redirect('profile')
@@ -98,7 +74,7 @@ class CreateNewKeyView(LoginRequiredMixin, TemplateView):
         elif protocol == 'vless':
 
             server = Server.objects.filter(is_active=True, is_activated_vless=True, country=country,
-                                           keys_generated__lte=200).first()
+                                           keys_generated__lte=200).order_by('keys_generated').first()
             if not server:
                 messages.error(request, f"Ошибка создания ключа! Нет доступных серверов для страны '{country.name}'.")
                 return redirect('profile')

@@ -418,8 +418,12 @@ async def callback_query_handlers(call):
                                 #  Удаляем все предыдущие ключи
                                 await delete_user_keys(user=user)
                                 country = call.data.split('_')[-1]
-                                server = Server.objects.filter(is_active=True, is_activated=True, country__name=country,
-                                                               keys_generated__lte=200).last()
+                                server = Server.objects.filter(
+                                    is_active=True,
+                                    is_activated=True,
+                                    country__name=country,
+                                    keys_generated__lte=200
+                                ).order_by('keys_generated').first()
                                 logger.info(f"[get_new_key] [SERVER] [{server}]")
                                 key = await create_new_key(server=server, user=user)
                                 await bot.send_message(call.message.chat.id,
@@ -434,8 +438,12 @@ async def callback_query_handlers(call):
                                 _key.delete()
 
                                 country = call.data.split('_')[-1]
-                                server = Server.objects.filter(is_active=True, is_activated_vless=True,
-                                                               country__name=country, keys_generated__lte=200).last()
+                                server = Server.objects.filter(
+                                    is_active=True,
+                                    is_activated_vless=True,
+                                    country__name=country,
+                                    keys_generated__lte=200
+                                ).order_by('keys_generated').first()
                                 logger.info(f"[get_new_key] [SERVER] [{server}]")
 
                                 MarzbanAPI().create_user(username=str(user.user_id))
@@ -694,7 +702,6 @@ async def callback_query_handlers(call):
 if __name__ == '__main__':
     bot.add_custom_filter(asyncio_filters.StateFilter(bot))
     loop = asyncio.get_event_loop()
-    # loop.create_task(update_user_subscription_status())                                                 # SUBSCRIPTION REDEEM ON EXPIRATION
     loop.create_task(send_pending_messages())                                                           # MAILING
     loop.create_task(bot.polling(non_stop=True, request_timeout=100, timeout=100, skip_pending=True))  # TELEGRAM BOT
     loop.run_forever()

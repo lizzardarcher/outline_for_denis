@@ -2,7 +2,6 @@ from datetime import datetime
 
 from django.contrib.auth.models import User
 from django.db import models
-from django.utils import timezone
 from django.utils.safestring import mark_safe
 
 
@@ -382,14 +381,6 @@ class TelegramMessage(models.Model):
     def __str__(self):
         return f"Сообщение от {self.created_at.strftime('%Y-%m-%d %H:%M:%S')} [{self.status}] [Отправлено: {str(self.counter)} пользователям]"
 
-    def save(self, *args, **kwargs):
-        """
-        При сохранении нового сообщения ставим время отправки как сейчас.
-        Если сообщение создается через админку, то время будет переписано, если админ захочет отложить рассылку
-        """
-        if not self.pk:
-            self.send_at = timezone.now()
-        super().save(*args, **kwargs)
 
     class Meta:
         verbose_name = 'Сообщение Telegram'
