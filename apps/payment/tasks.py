@@ -49,8 +49,9 @@ def attempt_recurring_payment():
                 user.subscription_expiration = timezone.now().date() + timedelta(days=31)
                 user.save()
                 Transaction.objects.create(user=user, amount=amount_to_charge, currency=currency,
-                                           side='Автосписание приход', status='succeeded', paid=True,
-                                           income_info=IncomeInfo.objects.get(pk=1))
+                                           side='Приход средств', status='succeeded', paid=True,
+                                           income_info=IncomeInfo.objects.get(pk=1),
+                                           description='Рекуррентный платеж')
                 msg = (
                     f"Автосписание успешно! Пользователь {user.user_id} оплатил с {str(amount_to_charge)} {currency}. "
                        f""f"Подписка активирована до {user.subscription_expiration}"
