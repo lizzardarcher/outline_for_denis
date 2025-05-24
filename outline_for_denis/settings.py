@@ -61,6 +61,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'django_recaptcha',
     'django_celery_beat',
+    'django_admin_inline_paginator',
     'fontawesomefree',
     'apps.authentication',
     'apps.home',

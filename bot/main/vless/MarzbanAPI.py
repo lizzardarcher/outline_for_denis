@@ -84,8 +84,10 @@ class MarzbanAPI:
             except json.JSONDecodeError:
                 return True, response.text  # Возвращаем текст, если JSON не декодируется
         except requests.exceptions.RequestException as e:
+            print(e)
             return False, str(e)  # Обрабатываем ошибки соединения, таймауты и т.д.
         except Exception as e:
+            print(e)
             return False, str(e)  # Обрабатываем любые другие исключения
 
     def create_user(self, username, data_limit=0, data_limit_reset_strategy="no_reset", expire=0,
@@ -118,15 +120,6 @@ class MarzbanAPI:
             "inbounds": {
                 "vless": ["VLESS TCP REALITY"],
             },
-            # "next_plan": {
-            #     "add_remaining_traffic": False,
-            #     "data_limit": 0,
-            #     "expire": 0,
-            #     "fire_on_either": True
-            # },
-            # "note": note,
-            # "on_hold_expire_duration": on_hold_expire_duration,
-            # "on_hold_timeout": on_hold_timeout,
             "proxies": proxies or {
                 "vless": {},
             },
@@ -186,6 +179,8 @@ class MarzbanAPI:
         success, result = self._make_request("POST", f"/node", data=node)
         return success, result
 
+
+
 # Пример использования:
 # if __name__ == '__main__':
 #     marzban.add_node("178.208.78.170", "test")
@@ -195,7 +190,7 @@ class MarzbanAPI:
 #     API_TOKEN = TelegramBot.objects.all().first().marzban_api_key
 #
 #
-#     marzban = MarzbanAPI(API_URL, API_TOKEN)
+    # marzban = MarzbanAPI()
 # Пример создания пользователя с настройками
 # marzban = MarzbanAPI()
 # success, result = marzban.create_user(
@@ -233,12 +228,12 @@ class MarzbanAPI:
 #     print("Ошибка получения конфигурации:", result)
 
 
-# # Список пользователей
-# success, result = marzban.list_users()
-# if success:
-#     print("Список пользователей:", result)
-# else:
-#     print("Ошибка получения списка пользователей:", result)
+# Список пользователей
+#     success, result = marzban.list_users()
+#     if success:
+#         print("Список пользователей:", result)
+#     else:
+#         print("Ошибка получения списка пользователей:", result)
 
 
 # # Удаление пользователя

@@ -256,7 +256,7 @@ class IncomeInfo(models.Model):
                                              verbose_name='Общий баланс всех пользователей')
 
     def __str__(self):
-        return f'[Общий доход проекта: * {str(self.total_amount)} (RUB) *] [Общий баланс всех пользователей: * {str(self.user_balance_total)} (RUB) *]'
+        return f'Доход проекта:  [ {str(self.total_amount)} (RUB) ]'
 
     class Meta:
         verbose_name = 'Доход'

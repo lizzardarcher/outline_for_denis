@@ -5,6 +5,9 @@ from django.contrib.auth.models import Group, User
 from django.utils.html import format_html
 from django.conf import settings
 from django_celery_beat.models import *
+from django_admin_inline_paginator.admin import TabularInlinePaginated
+from django.urls import path, reverse
+from django.shortcuts import render
 
 from bot.models import *
 
@@ -39,11 +42,11 @@ class WithdrawalRequestInline(admin.TabularInline):
         return False
 
 
-class TransactionInline(admin.TabularInline):
+class TransactionInline(TabularInlinePaginated, admin.TabularInline):
     model = Transaction
     fields = ('amount', 'currency', 'user', 'side')
     ordering = ['-timestamp']
-
+    per_page = 50
     def has_add_permission(self, request, obj):
         if not DEBUG:
             return False
@@ -250,28 +253,6 @@ class ReferralSettingAdmin(admin.ModelAdmin):
         return actions
 
 
-# @admin.register(GlobalSettings)
-# class GlobalSettingAdmin(admin.ModelAdmin):
-#     def has_add_permission(self, request):
-#         if not DEBUG:
-#             return False
-#         else:
-#             return True
-#
-#     def get_actions(self, request):
-#         actions = super().get_actions(request)
-#         if 'delete_selected' in actions:
-#             del actions['delete_selected']
-#         return actions
-#
-#     def save_model(self, request, obj, form, change):
-#         """
-#         Given a model instance save it to the database.
-#         """
-#         obj.save()
-#         os.system('systemctl restart outline_for_denis-vpnbot.service')
-
-
 @admin.register(IncomeInfo)
 class IncomeInfo(admin.ModelAdmin):
     def get_actions(self, request):
@@ -421,10 +402,6 @@ class PricesAdmin(admin.ModelAdmin):
         return False
 
 
-# @admin.register(UserProfile)
-# class UserProfileAdmin(admin.ModelAdmin):
-#     ...
-
 @admin.register(UserProfile)
 class UserProfileAdmin(admin.ModelAdmin):
     list_display = ('user', 'telegram_user', 'referral_link')
@@ -448,3 +425,5 @@ class UserProfileAdmin(admin.ModelAdmin):
 @admin.register(TelegramMessage)
 class TelegramMessageAdmin(admin.ModelAdmin):
     readonly_fields = ('status', 'counter')
+
+

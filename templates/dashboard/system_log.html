@@ -1,0 +1,18 @@
+{% extends 'admin/base.html' %}
+
+{% block content %}
+    <div class="container">
+        <div class="row">
+            <div class="col">
+                <h1>Системные логи</h1>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col">
+                {% for log in log_content %}
+                    <p>{{ log }}</p>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+{% endblock %}
