@@ -115,8 +115,8 @@ STATUS = (('pending', 'В ожидании'), ('succeeded', 'Успешно'), (
 
 
 class Transaction(models.Model):
-    income_info = models.ForeignKey('IncomeInfo', on_delete=models.CASCADE, related_name='Доходы')
-    user = models.ForeignKey(TelegramUser, on_delete=models.CASCADE, verbose_name='Пользователь')
+    income_info = models.ForeignKey('IncomeInfo', on_delete=models.SET_NULL, null=True, blank=True, related_name='Доходы')
+    user = models.ForeignKey(TelegramUser, on_delete=models.SET_NULL, null=True, blank=True, verbose_name='Пользователь')
     amount = models.DecimalField(max_digits=10, decimal_places=2, verbose_name='Количество')
     currency = models.CharField(max_length=100, blank=True, null=True, verbose_name='Валюта')
     timestamp = models.DateTimeField(auto_now_add=True, verbose_name='Время')

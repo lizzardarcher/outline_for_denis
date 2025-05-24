@@ -144,6 +144,9 @@ class TelegramUserAdmin(admin.ModelAdmin):
         else:
             return True
 
+    def has_delete_permission(self, request, obj=None):
+        return True
+
     def get_actions(self, request):
         actions = super().get_actions(request)
         if 'delete_selected' in actions:
@@ -261,7 +264,7 @@ class IncomeInfo(admin.ModelAdmin):
             del actions['delete_selected']
         return actions
 
-    readonly_fields = ('total_amount', 'user_balance_total')
+    exclude = ('user_balance_total', 'total_amount')
     inlines = [TransactionInline]
 
     def has_add_permission(self, request, obj=None):
@@ -379,6 +382,8 @@ class LoggingAdmin(admin.ModelAdmin):
 @admin.register(User)
 class UserAdmin(admin.ModelAdmin):
 
+    # search_fields = ('username', 'first_name', 'last_name', 'email', 'id')
+
     def has_add_permission(self, request, obj=None):
         if not DEBUG:
             return False
@@ -386,10 +391,7 @@ class UserAdmin(admin.ModelAdmin):
             return True
 
     def has_delete_permission(self, request, obj=None):
-        if not DEBUG:
-            return False
-        else:
-            return True
+        return True
 
 
 @admin.register(Prices)
