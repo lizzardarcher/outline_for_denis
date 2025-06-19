@@ -214,6 +214,8 @@ class TelegramBotAdmin(admin.ModelAdmin):
     def has_view_permission(self, request, obj=None):
         if request.user.username == SUPPORT_ACCOUNT:
             return False
+        else:
+            return True
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)
@@ -258,6 +260,8 @@ class TelegramReferralAdmin(admin.ModelAdmin):
     def has_view_permission(self, request, obj=None):
         if request.user.username == SUPPORT_ACCOUNT:
             return False
+        else:
+            return True
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)
@@ -380,6 +384,8 @@ class IncomeInfo(admin.ModelAdmin):
     def has_view_permission(self, request, obj=None):
         if request.user.username == SUPPORT_ACCOUNT:
             return False
+        else:
+            return True
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)
@@ -497,6 +503,8 @@ class CountryAdmin(admin.ModelAdmin):
     def has_view_permission(self, request, obj=...):
         if request.user.username == SUPPORT_ACCOUNT:
             return False
+        else:
+            return True
 
     def has_add_permission(self, request, obj=None):
         if request.user.username == SUPPORT_ACCOUNT:
@@ -600,9 +608,11 @@ class LoggingAdmin(admin.ModelAdmin):
 @admin.register(User)
 class UserAdmin(admin.ModelAdmin):
 
-    def has_view_permission(self, request, obj=...):
+    def has_view_permission(self, request, obj=None):
         if request.user.username == SUPPORT_ACCOUNT:
             return False
+        else:
+            return True
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)
@@ -671,10 +681,11 @@ class UserProfileAdmin(admin.ModelAdmin):
                      'telegram_user__username')  # Search on related fields
     list_filter = ('telegram_user__is_banned', 'telegram_user__subscription_status')  # Filter by telegram user status.
 
-    def has_view_permission(self, request, obj=...):
+    def has_view_permission(self, request, obj=None):
         if request.user.username == SUPPORT_ACCOUNT:
             return False
-
+        else:
+            return True
     def get_queryset(self, request):
         qs = super().get_queryset(request)
         if request.user.username == SUPPORT_ACCOUNT:
@@ -722,9 +733,11 @@ class UserProfileAdmin(admin.ModelAdmin):
 @admin.register(TelegramMessage)
 class TelegramMessageAdmin(admin.ModelAdmin):
 
-    def has_view_permission(self, request, obj=...):
+    def has_view_permission(self, request, obj=None):
         if request.user.username == SUPPORT_ACCOUNT:
             return False
+        else:
+            return True
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)
