@@ -145,31 +145,12 @@ class YookassaTGBOTWebhookView(View):
                     else:
                         telegram_user.subscription_status = True
                         telegram_user.subscription_expiration = datetime.now() + timedelta(days=days)
-                        telegram_user.permission_revoked = False
                         telegram_user.payment_method_id = payment_method_id
+                        telegram_user.permission_revoked = False
                         telegram_user.save()
 
-                    # referred_list = [x for x in TelegramReferral.objects.filter(referred=telegram_user)]
-                    # if referred_list:
-                    #     for r in referred_list:
-                    #         user_to_pay = TelegramUser.objects.filter(user_id=r.referrer.user_id).first()
-                    #         level = r.level
-                    #         percent = None
-                    #         if level == 1:
-                    #             percent = ReferralSettings.objects.get(pk=1).level_1_percentage
-                    #         elif level == 2:
-                    #             percent = ReferralSettings.objects.get(pk=1).level_2_percentage
-                    #         elif level == 3:
-                    #             percent = ReferralSettings.objects.get(pk=1).level_3_percentage
-                    #         elif level == 4:
-                    #             percent = ReferralSettings.objects.get(pk=1).level_4_percentage
-                    #         elif level == 5:
-                    #             percent = ReferralSettings.objects.get(pk=1).level_5_percentage
-                    #         if percent:
-                    #             income = float(TelegramUser.objects.get(user_id=user_to_pay.user_id).income) + (
-                    #                     float(amount_value) * float(percent) / 100)
-                    #             telegram_user.income = income
-                    #             telegram_user.save()
+                    Logging.objects.create(log_level="INFO", message=f'[BOT] [Обработка платежа] [{event_type}] [Сумма: {amount_value}] [Дни:{days}]',
+                                           datetime=datetime.now(), user=telegram_user)
 
                     REFERRAL_PERCENTAGES = {
                         1: ReferralSettings.objects.get(pk=1).level_1_percentage,
@@ -289,27 +270,9 @@ class YookassaSiteWebhookView(View):
                         telegram_user.payment_method_id = payment_method_id
                         telegram_user.save()
 
-                    # referred_list = [x for x in TelegramReferral.objects.filter(referred=telegram_user)]
-                    # if referred_list:
-                    #     for r in referred_list:
-                    #         user_to_pay = TelegramUser.objects.filter(user_id=r.referrer.user_id).first()
-                    #         level = r.level
-                    #         percent = None
-                    #         if level == 1:
-                    #             percent = ReferralSettings.objects.get(pk=1).level_1_percentage
-                    #         elif level == 2:
-                    #             percent = ReferralSettings.objects.get(pk=1).level_2_percentage
-                    #         elif level == 3:
-                    #             percent = ReferralSettings.objects.get(pk=1).level_3_percentage
-                    #         elif level == 4:
-                    #             percent = ReferralSettings.objects.get(pk=1).level_4_percentage
-                    #         elif level == 5:
-                    #             percent = ReferralSettings.objects.get(pk=1).level_5_percentage
-                    #         if percent:
-                    #             income = float(TelegramUser.objects.get(user_id=user_to_pay.user_id).income) + (
-                    #                     float(amount_value) * float(percent) / 100)
-                    #             telegram_user.income = income
-                    #             telegram_user.save()
+                    Logging.objects.create(log_level="INFO",
+                                           message=f'[BOT] [Обработка платежа] [{event_type}] [Сумма: {amount_value}] [Дни:{days}]',
+                                           datetime=datetime.now(), user=telegram_user)
 
                     REFERRAL_PERCENTAGES = {
                         1: ReferralSettings.objects.get(pk=1).level_1_percentage,

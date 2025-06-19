@@ -49,8 +49,8 @@ logging.basicConfig(
 bot = AsyncTeleBot(token=TelegramBot.objects.all().first().token, state_storage=StateMemoryStorage())
 bot.parse_mode = 'HTML'
 DEBUG = settings.DEBUG
-BOT_USERNAME = 'xDomvpn_Bot'
-
+BOT_USERNAME = settings.BOT_USERNAME
+KEY_LIMIT = settings.KEY_LIMIT
 
 def update_sub_status(user: TelegramUser):
     exp_date = user.subscription_expiration
@@ -343,7 +343,7 @@ async def callback_query_handlers(call):
                 await bot.send_message(chat_id=call.message.chat.id, text=msg.app_installed,
                                        reply_markup=markup.start())
                 if user.subscription_status and not VpnKey.objects.filter(user=user):
-                    server = random.choice(Server.objects.filter(is_active=True, keys_generated__lte=200))
+                    server = random.choice(Server.objects.filter(is_active=True, keys_generated__lte=KEY_LIMIT))
                     logger.info(f"[app_installed] [SERVER] [{server}]")
                     key = await create_new_key(server, user)
                     await bot.send_message(chat_id=user.user_id, text=msg.trial_key.format(key))
@@ -422,7 +422,7 @@ async def callback_query_handlers(call):
                                     is_active=True,
                                     is_activated=True,
                                     country__name=country,
-                                    keys_generated__lte=200
+                                    keys_generated__lte=KEY_LIMIT
                                 ).order_by('keys_generated').first()
                                 logger.info(f"[get_new_key] [SERVER] [{server}]")
                                 key = await create_new_key(server=server, user=user)
@@ -442,7 +442,7 @@ async def callback_query_handlers(call):
                                     is_active=True,
                                     is_activated_vless=True,
                                     country__name=country,
-                                    keys_generated__lte=200
+                                    keys_generated__lte=KEY_LIMIT
                                 ).order_by('keys_generated').first()
                                 logger.info(f"[get_new_key] [SERVER] [{server}]")
 
@@ -477,7 +477,7 @@ async def callback_query_handlers(call):
                                 await delete_user_keys(user=user)
                                 country = call.data.split('_')[-1]
                                 server = Server.objects.filter(is_active=True, is_activated=True, country__name=country,
-                                                               keys_generated__lte=200).last()
+                                                               keys_generated__lte=KEY_LIMIT).last()
                                 logger.info(f"[swap_key] [SERVER] [{server}]")
                                 key = await create_new_key(server=server, user=user)
                                 await bot.send_message(call.message.chat.id,
@@ -499,7 +499,7 @@ async def callback_query_handlers(call):
                                 country = call.data.split('_')[-1]
 
                                 server = Server.objects.filter(is_active=True, is_activated_vless=True,
-                                                               country__name=country, keys_generated__lte=200).last()
+                                                               country__name=country, keys_generated__lte=KEY_LIMIT).last()
 
                                 logger.info(f"[swap_key] [SERVER] [{server}]")
 

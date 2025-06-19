@@ -1,5 +1,6 @@
 from datetime import timedelta, datetime, date
 
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.messages.views import SuccessMessageMixin
@@ -11,7 +12,7 @@ from bot.main.vless.MarzbanAPI import MarzbanAPI
 from bot.models import VpnKey, Server, TelegramUser, Country, Prices, UserProfile, ReferralSettings, TelegramReferral, \
     Transaction, Logging
 
-
+KEY_LIMIT = settings.KEY_LIMIT
 class ProfileView(LoginRequiredMixin, SuccessMessageMixin, TemplateView):
     template_name = 'dashboard/index.html'
 
@@ -62,7 +63,7 @@ class CreateNewKeyView(LoginRequiredMixin, TemplateView):
 
         if protocol == 'outline':
             server = Server.objects.filter(is_active=True, is_activated=True, country=country,
-                                           keys_generated__lte=200).order_by('keys_generated').first()
+                                           keys_generated__lte=KEY_LIMIT).order_by('keys_generated').first()
             if not server:
                 messages.error(request, f"Ошибка создания ключа! Нет доступных серверов для страны '{country.name}'.")
                 return redirect('profile')
@@ -74,7 +75,7 @@ class CreateNewKeyView(LoginRequiredMixin, TemplateView):
         elif protocol == 'vless':
 
             server = Server.objects.filter(is_active=True, is_activated_vless=True, country=country,
-                                           keys_generated__lte=200).order_by('keys_generated').first()
+                                           keys_generated__lte=KEY_LIMIT).order_by('keys_generated').first()
             if not server:
                 messages.error(request, f"Ошибка создания ключа! Нет доступных серверов для страны '{country.name}'.")
                 return redirect('profile')

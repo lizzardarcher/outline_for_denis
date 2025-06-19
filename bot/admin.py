@@ -12,7 +12,7 @@ from django.shortcuts import render
 from bot.models import *
 
 DEBUG = settings.DEBUG
-# admin.site.site_url = ''
+SUPPORT_ACCOUNT = settings.SUPPORT_ACCOUNT
 admin.site.site_header = "DomVPN BOT Админ Панель"
 admin.site.site_title = "DomVPN BOT"
 admin.site.index_title = "Добро пожаловать в DomVPN BOT Админ Панель"
@@ -26,20 +26,29 @@ admin.site.unregister(ClockedSchedule)
 class WithdrawalRequestInline(admin.TabularInline):
     model = WithdrawalRequest
 
-    def has_add_permission(self, request, obj):
+    def has_add_permission(self, request, obj=None):
+        if request.user.username == SUPPORT_ACCOUNT:
+            return False
         if not DEBUG:
             return False
         else:
             return True
 
     def has_delete_permission(self, request, obj=None):
+        if request.user.username == SUPPORT_ACCOUNT:
+            return False
         if not DEBUG:
             return False
         else:
             return True
 
     def has_change_permission(self, request, obj=None):
-        return False
+        if request.user.username == SUPPORT_ACCOUNT:
+            return False
+        if not DEBUG:
+            return False
+        else:
+            return True
 
 
 class TransactionInline(TabularInlinePaginated, admin.TabularInline):
@@ -47,39 +56,59 @@ class TransactionInline(TabularInlinePaginated, admin.TabularInline):
     fields = ('amount', 'currency', 'user', 'side')
     ordering = ['-timestamp']
     per_page = 50
-    def has_add_permission(self, request, obj):
+
+    def has_add_permission(self, request, obj=None):
+        if request.user.username == SUPPORT_ACCOUNT:
+            return False
         if not DEBUG:
             return False
         else:
             return True
 
     def has_delete_permission(self, request, obj=None):
+        if request.user.username == SUPPORT_ACCOUNT:
+            return False
         if not DEBUG:
             return False
         else:
             return True
 
     def has_change_permission(self, request, obj=None):
-        return False
+        if request.user.username == SUPPORT_ACCOUNT:
+            return False
+        if not DEBUG:
+            return False
+        else:
+            return True
 
 
 class VpnKeyInline(admin.TabularInline):
     model = VpnKey
     list_display_links = ('key_id', 'access_url')
+
     def has_add_permission(self, request, obj=None):
+        if request.user.username == SUPPORT_ACCOUNT:
+            return False
         if not DEBUG:
             return False
         else:
             return True
 
     def has_delete_permission(self, request, obj=None):
+        if request.user.username == SUPPORT_ACCOUNT:
+            return False
         if not DEBUG:
             return False
         else:
             return True
 
     def has_change_permission(self, request, obj=None):
-        return False
+        if request.user.username == SUPPORT_ACCOUNT:
+            return False
+        if not DEBUG:
+            return False
+        else:
+            return True
 
 
 class ServerInline(admin.TabularInline):
@@ -87,13 +116,28 @@ class ServerInline(admin.TabularInline):
     extra = 1
 
     def has_add_permission(self, request, obj=None):
-        return False
+        if request.user.username == SUPPORT_ACCOUNT:
+            return False
+        if not DEBUG:
+            return False
+        else:
+            return True
 
     def has_delete_permission(self, request, obj=None):
-        return False
+        if request.user.username == SUPPORT_ACCOUNT:
+            return False
+        if not DEBUG:
+            return False
+        else:
+            return True
 
     def has_change_permission(self, request, obj=None):
-        return False
+        if request.user.username == SUPPORT_ACCOUNT:
+            return False
+        if not DEBUG:
+            return False
+        else:
+            return True
 
 
 class LogInline(admin.TabularInline):
@@ -117,7 +161,8 @@ class TelegramUserAdmin(admin.ModelAdmin):
         'join_date', 'first_name', 'last_name', 'username', 'subscription_status',
         'subscription_expiration', 'balance', 'referral_link', 'get_payment_method_id', 'permission_revoked', 'income')
     list_display_links = (
-        'join_date', 'first_name', 'last_name', 'username', 'subscription_status', 'subscription_expiration', 'balance', 'income')
+        'join_date', 'first_name', 'last_name', 'username', 'subscription_status', 'subscription_expiration', 'balance',
+        'income')
     search_fields = ('first_name', 'last_name', 'username', 'user_id')
     readonly_fields = ('join_date', 'first_name', 'last_name', 'username', 'user_id',)
     exclude = ('data_limit', 'is_banned', 'top_up_balance_listener', 'withdrawal_listener')
@@ -135,17 +180,25 @@ class TelegramUserAdmin(admin.ModelAdmin):
             return '✅'
         else:
             return '---'
+
     referral_link.short_description = 'Referral Link'
     get_payment_method_id.short_description = 'Payment Method ID'
 
-    def has_add_permission(self, request):
+    def has_add_permission(self, request, obj=None):
+        if request.user.username == SUPPORT_ACCOUNT:
+            return False
         if not DEBUG:
             return False
         else:
             return True
 
     def has_delete_permission(self, request, obj=None):
-        return True
+        if request.user.username == SUPPORT_ACCOUNT:
+            return False
+        if not DEBUG:
+            return False
+        else:
+            return True
 
     def get_actions(self, request):
         actions = super().get_actions(request)
@@ -158,8 +211,26 @@ class TelegramUserAdmin(admin.ModelAdmin):
 class TelegramBotAdmin(admin.ModelAdmin):
     list_display = ('title', 'token', 'username', 'created_at')
 
+    def has_view_permission(self, request, obj=None):
+        if request.user.username == SUPPORT_ACCOUNT:
+            return False
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        if request.user.username == SUPPORT_ACCOUNT:
+            return qs.none()  # Возвращаем пустой QuerySet
+        return qs
+
     def has_add_permission(self, request):
         if TelegramBot.objects.all():
+            return False
+        else:
+            return True
+
+    def has_delete_permission(self, request, obj=None):
+        if request.user.username == SUPPORT_ACCOUNT:
+            return False
+        if not DEBUG:
             return False
         else:
             return True
@@ -183,6 +254,17 @@ class TelegramReferralAdmin(admin.ModelAdmin):
     list_display = ('referrer', 'referred', 'level')
     search_fields = ('referrer__username', 'referred__username', 'referrer__first_name', 'referred__first_name',
                      'referrer__last_name', 'referred__last_name', 'referrer__user_id', 'referred__user_id')
+
+    def has_view_permission(self, request, obj=None):
+        if request.user.username == SUPPORT_ACCOUNT:
+            return False
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        if request.user.username == SUPPORT_ACCOUNT:
+            return qs.none()  # Возвращаем пустой QuerySet
+        return qs
+
     def has_add_permission(self, request):
         if not DEBUG:
             return False
@@ -198,25 +280,33 @@ class TelegramReferralAdmin(admin.ModelAdmin):
 
 @admin.register(Transaction)
 class TransactionAdmin(admin.ModelAdmin):
-    list_display = ('timestamp', 'amount', 'currency', 'status','description','paid','payment_id',  'user', 'side')
+    list_display = ('timestamp', 'amount', 'currency', 'status', 'description', 'paid', 'payment_id', 'user', 'side')
     list_display_links = ('user',)
     ordering = ['-timestamp']
 
     def has_add_permission(self, request):
+        if request.user.username == SUPPORT_ACCOUNT:
+            return False
         if not DEBUG:
             return False
         else:
             return True
 
     def has_delete_permission(self, request, obj=None):
+        if request.user.username == SUPPORT_ACCOUNT:
+            return False
         if not DEBUG:
             return False
         else:
             return True
 
     def has_change_permission(self, request, obj=None):
-        return False
-
+        if request.user.username == SUPPORT_ACCOUNT:
+            return False
+        if not DEBUG:
+            return False
+        else:
+            return True
 
     def get_actions(self, request):
         actions = super().get_actions(request)
@@ -230,20 +320,49 @@ class WithdrawalRequestAdmin(admin.ModelAdmin):
     list_display = ('user', 'amount', 'status', 'currency', 'timestamp')
     list_editable = ['status']
 
-    def has_add_permission(self, request, obj=None):
+    def has_add_permission(self, request):
+        if request.user.username == SUPPORT_ACCOUNT:
+            return False
         if not DEBUG:
             return False
         else:
             return True
 
-    # def has_delete_permission(self, request, obj=None):
-    #     return False
+    def has_delete_permission(self, request, obj=None):
+        if request.user.username == SUPPORT_ACCOUNT:
+            return False
+
+    def has_change_permission(self, request, obj=None):
+        if request.user.username == SUPPORT_ACCOUNT:
+            return False
+        if not DEBUG:
+            return False
+        else:
+            return True
 
 
 @admin.register(ReferralSettings)
 class ReferralSettingAdmin(admin.ModelAdmin):
 
     def has_add_permission(self, request):
+        if request.user.username == SUPPORT_ACCOUNT:
+            return False
+        if not DEBUG:
+            return False
+        else:
+            return True
+
+    def has_delete_permission(self, request, obj=None):
+        if request.user.username == SUPPORT_ACCOUNT:
+            return False
+        if not DEBUG:
+            return False
+        else:
+            return True
+
+    def has_change_permission(self, request, obj=None):
+        if request.user.username == SUPPORT_ACCOUNT:
+            return False
         if not DEBUG:
             return False
         else:
@@ -258,6 +377,16 @@ class ReferralSettingAdmin(admin.ModelAdmin):
 
 @admin.register(IncomeInfo)
 class IncomeInfo(admin.ModelAdmin):
+    def has_view_permission(self, request, obj=None):
+        if request.user.username == SUPPORT_ACCOUNT:
+            return False
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        if request.user.username == SUPPORT_ACCOUNT:
+            return qs.none()  # Возвращаем пустой QuerySet
+        return qs
+
     def get_actions(self, request):
         actions = super().get_actions(request)
         if 'delete_selected' in actions:
@@ -267,8 +396,29 @@ class IncomeInfo(admin.ModelAdmin):
     exclude = ('user_balance_total', 'total_amount')
     inlines = [TransactionInline]
 
-    def has_add_permission(self, request, obj=None):
-        return False
+    def has_add_permission(self, request):
+        if request.user.username == SUPPORT_ACCOUNT:
+            return False
+        if not DEBUG:
+            return False
+        else:
+            return True
+
+    def has_delete_permission(self, request, obj=None):
+        if request.user.username == SUPPORT_ACCOUNT:
+            return False
+        if not DEBUG:
+            return False
+        else:
+            return True
+
+    def has_change_permission(self, request, obj=None):
+        if request.user.username == SUPPORT_ACCOUNT:
+            return False
+        if not DEBUG:
+            return False
+        else:
+            return True
 
 
 @admin.register(VpnKey)
@@ -278,15 +428,48 @@ class VpnKey(admin.ModelAdmin):
     search_fields = ('access_url',)
     list_filter = ('server',)
     ordering = ['server']
-    def has_change_permission(self, request, obj=None):
-        return False
 
-    def has_add_permission(self, request, obj=None):
-        return False
+    def has_add_permission(self, request):
+        if request.user.username == SUPPORT_ACCOUNT:
+            return False
+        if not DEBUG:
+            return False
+        else:
+            return True
+
+    def has_delete_permission(self, request, obj=None):
+        if request.user.username == SUPPORT_ACCOUNT:
+            return False
+
+    def has_change_permission(self, request, obj=None):
+        if request.user.username == SUPPORT_ACCOUNT:
+            return False
+        if not DEBUG:
+            return False
+        else:
+            return True
 
 
 @admin.register(Server)
 class ServerAdmin(admin.ModelAdmin):
+
+    def has_add_permission(self, request, obj=None):
+        if request.user.username == SUPPORT_ACCOUNT:
+            return False
+
+    def has_delete_permission(self, request, obj=None):
+        if request.user.username == SUPPORT_ACCOUNT:
+            return False
+
+    def has_change_permission(self, request, obj=None):
+        if request.user.username == SUPPORT_ACCOUNT:
+            return False
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        if request.user.username == SUPPORT_ACCOUNT:
+            return qs.none()  # Возвращаем пустой QuerySet
+        return qs
 
     def get_key_generated(self, obj):
         if 0 < obj.keys_generated <= 100:
@@ -296,12 +479,12 @@ class ServerAdmin(admin.ModelAdmin):
         elif obj.keys_generated > 150:
             return format_html('<b style="color:red;">%s</b>' % obj.keys_generated)
 
-
     get_key_generated.allow_tags = True
     get_key_generated.short_description = 'Всего ключей'
 
     list_display = (
-        'hosting', 'ip_address', 'user', 'password', 'rental_price', 'max_keys', 'get_key_generated', 'is_active', 'is_activated', 'is_activated_vless',
+        'hosting', 'ip_address', 'user', 'password', 'rental_price', 'max_keys', 'get_key_generated', 'is_active',
+        'is_activated', 'is_activated_vless',
         'country', 'created_at')
     list_display_links = ('hosting', 'ip_address',)
     # inlines = [VpnKeyInline]
@@ -310,6 +493,23 @@ class ServerAdmin(admin.ModelAdmin):
 
 @admin.register(Country)
 class CountryAdmin(admin.ModelAdmin):
+
+    def has_view_permission(self, request, obj=...):
+        if request.user.username == SUPPORT_ACCOUNT:
+            return False
+
+    def has_add_permission(self, request, obj=None):
+        if request.user.username == SUPPORT_ACCOUNT:
+            return False
+
+    def has_delete_permission(self, request, obj=None):
+        if request.user.username == SUPPORT_ACCOUNT:
+            return False
+
+    def has_change_permission(self, request, obj=None):
+        if request.user.username == SUPPORT_ACCOUNT:
+            return False
+
     list_display = ('name_for_app', 'is_active', 'name')
     list_display_links = ('name_for_app', 'name')
     inlines = [ServerInline]
@@ -372,7 +572,25 @@ class LoggingAdmin(admin.ModelAdmin):
     ordering = ['-datetime']
     actions = [make_warning, make_debug, make_fatal, make_trace, make_success, make_info]
 
-    def has_add_permission(self, request, obj=None):
+    def has_add_permission(self, request):
+        if request.user.username == SUPPORT_ACCOUNT:
+            return False
+        if not DEBUG:
+            return False
+        else:
+            return True
+
+    def has_delete_permission(self, request, obj=None):
+        if request.user.username == SUPPORT_ACCOUNT:
+            return False
+        if not DEBUG:
+            return False
+        else:
+            return True
+
+    def has_change_permission(self, request, obj=None):
+        if request.user.username == SUPPORT_ACCOUNT:
+            return False
         if not DEBUG:
             return False
         else:
@@ -382,34 +600,110 @@ class LoggingAdmin(admin.ModelAdmin):
 @admin.register(User)
 class UserAdmin(admin.ModelAdmin):
 
-    # search_fields = ('username', 'first_name', 'last_name', 'email', 'id')
+    def has_view_permission(self, request, obj=...):
+        if request.user.username == SUPPORT_ACCOUNT:
+            return False
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        if request.user.username == SUPPORT_ACCOUNT:
+            return qs.none()  # Возвращаем пустой QuerySet
+        return qs
 
     def has_add_permission(self, request, obj=None):
+        if request.user.username == SUPPORT_ACCOUNT:
+            return False
         if not DEBUG:
             return False
         else:
             return True
 
     def has_delete_permission(self, request, obj=None):
-        return True
+        if request.user.username == SUPPORT_ACCOUNT:
+            return False
+        if not DEBUG:
+            return False
+        else:
+            return True
+
+    def has_change_permission(self, request, obj=None):
+        if request.user.username == SUPPORT_ACCOUNT:
+            return False
+        if not DEBUG:
+            return False
+        else:
+            return True
 
 
 @admin.register(Prices)
 class PricesAdmin(admin.ModelAdmin):
 
-    def has_delete_permission(self, request, obj=None):
-        return False
+    def has_add_permission(self, request):
+        if request.user.username == SUPPORT_ACCOUNT:
+            return False
+        if not DEBUG:
+            return False
+        else:
+            return True
 
-    def has_add_permission(self, request, obj=None):
-        return False
+    def has_delete_permission(self, request, obj=None):
+        if request.user.username == SUPPORT_ACCOUNT:
+            return False
+        if not DEBUG:
+            return False
+        else:
+            return True
+
+    def has_change_permission(self, request, obj=None):
+        if request.user.username == SUPPORT_ACCOUNT:
+            return False
+        if not DEBUG:
+            return False
+        else:
+            return True
 
 
 @admin.register(UserProfile)
 class UserProfileAdmin(admin.ModelAdmin):
     list_display = ('user', 'telegram_user', 'referral_link')
     readonly_fields = ('referral_link',)
-    search_fields = ('user__username', 'user__first_name', 'user__last_name', 'telegram_user__user_id', 'telegram_user__username')  # Search on related fields
-    list_filter = ('telegram_user__is_banned', 'telegram_user__subscription_status') # Filter by telegram user status.
+    search_fields = ('user__username', 'user__first_name', 'user__last_name', 'telegram_user__user_id',
+                     'telegram_user__username')  # Search on related fields
+    list_filter = ('telegram_user__is_banned', 'telegram_user__subscription_status')  # Filter by telegram user status.
+
+    def has_view_permission(self, request, obj=...):
+        if request.user.username == SUPPORT_ACCOUNT:
+            return False
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        if request.user.username == SUPPORT_ACCOUNT:
+            return qs.none()  # Возвращаем пустой QuerySet
+        return qs
+
+    def has_add_permission(self, request, obj=None):
+        if request.user.username == SUPPORT_ACCOUNT:
+            return False
+        if not DEBUG:
+            return False
+        else:
+            return True
+
+    def has_delete_permission(self, request, obj=None):
+        if request.user.username == SUPPORT_ACCOUNT:
+            return False
+        if not DEBUG:
+            return False
+        else:
+            return True
+
+    def has_change_permission(self, request, obj=None):
+        if request.user.username == SUPPORT_ACCOUNT:
+            return False
+        if not DEBUG:
+            return False
+        else:
+            return True
 
     def referral_link(self, obj):
         """
@@ -424,8 +718,30 @@ class UserProfileAdmin(admin.ModelAdmin):
 
     referral_link.short_description = 'Referral Link'
 
+
 @admin.register(TelegramMessage)
 class TelegramMessageAdmin(admin.ModelAdmin):
+
+    def has_view_permission(self, request, obj=...):
+        if request.user.username == SUPPORT_ACCOUNT:
+            return False
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        if request.user.username == SUPPORT_ACCOUNT:
+            return qs.none()  # Возвращаем пустой QuerySet
+        return qs
+
+    def has_add_permission(self, request, obj=None):
+        if request.user.username == SUPPORT_ACCOUNT:
+            return False
+
+    def has_delete_permission(self, request, obj=None):
+        if request.user.username == SUPPORT_ACCOUNT:
+            return False
+
+    def has_change_permission(self, request, obj=None):
+        if request.user.username == SUPPORT_ACCOUNT:
+            return False
+
     readonly_fields = ('status', 'counter')
-
-
