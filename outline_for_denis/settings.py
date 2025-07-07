@@ -189,5 +189,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 KEY_LIMIT = 200
 BOT_USERNAME = 'xDomvpn_Bot'
+# SUPPORT_ACCOUNT = 'megafoll'
 SUPPORT_ACCOUNT = 'Domvpnsupport'
+
 # LOGIN_URL= '/auth/accounts/login/'

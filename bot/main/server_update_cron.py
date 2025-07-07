@@ -170,6 +170,6 @@ if __name__ == '__main__':
     while True:
         init_outline_servers()
         init_vless_servers()
-        update_generated_keys()
+        # update_generated_keys()
         sleep(60)
 

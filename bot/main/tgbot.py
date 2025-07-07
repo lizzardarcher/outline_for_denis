@@ -556,7 +556,7 @@ async def callback_query_handlers(call):
                             days = 366
                         elif data[-1] == '3_days_trial':
                             price = 20
-                            days = 3
+                            days = prices.price_5
 
                         try:
 
@@ -623,10 +623,14 @@ async def callback_query_handlers(call):
 
                 elif 'cancelled_sbs' in data:
                     # Подтверждение отмены подписки
+                    Logging.objects.create(log_level="INFO",
+                                           message=f'[BOT] [ДЕЙСТВИЕ: ОТМЕНА ПОДПИСКИ ID Платежа: {user.payment_method_id}]',
+                                           datetime=datetime.now(), user=user)
                     user.payment_method_id = None
                     user.save()
                     await bot.send_message(call.message.chat.id, text=msg.cancel_subscription_success,
                                            reply_markup=markup.start())
+
             elif 'profile' in data:
                 user_id = user.user_id
                 income = user.income
@@ -702,6 +706,6 @@ async def callback_query_handlers(call):
 if __name__ == '__main__':
     bot.add_custom_filter(asyncio_filters.StateFilter(bot))
     loop = asyncio.get_event_loop()
-    loop.create_task(send_pending_messages())                                                           # MAILING
+    loop.create_task(send_pending_messages())                                                          # MAILING
     loop.create_task(bot.polling(non_stop=True, request_timeout=100, timeout=100, skip_pending=True))  # TELEGRAM BOT
     loop.run_forever()

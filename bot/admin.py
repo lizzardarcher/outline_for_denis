@@ -21,6 +21,61 @@ admin.site.unregister(User)
 admin.site.unregister(CrontabSchedule)
 admin.site.unregister(SolarSchedule)
 admin.site.unregister(ClockedSchedule)
+admin.site.unregister(IntervalSchedule)
+admin.site.unregister(PeriodicTask)
+# admin.site.unregister(PeriodicTasks)
+
+@admin.register(PeriodicTask)
+class PeriodicTaskAdmin(admin.ModelAdmin):
+    def has_add_permission(self, request):
+        if request.user.username == SUPPORT_ACCOUNT:
+            return False
+        else:
+            return True
+
+    def has_delete_permission(self, request, obj=None):
+        if request.user.username == SUPPORT_ACCOUNT:
+            return False
+        else:
+            return True
+
+    def has_change_permission(self, request, obj=None):
+        if request.user.username == SUPPORT_ACCOUNT:
+            return False
+        else:
+            return True
+
+    def has_view_permission(self, request, obj=None):
+        if request.user.username == SUPPORT_ACCOUNT:
+            return False
+        else:
+            return True
+
+@admin.register(IntervalSchedule)
+class IntervalScheduleAdmin(admin.ModelAdmin):
+    def has_add_permission(self, request):
+        if request.user.username == SUPPORT_ACCOUNT:
+            return False
+        else:
+            return True
+
+    def has_delete_permission(self, request, obj=None):
+        if request.user.username == SUPPORT_ACCOUNT:
+            return False
+        else:
+            return True
+
+    def has_change_permission(self, request, obj=None):
+        if request.user.username == SUPPORT_ACCOUNT:
+            return False
+        else:
+            return True
+
+    def has_view_permission(self, request, obj=None):
+        if request.user.username == SUPPORT_ACCOUNT:
+            return False
+        else:
+            return True
 
 
 class WithdrawalRequestInline(admin.TabularInline):
@@ -349,12 +404,7 @@ class WithdrawalRequestAdmin(admin.ModelAdmin):
 class ReferralSettingAdmin(admin.ModelAdmin):
 
     def has_add_permission(self, request):
-        if request.user.username == SUPPORT_ACCOUNT:
-            return False
-        if not DEBUG:
-            return False
-        else:
-            return True
+        return False
 
     def has_delete_permission(self, request, obj=None):
         if request.user.username == SUPPORT_ACCOUNT:
@@ -366,8 +416,6 @@ class ReferralSettingAdmin(admin.ModelAdmin):
 
     def has_change_permission(self, request, obj=None):
         if request.user.username == SUPPORT_ACCOUNT:
-            return False
-        if not DEBUG:
             return False
         else:
             return True
@@ -462,14 +510,20 @@ class ServerAdmin(admin.ModelAdmin):
     def has_add_permission(self, request, obj=None):
         if request.user.username == SUPPORT_ACCOUNT:
             return False
+        else:
+            return True
 
     def has_delete_permission(self, request, obj=None):
         if request.user.username == SUPPORT_ACCOUNT:
             return False
+        else:
+            return True
 
     def has_change_permission(self, request, obj=None):
         if request.user.username == SUPPORT_ACCOUNT:
             return False
+        else:
+            return True
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)
@@ -509,14 +563,20 @@ class CountryAdmin(admin.ModelAdmin):
     def has_add_permission(self, request, obj=None):
         if request.user.username == SUPPORT_ACCOUNT:
             return False
+        else:
+            return True
 
     def has_delete_permission(self, request, obj=None):
         if request.user.username == SUPPORT_ACCOUNT:
             return False
+        else:
+            return True
 
     def has_change_permission(self, request, obj=None):
         if request.user.username == SUPPORT_ACCOUNT:
             return False
+        else:
+            return True
 
     list_display = ('name_for_app', 'is_active', 'name')
     list_display_links = ('name_for_app', 'name')
@@ -623,15 +683,11 @@ class UserAdmin(admin.ModelAdmin):
     def has_add_permission(self, request, obj=None):
         if request.user.username == SUPPORT_ACCOUNT:
             return False
-        if not DEBUG:
-            return False
         else:
             return True
 
     def has_delete_permission(self, request, obj=None):
         if request.user.username == SUPPORT_ACCOUNT:
-            return False
-        if not DEBUG:
             return False
         else:
             return True
@@ -639,35 +695,22 @@ class UserAdmin(admin.ModelAdmin):
     def has_change_permission(self, request, obj=None):
         if request.user.username == SUPPORT_ACCOUNT:
             return False
-        if not DEBUG:
-            return False
         else:
             return True
 
+    search_fields = ('username', 'first_name', 'last_name', 'id')
 
 @admin.register(Prices)
 class PricesAdmin(admin.ModelAdmin):
 
     def has_add_permission(self, request):
-        if request.user.username == SUPPORT_ACCOUNT:
-            return False
-        if not DEBUG:
-            return False
-        else:
-            return True
+        return False
 
     def has_delete_permission(self, request, obj=None):
-        if request.user.username == SUPPORT_ACCOUNT:
-            return False
-        if not DEBUG:
-            return False
-        else:
-            return True
+        return False
 
     def has_change_permission(self, request, obj=None):
         if request.user.username == SUPPORT_ACCOUNT:
-            return False
-        if not DEBUG:
             return False
         else:
             return True
@@ -686,6 +729,7 @@ class UserProfileAdmin(admin.ModelAdmin):
             return False
         else:
             return True
+
     def get_queryset(self, request):
         qs = super().get_queryset(request)
         if request.user.username == SUPPORT_ACCOUNT:
@@ -748,13 +792,19 @@ class TelegramMessageAdmin(admin.ModelAdmin):
     def has_add_permission(self, request, obj=None):
         if request.user.username == SUPPORT_ACCOUNT:
             return False
+        else:
+            return True
 
     def has_delete_permission(self, request, obj=None):
         if request.user.username == SUPPORT_ACCOUNT:
             return False
+        else:
+            return True
 
     def has_change_permission(self, request, obj=None):
         if request.user.username == SUPPORT_ACCOUNT:
             return False
+        else:
+            return True
 
     readonly_fields = ('status', 'counter')

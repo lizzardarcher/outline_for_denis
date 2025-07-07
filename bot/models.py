@@ -137,12 +137,8 @@ class Transaction(models.Model):
             status = f"<span class='badge badge-danger'>{self.status}</span>"
         else:
             status = f"<span class='badge badge-secondary'>{self.status}</span>"
-        if self.paid:
-            paid = '✅'
-        else:
-            paid = '❌'
 
-        return mark_safe(f"Платеж на <span class='badge badge-info'>{self.amount}</span>p. {self.timestamp.strftime('%Y-%m-%d %H:%M')} {status} {str(self.user)} {paid}")
+        return mark_safe(f"Платеж на <span class='badge badge-info'>{self.amount}</span>p. {self.timestamp.strftime('%Y-%m-%d %H:%M')} {status} {str(self.user)}")
 
     class Meta:
         verbose_name = 'Транзакция'
