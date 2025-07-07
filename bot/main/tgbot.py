@@ -555,11 +555,10 @@ async def callback_query_handlers(call):
                             price = prices.price_4
                             days = 366
                         elif data[-1] == '3_days_trial':
-                            price = 20
-                            days = prices.price_5
+                            price = prices.price_5
+                            days = 3
 
                         try:
-
                             # Настройка ЮKassa
                             Configuration.account_id = settings.YOOKASSA_SHOP_ID_BOT
                             Configuration.secret_key = settings.YOOKASSA_SECRET_BOT

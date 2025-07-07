@@ -51,6 +51,7 @@ def attempt_recurring_payment():
                     user.save()
                     Transaction.objects.create(user=user, amount=amount_to_charge, currency=currency,
                                                side='Приход средств', status='succeeded', paid=True,
+                                               payment_id=payment.id,
                                                income_info=IncomeInfo.objects.get(pk=1),
                                                description='Рекуррентный платеж')
                     msg = (

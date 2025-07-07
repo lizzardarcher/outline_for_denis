@@ -342,7 +342,7 @@ class TransactionAdmin(admin.ModelAdmin):
     list_display = ('timestamp', 'amount', 'currency', 'status', 'description', 'paid', 'payment_id', 'user', 'side')
     list_display_links = ('user',)
     ordering = ['-timestamp']
-
+    search_fields = ('user__username', 'user__first_name', 'user__last_name', 'user__user_id')
     def has_add_permission(self, request):
         if request.user.username == SUPPORT_ACCOUNT:
             return False
