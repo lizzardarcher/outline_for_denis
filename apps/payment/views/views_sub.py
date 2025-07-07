@@ -16,6 +16,7 @@ import hashlib, hmac, json
 from django.http import HttpResponse
 from bot.models import TelegramUser, Transaction, IncomeInfo, Logging, Prices, TelegramReferral, ReferralSettings
 
+
 class CreatePaymentView(View):
     def post(self, request, *args, **kwargs):
         try:
@@ -66,7 +67,8 @@ class CreatePaymentView(View):
             request.session['yookassa_payment_id'] = payment.id
             request.session['yookassa_payment_amount'] = float(amount)
 
-            Transaction.objects.create(status='pending', paid=False, amount=amount, user=request.user.profile.telegram_user,
+            Transaction.objects.create(status='pending', paid=False, amount=amount,
+                                       user=request.user.profile.telegram_user,
                                        currency='RUB', income_info=IncomeInfo.objects.get(pk=1), side='Приход средств',
                                        description='Приобретение подписки', payment_id=payment.id)
             Logging.objects.create(log_level="INFO", message=f'[WEB] [Платёжный запрос на сумму {str(amount)} р.]',
@@ -80,6 +82,7 @@ class CreatePaymentView(View):
                                    message=f'[WEB] [Ошибка платёжного запроса {str(traceback.format_exc())}]',
                                    datetime=datetime.now(), user=self.request.user.profile.telegram_user)
             return redirect('profile')
+
 
 class PaymentSuccessView(TemplateView):
     template_name = 'payments/payment_success.html'
@@ -149,7 +152,8 @@ class YookassaTGBOTWebhookView(View):
                         telegram_user.permission_revoked = False
                         telegram_user.save()
 
-                    Logging.objects.create(log_level="INFO", message=f'[BOT] [Обработка платежа] [{event_type}] [Сумма: {amount_value}] [Дни:{days}]',
+                    Logging.objects.create(log_level="INFO",
+                                           message=f'[BOT] [Обработка платежа] [{event_type}] [Сумма: {amount_value}] [Дни:{days}]',
                                            datetime=datetime.now(), user=telegram_user)
 
                     REFERRAL_PERCENTAGES = {
@@ -296,7 +300,7 @@ class YookassaSiteWebhookView(View):
                             percent = REFERRAL_PERCENTAGES.get(level)
                             if percent:
                                 income = Decimal(user_to_pay.income) + (
-                                            Decimal(amount_value) * Decimal(percent) / 100)
+                                        Decimal(amount_value) * Decimal(percent) / 100)
                                 user_to_pay.income = income
                                 user_to_pay.save()  # Save the user to pay not the original user
 
