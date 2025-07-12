@@ -220,7 +220,7 @@ class TelegramUserAdmin(admin.ModelAdmin):
         'income')
     search_fields = ('first_name', 'last_name', 'username', 'user_id')
     readonly_fields = ('join_date', 'first_name', 'last_name', 'username', 'user_id',)
-    exclude = ('data_limit', 'is_banned', 'top_up_balance_listener', 'withdrawal_listener')
+    exclude = ('data_limit', 'top_up_balance_listener', 'withdrawal_listener')
     ordering = ('-subscription_status', '-join_date',)
     empty_value_display = '---'
     inlines = [TransactionInline, VpnKeyInline, WithdrawalRequestInline, LogInline]

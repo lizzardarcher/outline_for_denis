@@ -175,3 +175,5 @@ try_another_server = '''
 '''
 
 choose_protocol = '''Выберите протокол'''
+
+banned_user = '''Вы были забанены администратором. ❌ '''
