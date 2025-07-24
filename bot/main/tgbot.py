@@ -451,6 +451,14 @@ async def callback_query_handlers(call):
                                     ).order_by('keys_generated').first()
                                     logger.info(f"[get_new_key] [SERVER] [{server}]")
 
+                                    # try:
+                                    #     MarzbanAPI().delete_user(username=str(user.user_id))
+                                    # except:
+                                    #     pass
+                                    # try:
+                                    #     MarzbanAPI().create_user(username=str(user.user_id))
+                                    # except:
+                                    #     pass
                                     MarzbanAPI().create_user(username=str(user.user_id))
                                     success, result = MarzbanAPI().get_user(username=str(user.user_id))
                                     links = result['links']
@@ -507,7 +515,14 @@ async def callback_query_handlers(call):
                                                                    country__name=country, keys_generated__lte=KEY_LIMIT).last()
 
                                     logger.info(f"[swap_key] [SERVER] [{server}]")
-
+                                    # try:
+                                    #     MarzbanAPI().delete_user(username=str(user.user_id))
+                                    # except:
+                                    #     pass
+                                    # try:
+                                    #     MarzbanAPI().create_user(username=str(user.user_id))
+                                    # except:
+                                    #     pass
                                     success, result = MarzbanAPI().get_user(username=str(user.user_id))
 
                                     links = result['links']
