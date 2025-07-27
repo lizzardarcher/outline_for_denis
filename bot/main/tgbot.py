@@ -5,6 +5,7 @@ import sys
 import traceback
 from datetime import datetime, timedelta, date
 
+from django.contrib.messages.api import success
 from yookassa import Configuration, Payment
 
 import django_orm
@@ -451,20 +452,17 @@ async def callback_query_handlers(call):
                                     ).order_by('keys_generated').first()
                                     logger.info(f"[get_new_key] [SERVER] [{server}]")
 
-                                    # try:
-                                    #     MarzbanAPI().delete_user(username=str(user.user_id))
-                                    # except:
-                                    #     pass
-                                    # try:
-                                    #     MarzbanAPI().create_user(username=str(user.user_id))
-                                    # except:
-                                    #     pass
-                                    MarzbanAPI().create_user(username=str(user.user_id))
+                                    try:
+                                        MarzbanAPI().delete_user(username=str(user.user_id))
+                                        MarzbanAPI().create_user(username=str(user.user_id))
+                                    except:
+                                        pass
+                                    # MarzbanAPI().create_user(username=str(user.user_id))
                                     success, result = MarzbanAPI().get_user(username=str(user.user_id))
                                     links = result['links']
                                     key = "---"
                                     for link in links:
-                                        if server.ip_address in link:
+                                        if server.ip_address in link and "vless" in link:
                                             key = link
                                             break
                                     logger.info(f"VLESS_KEY: {key}")
@@ -515,21 +513,18 @@ async def callback_query_handlers(call):
                                                                    country__name=country, keys_generated__lte=KEY_LIMIT).last()
 
                                     logger.info(f"[swap_key] [SERVER] [{server}]")
-                                    # try:
-                                    #     MarzbanAPI().delete_user(username=str(user.user_id))
-                                    # except:
-                                    #     pass
-                                    # try:
-                                    #     MarzbanAPI().create_user(username=str(user.user_id))
-                                    # except:
-                                    #     pass
+                                    try:
+                                        MarzbanAPI().delete_user(username=str(user.user_id))
+                                        MarzbanAPI().create_user(username=str(user.user_id))
+                                    except:
+                                        pass
                                     success, result = MarzbanAPI().get_user(username=str(user.user_id))
 
                                     links = result['links']
 
                                     key = "---"
                                     for link in links:
-                                        if server.ip_address in link:
+                                        if server.ip_address in link and "vless" in link:
                                             key = link
                                             break
 

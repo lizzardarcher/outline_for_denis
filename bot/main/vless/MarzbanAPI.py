@@ -75,20 +75,18 @@ class MarzbanAPI:
         try:
             response = requests.request(method, url, headers=self.headers, json=data, timeout=10)  # Добавил timeout
 
-            response.raise_for_status()  # Поднимает HTTPError для плохих ответов (4xx или 5xx)
+            response.raise_for_status()
 
-            if response.status_code == 204:  # No content
-                return True, None  # Успешный DELETE часто возвращает 204
+            if response.status_code == 204:
+                return True, None
             try:
                 return True, response.json()
             except json.JSONDecodeError:
-                return True, response.text  # Возвращаем текст, если JSON не декодируется
+                return True, response.text
         except requests.exceptions.RequestException as e:
-            print(e)
-            return False, str(e)  # Обрабатываем ошибки соединения, таймауты и т.д.
+            return False, str(e)
         except Exception as e:
-            print(e)
-            return False, str(e)  # Обрабатываем любые другие исключения
+            return False, str(e)
 
     def create_user(self, username, data_limit=0, data_limit_reset_strategy="no_reset", expire=0,
                     inbounds=None, next_plan=None, note="", on_hold_expire_duration=0,
