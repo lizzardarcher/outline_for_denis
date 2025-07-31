@@ -724,37 +724,37 @@ class UserProfileAdmin(admin.ModelAdmin):
                      'telegram_user__username')  # Search on related fields
     list_filter = ('telegram_user__is_banned', 'telegram_user__subscription_status')  # Filter by telegram user status.
 
-    def has_view_permission(self, request, obj=None):
-        if request.user.username == SUPPORT_ACCOUNT:
-            return False
-        else:
-            return True
+    # def has_view_permission(self, request, obj=None):
+    #     if request.user.username == SUPPORT_ACCOUNT:
+    #         return False
+    #     else:
+    #         return True
 
-    def get_queryset(self, request):
-        qs = super().get_queryset(request)
-        if request.user.username == SUPPORT_ACCOUNT:
-            return qs.none()  # Возвращаем пустой QuerySet
-        return qs
+    # def get_queryset(self, request):
+    #     qs = super().get_queryset(request)
+    #     if request.user.username == SUPPORT_ACCOUNT:
+    #         return qs.none()  # Возвращаем пустой QuerySet
+    #     return qs
 
     def has_add_permission(self, request, obj=None):
-        if request.user.username == SUPPORT_ACCOUNT:
-            return False
+        # if request.user.username == SUPPORT_ACCOUNT:
+        #     return False
         if not DEBUG:
             return False
         else:
             return True
 
     def has_delete_permission(self, request, obj=None):
-        if request.user.username == SUPPORT_ACCOUNT:
-            return False
+        # if request.user.username == SUPPORT_ACCOUNT:
+        #     return False
         if not DEBUG:
             return False
         else:
             return True
 
     def has_change_permission(self, request, obj=None):
-        if request.user.username == SUPPORT_ACCOUNT:
-            return False
+        # if request.user.username == SUPPORT_ACCOUNT:
+        #     return False
         if not DEBUG:
             return False
         else:

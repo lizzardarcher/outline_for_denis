@@ -112,14 +112,29 @@ class MarzbanAPI:
             tuple: (bool, dict) - (Успешно ли создан пользователь, данные пользователя или сообщение об ошибке)
         """
 
+        # data = {
+        #     "data_limit": data_limit,
+        #     "expire": expire,
+        #     "inbounds": {
+        #         "vless": ["VLESS TCP REALITY"],
+        #     },
+        #     "proxies": proxies or {
+        #         "vless": {},
+        #     },
+        #     "status": status,
+        #     "username": username
+        # }
+
         data = {
             "data_limit": data_limit,
             "expire": expire,
             "inbounds": {
                 "vless": ["VLESS TCP REALITY"],
+                "shadowsocks": ["Shadowsocks TCP"]
             },
             "proxies": proxies or {
                 "vless": {},
+                "shadowsocks": {}
             },
             "status": status,
             "username": username

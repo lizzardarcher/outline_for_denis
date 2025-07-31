@@ -333,6 +333,9 @@ async def callback_query_handlers(call):
                 lg.objects.create(log_level='INFO', message=f'[BOT] [ДЕЙСТВИЕ: {call.data}]',
                                   datetime=datetime.now(), user=user)
 
+            async def send_dummy():
+                await bot.send_message(call.message.chat.id, text=msg.dummy_message, reply_markup=markup.start())
+
             if call.message.chat.type == 'private':
                 try:
                     await bot.delete_message(call.message.chat.id, call.message.message_id)
@@ -413,61 +416,131 @@ async def callback_query_handlers(call):
 
                 elif 'account' in data:
 
-                    if 'get_new_key' in call.data or 'swap_key' in call.data:
+                    if 'get_new_key' in call.data:
                         protocol = call.data.split(':')[1]
-                        print(f"[get_new_key] [PROTOCOL] [{protocol}]")
                         if user.subscription_status:
-                            try:
-                                country = call.data.split('_')[-1]
-                                server = Server.objects.filter(
-                                    is_active=True,
-                                    is_activated_vless=True,
-                                    country__name=country,
-                                    keys_generated__lte=200).order_by('keys_generated').first()
-                                logger.info(f"[get_new_key] [SERVER] [{server}]")
+                            if protocol == 'outline':
+                                try:
+                                    #  Удаляем все предыдущие ключи
+                                    await delete_user_keys(user=user)
+                                    country = call.data.split('_')[-1]
+                                    server = Server.objects.filter(
+                                        is_active=True,
+                                        is_activated=True,
+                                        country__name=country,
+                                        keys_generated__lte=KEY_LIMIT
+                                    ).order_by('keys_generated').first()
+                                    logger.info(f"[get_new_key] [SERVER] [{server}]")
+                                    key = await create_new_key(server=server, user=user)
+                                    await bot.send_message(call.message.chat.id,
+                                                           text=f'{msg.key_avail}\n<code>{key}</code>',
+                                                           reply_markup=markup.key_menu(country, protocol))
+                                except:
+                                    logger.error(f'{traceback.format_exc()}')
+                            elif protocol == 'vless':
+                                try:
+                                    #  Удаляем все предыдущие ключи
+                                    _key = VpnKey.objects.filter(user=user)
+                                    _key.delete()
 
-                                VpnKey.objects.filter(user=user).delete()  # Удаляем все предыдущие ключи
-                                # MarzbanAPI().delete_user(username=str(user.user_id))
-                                # await asyncio.sleep(2)
-                                print(f"[get_new_key] [Удалили предыдущие ключи] [{user}]")
+                                    country = call.data.split('_')[-1]
+                                    server = Server.objects.filter(
+                                        is_active=True,
+                                        is_activated_vless=True,
+                                        country__name=country,
+                                        keys_generated__lte=KEY_LIMIT
+                                    ).order_by('keys_generated').first()
+                                    logger.info(f"[get_new_key] [SERVER] [{server}]")
 
-                                MarzbanAPI().create_user(username=str(user.user_id))  # Генерируем новый ключ
-                                success, result = MarzbanAPI().get_user(username=str(user.user_id))
-
-                                links = result['links']
-                                key = "---"
-                                for link in links:
-
-                                    if protocol == 'outline':
-                                        if server.ip_address in link:
-                                            print(f"[SERVER IP {server.ip_address, server.country}:{server.ip_address in link}] [ss:// in link {'ss://' in link}] [vless:// not in link {'vless://' not in link}]")
-                                            print(link)
-                                        if server.ip_address in link and "ss://" in link and not "vless://" in link:
+                                    # try:
+                                    #     MarzbanAPI().delete_user(username=str(user.user_id))
+                                    #     MarzbanAPI().create_user(username=str(user.user_id))
+                                    # except:
+                                    #     pass
+                                    MarzbanAPI().create_user(username=str(user.user_id))
+                                    success, result = MarzbanAPI().get_user(username=str(user.user_id))
+                                    links = result['links']
+                                    key = "---"
+                                    for link in links:
+                                        if server.ip_address in link and "vless" in link:
                                             key = link
                                             break
+                                    logger.info(f"VLESS_KEY: {key}")
+                                    key = VpnKey.objects.create(server=server, user=user, key_id=user.user_id,
+                                                                name=str(user.user_id), password=str(user.user_id),
+                                                                port=1040, method='vless', access_url=key, protocol='vless')
 
-                                    if protocol == 'vless':
-                                        if server.ip_address in link:
-                                            print(f"[SERVER IP {server.ip_address, server.country}:{server.ip_address in link}] [ss:// in link {'ss://' in link}]")
-                                            print(link)
-                                        if server.ip_address in link and "vless://" in link:
-                                            key = link
-                                            break
-
-                                print(f"KEY: {key}")
-                                key = VpnKey.objects.create(server=server, user=user, key_id=user.user_id,
-                                                            name=str(user.user_id), password=str(user.user_id),
-                                                            port=1040, method=protocol, access_url=key,
-                                                            protocol=protocol)
-
-                                await bot.send_message(call.message.chat.id,
-                                                       text=f'{msg.key_avail}\n<code>{key.access_url}</code>',
-                                                       reply_markup=markup.key_menu(country, protocol))
-                            except:
-                                logger.error(f'{traceback.format_exc()}')
+                                    await bot.send_message(call.message.chat.id,
+                                                           text=f'{msg.key_avail}\n<code>{key.access_url}</code>',
+                                                           reply_markup=markup.key_menu(country, protocol))
+                                except:
+                                    logger.error(f'{traceback.format_exc()}')
                         else:
                             await bot.send_message(call.message.chat.id, msg.no_subscription,
                                                    reply_markup=markup.get_subscription())
+
+                    elif 'swap_key' in call.data:
+                        protocol = call.data.split(':')[1]
+                        if protocol == 'outline':
+                            if user.subscription_status:
+                                try:
+                                    #  Удаляем все предыдущие ключи
+                                    await delete_user_keys(user=user)
+                                    country = call.data.split('_')[-1]
+                                    server = Server.objects.filter(is_active=True, is_activated=True, country__name=country,
+                                                                   keys_generated__lte=KEY_LIMIT).last()
+                                    logger.info(f"[swap_key] [SERVER] [{server}]")
+                                    key = await create_new_key(server=server, user=user)
+                                    await bot.send_message(call.message.chat.id,
+                                                           text=f'{msg.key_avail}\n<code>{key}</code>',
+                                                           reply_markup=markup.key_menu(country, protocol))
+                                except:
+                                    logger.error(f'{traceback.format_exc()}')
+                            else:
+                                await bot.send_message(call.message.chat.id, msg.no_subscription,
+                                                       reply_markup=markup.get_subscription())
+                        elif protocol == 'vless':
+                            if user.subscription_status:
+
+                                try:
+                                    #  Удаляем все предыдущие ключи
+                                    _key = VpnKey.objects.filter(user=user)
+                                    _key.delete()
+
+                                    country = call.data.split('_')[-1]
+
+                                    server = Server.objects.filter(is_active=True, is_activated_vless=True, country__name=country, keys_generated__lte=KEY_LIMIT).last()
+
+                                    logger.info(f"[swap_key] [SERVER] [{server}]")
+                                    # try:
+                                    #     MarzbanAPI().delete_user(username=str(user.user_id))
+                                    #     MarzbanAPI().create_user(username=str(user.user_id))
+                                    # except:
+                                    #     pass
+                                    success, result = MarzbanAPI().get_user(username=str(user.user_id))
+
+                                    links = result['links']
+
+                                    key = "---"
+                                    for link in links:
+                                        if server.ip_address in link and "vless" in link:
+                                            key = link
+                                            break
+
+                                    logger.info(f"VLESS_KEY: {key}")
+
+                                    key = VpnKey.objects.create(server=server, user=user, key_id=user.user_id,
+                                                                name=str(user.user_id), password=str(user.user_id),
+                                                                port=1040, method='vless', access_url=key, protocol='vless')
+
+                                    await bot.send_message(call.message.chat.id,
+                                                           text=f'{msg.key_avail}\n<code>{key.access_url}</code>',
+                                                           reply_markup=markup.key_menu(country, protocol))
+                                except:
+                                    logger.error(f'{traceback.format_exc()}')
+                            else:
+                                await bot.send_message(call.message.chat.id, msg.no_subscription,
+                                                       reply_markup=markup.get_subscription())
 
                     elif 'choose_payment' in data:
                         await bot.send_message(call.message.chat.id, text=msg.choose_subscription,

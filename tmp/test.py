@@ -34,3 +34,4 @@ text = "средненький такой, ничего особенного."
 sentiment = analyze_sentiment_ru(text)
 print(f"Текст: {text}")
 print(f"Тональность: {sentiment}")
+

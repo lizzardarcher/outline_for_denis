@@ -47,7 +47,9 @@ logging.basicConfig(
     ],
 )
 
-bot = AsyncTeleBot(token=TelegramBot.objects.all().first().token, state_storage=StateMemoryStorage())
+# bot = AsyncTeleBot(token=TelegramBot.objects.all().first().token, state_storage=StateMemoryStorage())
+bot = AsyncTeleBot(token='8110135608:AAEBfrwyAXI8znOdrIRbHmX43TR_ArYyflI', state_storage=StateMemoryStorage())
+
 bot.parse_mode = 'HTML'
 DEBUG = settings.DEBUG
 BOT_USERNAME = settings.BOT_USERNAME
