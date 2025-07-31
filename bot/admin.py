@@ -546,7 +546,7 @@ class ServerAdmin(admin.ModelAdmin):
         'hosting', 'ip_address', 'user', 'password', 'rental_price', 'max_keys', 'get_key_generated', 'is_active',
         'is_activated', 'is_activated_vless',
         'country', 'created_at')
-    list_display_links = ('hosting', 'ip_address',)
+    list_display_links = ('hosting',)
     # inlines = [VpnKeyInline]
     ordering = ('country', 'ip_address')
 
