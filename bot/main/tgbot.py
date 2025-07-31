@@ -427,8 +427,10 @@ async def callback_query_handlers(call):
                                 logger.info(f"[get_new_key] [SERVER] [{server}]")
 
                                 VpnKey.objects.filter(user=user).delete()  # Удаляем все предыдущие ключи
-                                # MarzbanAPI().delete_user(username=str(user.user_id))
-                                # await asyncio.sleep(2)
+                                wait_msg = await bot.send_message(call.message.chat.id, text='Ожидайте, ключи генерируются...')
+                                MarzbanAPI().delete_user(username=str(user.user_id))
+                                await asyncio.sleep(2)
+                                await bot.delete_message(wait_msg.chat.id, wait_msg.message_id)
                                 print(f"[get_new_key] [Удалили предыдущие ключи] [{user}]")
 
                                 MarzbanAPI().create_user(username=str(user.user_id))  # Генерируем новый ключ

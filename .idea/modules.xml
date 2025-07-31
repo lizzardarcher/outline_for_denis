@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/.idea/outline_for_denis.iml" filepath="$PROJECT_DIR$/.idea/outline_for_denis.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/DomVPN.iml" filepath="$PROJECT_DIR$/.idea/DomVPN.iml" />
     </modules>
   </component>
 </project>
