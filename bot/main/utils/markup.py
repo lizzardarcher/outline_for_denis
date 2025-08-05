@@ -67,7 +67,7 @@ def download_app():
 
 def help_markup():
     markup = InlineKeyboardMarkup()
-    markup.add(InlineKeyboardButton(text='Ссылки на скачивание', url='https://telegra.ph/VPN--Ssylki-na-skachivanie-11-20'))
+    markup.add(InlineKeyboardButton(text='Ссылки на скачивание', url='https://telegra.ph/VPN--Ssylki-na-skachivanie-08-04'))
     markup.add(InlineKeyboardButton(text='Условия использования', url='https://telegra.ph/Usloviya-polzovaniya-servisom-VPN-TON-11-20'))
     markup.add(InlineKeyboardButton(text='Инструкция', url='https://telegra.ph/Instrukciya-VPN-11-20'))
     markup.add(InlineKeyboardButton(text='Договор оферты', url='https://domvpn.store/oferta/'))

@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
-  <component name="PublishConfigData" autoUpload="Always" serverName="outline_denis" confirmBeforeUploading="false" confirmBeforeDeletion="false">
+  <component name="PublishConfigData" autoUpload="Always" serverName="DomVPN" confirmBeforeUploading="false" confirmBeforeDeletion="false">
     <option name="confirmBeforeDeletion" value="false" />
     <option name="confirmBeforeUploading" value="false" />
     <serverData>
-      <paths name="outline_denis">
+      <paths name="DomVPN">
         <serverdata>
           <mappings>
             <mapping deploy="/opt/outline" local="$PROJECT_DIR$" web="/" />

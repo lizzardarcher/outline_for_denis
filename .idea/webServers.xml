@@ -2,7 +2,7 @@
 <project version="4">
   <component name="WebServers">
     <option name="servers">
-      <webServer id="b02dd63b-4a96-49db-90b5-351e4668469c" name="outline_denis">
+      <webServer id="b02dd63b-4a96-49db-90b5-351e4668469c" name="DomVPN">
         <fileTransfer accessType="SFTP" host="179.43.180.203" port="22" sshConfigId="7e6e7a4a-ada6-4109-81fe-6a543121071e" sshConfig="root@179.43.180.203:22 password">
           <advancedOptions>
             <advancedOptions dataProtectionLevel="Private" keepAliveTimeout="0" passiveMode="true" shareSSLContext="true" />
