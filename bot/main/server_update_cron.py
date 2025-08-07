@@ -142,6 +142,7 @@ echo "Script completed successfully."
                     else:
                         logger.info(f'Нода {server.ip_address} добавлена успешно!')
                         server.is_activated_vless = True
+                        server.is_activated = True
                         server.save()
                 except:
                     print(traceback.format_exc())
