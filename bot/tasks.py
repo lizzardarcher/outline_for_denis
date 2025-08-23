@@ -1,5 +1,6 @@
 import traceback
 
+import paramiko
 from celery import shared_task
 from django.utils import timezone
 
@@ -118,3 +119,17 @@ def message_sender():
         message.status = 'sent'
         message.counter = counter
         message.save()
+
+
+@shared_task
+def reload_servers():
+    servers = Server.objects.filter(hosting__contains='IS Hosting')
+    for server in servers:
+        try:
+            ssh = paramiko.SSHClient()
+            ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            ssh.connect(server.ip_address, username=server.user, password=server.password)
+            stdin, stdout, stderr = ssh.exec_command('sudo reboot')  # or any other command to reload the server
+            ssh.close()
+        except Exception as e:
+            pass

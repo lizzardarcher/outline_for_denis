@@ -27,6 +27,7 @@ admin.site.unregister(PeriodicTask)
 
 @admin.register(PeriodicTask)
 class PeriodicTaskAdmin(admin.ModelAdmin):
+    list_display = ('name', 'task','interval', 'start_time', 'total_run_count', 'last_run_at')
     def has_add_permission(self, request):
         if request.user.username == SUPPORT_ACCOUNT:
             return False
