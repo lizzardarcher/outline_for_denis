@@ -126,10 +126,13 @@ def reload_servers():
     servers = Server.objects.filter(hosting__contains='IS Hosting')
     for server in servers:
         try:
+            Logging.objects.create(log_level='DEBUG', message=f'[CELERY] Reloading server {server.hosting}...')
             ssh = paramiko.SSHClient()
             ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
             ssh.connect(server.ip_address, username=server.user, password=server.password)
             stdin, stdout, stderr = ssh.exec_command('sudo reboot')  # or any other command to reload the server
             ssh.close()
+            Logging.objects.create(log_level='DEBUG', message=f'[CELERY] Reloading server {server.hosting}...Done')
         except Exception as e:
+            Logging.objects.create(log_level='ERROR', message=f'[CELERY] {traceback.format_exc()}')
             pass
