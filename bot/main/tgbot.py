@@ -501,57 +501,65 @@ async def callback_query_handlers(call):
                                 price = prices.price_5
                                 days = 3
 
-                            try:
-                                # Настройка ЮKassa
-                                Configuration.account_id = settings.YOOKASSA_SHOP_ID_BOT
-                                Configuration.secret_key = settings.YOOKASSA_SECRET_BOT
+                            await bot.send_message(
+                                call.message.chat.id,
+                                text='К сожалению, на данный момент мы не можем оказать услуги в связи с\n'
+                                     'проблемами с платёжной системой. Приём оплаты возобновится примерно <code>15.09</code>\n'
+                                     'Бот оповестит вас, когда будет возможность оплатить подписку.',
+                                reply_markup=markup.start()
+                            )
 
-                                payment = Payment.create({
-                                    "amount": {
-                                        "value": str(price),
-                                        "currency": "RUB"
-                                    },
-                                    "confirmation": {
-                                        "type": "redirect",
-                                        "return_url": f'https://t.me/{BOT_USERNAME}?start',
-                                        "enforce": False
-                                    },
-                                    "capture": True,
-                                    "description": f'Подписка DomVPN на {days} дн.',
-                                    "save_payment_method": True,
-                                    "metadata": {
-                                        'user_id': call.message.chat.id,
-                                        'telegram_user_id': call.message.chat.id,
-                                    }
-                                }, )
-
-                                Transaction.objects.create(status='pending', paid=False, amount=float(price), user=user,
-                                                           currency='RUB', income_info=IncomeInfo.objects.get(pk=1),
-                                                           side='Приход средств',
-                                                           description='Пополнение баланса пользователя',
-                                                           payment_id=payment.id)
-                                Logging.objects.create(log_level="INFO",
-                                                       message=f'[BOT] [Платёжный запрос на сумму {str(price)} р.]',
-                                                       datetime=datetime.now(), user=user)
-
-                                confirmation_url = payment.confirmation.confirmation_url
-                                payment_markup = InlineKeyboardMarkup()
-                                payment_markup.add(
-                                    InlineKeyboardButton(text=f'💳 Оплатить подписку {str(days)} дн. за {str(price)}р.',
-                                                         url=confirmation_url))
-                                payment_markup.add(
-                                    InlineKeyboardButton(text='Договор оферты', url='https://domvpn.store/oferta/'))
-                                payment_markup.add(InlineKeyboardButton(text=f'🔙 Назад', callback_data=f'back'))
-                                await bot.send_message(call.message.chat.id,
-                                                       f"Для оплаты подписки на {days} дн. нажмите на кнопку Оплатить и следуйте инструкциям:",
-                                                       reply_markup=payment_markup)
-                                await asyncio.sleep(10)
-                                await bot.send_message(call.message.chat.id, text=msg.after_payment,
-                                                       reply_markup=markup.proceed_to_profile())
-                            except Exception as e:
-                                print(f"Ошибка при создании платежа: {traceback.format_exc()}")
-                                await bot.send_message(call.message.chat.id,
-                                                       f"Произошла ошибка при оформлении подписки.  Попробуйте позже. {e}")
+                            # try:
+                            #     # Настройка ЮKassa
+                            #     Configuration.account_id = settings.YOOKASSA_SHOP_ID_BOT
+                            #     Configuration.secret_key = settings.YOOKASSA_SECRET_BOT
+                            #
+                            #     payment = Payment.create({
+                            #         "amount": {
+                            #             "value": str(price),
+                            #             "currency": "RUB"
+                            #         },
+                            #         "confirmation": {
+                            #             "type": "redirect",
+                            #             "return_url": f'https://t.me/{BOT_USERNAME}?start',
+                            #             "enforce": False
+                            #         },
+                            #         "capture": True,
+                            #         "description": f'Подписка DomVPN на {days} дн.',
+                            #         "save_payment_method": True,
+                            #         "metadata": {
+                            #             'user_id': call.message.chat.id,
+                            #             'telegram_user_id': call.message.chat.id,
+                            #         }
+                            #     }, )
+                            #
+                            #     Transaction.objects.create(status='pending', paid=False, amount=float(price), user=user,
+                            #                                currency='RUB', income_info=IncomeInfo.objects.get(pk=1),
+                            #                                side='Приход средств',
+                            #                                description='Пополнение баланса пользователя',
+                            #                                payment_id=payment.id)
+                            #     Logging.objects.create(log_level="INFO",
+                            #                            message=f'[BOT] [Платёжный запрос на сумму {str(price)} р.]',
+                            #                            datetime=datetime.now(), user=user)
+                            #
+                            #     confirmation_url = payment.confirmation.confirmation_url
+                            #     payment_markup = InlineKeyboardMarkup()
+                            #     payment_markup.add(
+                            #         InlineKeyboardButton(text=f'💳 Оплатить подписку {str(days)} дн. за {str(price)}р.',
+                            #                              url=confirmation_url))
+                            #     payment_markup.add(
+                            #         InlineKeyboardButton(text='Договор оферты', url='https://domvpn.store/oferta/'))
+                            #     payment_markup.add(InlineKeyboardButton(text=f'🔙 Назад', callback_data=f'back'))
+                            #     await bot.send_message(call.message.chat.id,
+                            #                            f"Для оплаты подписки на {days} дн. нажмите на кнопку Оплатить и следуйте инструкциям:",
+                            #                            reply_markup=payment_markup)
+                            #     await asyncio.sleep(10)
+                            #     await bot.send_message(call.message.chat.id, text=msg.after_payment,
+                            #                            reply_markup=markup.proceed_to_profile())
+                            # except Exception as e:
+                            #     print(f"Ошибка при создании платежа: {traceback.format_exc()}")
+                            #     await bot.send_message(call.message.chat.id,
+                            #                            f"Произошла ошибка при оформлении подписки.  Попробуйте позже. {e}")
 
 
                     elif 'cancel_subscription' in data:
