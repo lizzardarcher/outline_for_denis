@@ -36,6 +36,7 @@ DATA_UPLOAD_MAX_NUMBER_FIELDS = 10240
 # SERVER_EMAIL = EMAIL_HOST_USER
 # DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 
+
 # Email настройки для Gmail
 # https://myaccount.google.com/apppasswords
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
