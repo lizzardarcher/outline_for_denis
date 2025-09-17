@@ -53,6 +53,7 @@ DEBUG = settings.DEBUG
 BOT_USERNAME = settings.BOT_USERNAME
 KEY_LIMIT = settings.KEY_LIMIT
 
+
 def update_sub_status(user: TelegramUser):
     exp_date = user.subscription_expiration
     if exp_date < datetime.now().date():
@@ -162,11 +163,13 @@ async def start(message):
                             TelegramReferral.objects.create(referrer=referrer, referred=referred, level=1)
 
                             #  Проверяем есть ли рефералы у того, кто отправил ссылку и получаем их список, если есть
-                            referred_list = [x for x in TelegramReferral.objects.filter(referred=referrer, level__lte=4)]
+                            referred_list = [x for x in
+                                             TelegramReferral.objects.filter(referred=referrer, level__lte=4)]
                             for r in referred_list:
                                 current_level = r.level  # 1
                                 current_referrer = r.referrer
-                                new_referral = TelegramReferral.objects.create(referrer=current_referrer, referred=referred,
+                                new_referral = TelegramReferral.objects.create(referrer=current_referrer,
+                                                                               referred=referred,
                                                                                level=current_level + 1)
                                 logger.info(f'Создана новая реферальная связь {new_referral}')
                                 lg.objects.create(log_level='INFO',
@@ -309,8 +312,6 @@ async def got_payment(message):
     await bot.send_message(chat_id=message.chat.id, text='Success', reply_markup=markup.back())
 
 
-
-
 @bot.callback_query_handler(func=lambda call: True)
 async def callback_query_handlers(call):
     user = TelegramUser.objects.get(user_id=call.message.chat.id)
@@ -340,7 +341,8 @@ async def callback_query_handlers(call):
                     ...
 
                 if 'download_app' in data:
-                    await bot.send_message(call.message.chat.id, text=msg.download_app, reply_markup=markup.download_app())
+                    await bot.send_message(call.message.chat.id, text=msg.download_app,
+                                           reply_markup=markup.download_app())
 
                 elif 'app_installed' in data:
                     await bot.send_message(chat_id=call.message.chat.id, text=msg.app_installed,
@@ -352,7 +354,8 @@ async def callback_query_handlers(call):
                         await bot.send_message(chat_id=user.user_id, text=msg.trial_key.format(key))
 
                 elif 'manage' in data:
-                    await bot.send_message(call.message.chat.id, msg.choose_protocol, reply_markup=markup.choose_protocol())
+                    await bot.send_message(call.message.chat.id, msg.choose_protocol,
+                                           reply_markup=markup.choose_protocol())
 
                 elif 'country' in data:
 
@@ -427,7 +430,8 @@ async def callback_query_handlers(call):
                                 logger.info(f"[get_new_key] [SERVER] [{server}]")
 
                                 VpnKey.objects.filter(user=user).delete()  # Удаляем все предыдущие ключи
-                                wait_msg = await bot.send_message(call.message.chat.id, text='Ожидайте, ключи генерируются...')
+                                wait_msg = await bot.send_message(call.message.chat.id,
+                                                                  text='Ожидайте, ключи генерируются...')
                                 MarzbanAPI().delete_user(username=str(user.user_id))
                                 await asyncio.sleep(2)
                                 await bot.delete_message(wait_msg.chat.id, wait_msg.message_id)
@@ -442,7 +446,8 @@ async def callback_query_handlers(call):
 
                                     if protocol == 'outline':
                                         if server.ip_address in link:
-                                            print(f"[SERVER IP {server.ip_address, server.country}:{server.ip_address in link}] [ss:// in link {'ss://' in link}] [vless:// not in link {'vless://' not in link}]")
+                                            print(
+                                                f"[SERVER IP {server.ip_address, server.country}:{server.ip_address in link}] [ss:// in link {'ss://' in link}] [vless:// not in link {'vless://' not in link}]")
                                             print(link)
                                         if server.ip_address in link and "ss://" in link and not "vless://" in link:
                                             key = link
@@ -450,7 +455,8 @@ async def callback_query_handlers(call):
 
                                     if protocol == 'vless':
                                         if server.ip_address in link:
-                                            print(f"[SERVER IP {server.ip_address, server.country}:{server.ip_address in link}] [ss:// in link {'ss://' in link}]")
+                                            print(
+                                                f"[SERVER IP {server.ip_address, server.country}:{server.ip_address in link}] [ss:// in link {'ss://' in link}]")
                                             print(link)
                                         if server.ip_address in link and "vless://" in link:
                                             key = link
@@ -474,7 +480,7 @@ async def callback_query_handlers(call):
                     elif 'choose_payment' in data:
                         await bot.send_message(call.message.chat.id, text=msg.choose_subscription,
                                                reply_markup=markup.choose_subscription())
-                    elif 'sub' in data :
+                    elif 'sub' in data:
                         await bot.send_message(call.message.chat.id, text=msg.payment_menu,
                                                reply_markup=markup.payment_menu(data[-1]))
 
@@ -501,65 +507,103 @@ async def callback_query_handlers(call):
                                 price = prices.price_5
                                 days = 3
 
-                            await bot.send_message(
-                                call.message.chat.id,
-                                text='К сожалению, на данный момент мы не можем оказать услуги в связи с\n'
-                                     'проблемами с платёжной системой. Приём оплаты возобновится примерно <code>15.09</code>\n'
-                                     'Бот оповестит вас, когда будет возможность оплатить подписку.',
-                                reply_markup=markup.start()
-                            )
+                            # await bot.send_message(
+                            #     call.message.chat.id,
+                            #     text='К сожалению, на данный момент мы не можем оказать услуги в связи с\n'
+                            #          'проблемами с платёжной системой. Приём оплаты возобновится примерно <code>15.09</code>\n'
+                            #          'Бот оповестит вас, когда будет возможность оплатить подписку.',
+                            #     reply_markup=markup.start()
+                            # )
 
-                            # try:
-                            #     # Настройка ЮKassa
-                            #     Configuration.account_id = settings.YOOKASSA_SHOP_ID_BOT
-                            #     Configuration.secret_key = settings.YOOKASSA_SECRET_BOT
-                            #
-                            #     payment = Payment.create({
-                            #         "amount": {
-                            #             "value": str(price),
-                            #             "currency": "RUB"
-                            #         },
-                            #         "confirmation": {
-                            #             "type": "redirect",
-                            #             "return_url": f'https://t.me/{BOT_USERNAME}?start',
-                            #             "enforce": False
-                            #         },
-                            #         "capture": True,
-                            #         "description": f'Подписка DomVPN на {days} дн.',
-                            #         "save_payment_method": True,
-                            #         "metadata": {
-                            #             'user_id': call.message.chat.id,
-                            #             'telegram_user_id': call.message.chat.id,
-                            #         }
-                            #     }, )
-                            #
-                            #     Transaction.objects.create(status='pending', paid=False, amount=float(price), user=user,
-                            #                                currency='RUB', income_info=IncomeInfo.objects.get(pk=1),
-                            #                                side='Приход средств',
-                            #                                description='Пополнение баланса пользователя',
-                            #                                payment_id=payment.id)
-                            #     Logging.objects.create(log_level="INFO",
-                            #                            message=f'[BOT] [Платёжный запрос на сумму {str(price)} р.]',
-                            #                            datetime=datetime.now(), user=user)
-                            #
-                            #     confirmation_url = payment.confirmation.confirmation_url
-                            #     payment_markup = InlineKeyboardMarkup()
-                            #     payment_markup.add(
-                            #         InlineKeyboardButton(text=f'💳 Оплатить подписку {str(days)} дн. за {str(price)}р.',
-                            #                              url=confirmation_url))
-                            #     payment_markup.add(
-                            #         InlineKeyboardButton(text='Договор оферты', url='https://domvpn.store/oferta/'))
-                            #     payment_markup.add(InlineKeyboardButton(text=f'🔙 Назад', callback_data=f'back'))
-                            #     await bot.send_message(call.message.chat.id,
-                            #                            f"Для оплаты подписки на {days} дн. нажмите на кнопку Оплатить и следуйте инструкциям:",
-                            #                            reply_markup=payment_markup)
-                            #     await asyncio.sleep(10)
-                            #     await bot.send_message(call.message.chat.id, text=msg.after_payment,
-                            #                            reply_markup=markup.proceed_to_profile())
-                            # except Exception as e:
-                            #     print(f"Ошибка при создании платежа: {traceback.format_exc()}")
-                            #     await bot.send_message(call.message.chat.id,
-                            #                            f"Произошла ошибка при оформлении подписки.  Попробуйте позже. {e}")
+                            try:
+                                # Настройка ЮKassa
+                                Configuration.account_id = settings.YOOKASSA_SHOP_ID_BOT
+                                Configuration.secret_key = settings.YOOKASSA_SECRET_BOT
+
+                                # payment = Payment.create({
+                                #     "amount": {
+                                #         "value": str(price),
+                                #         "currency": "RUB"
+                                #     },
+                                #     "confirmation": {
+                                #         "type": "redirect",
+                                #         "return_url": f'https://t.me/{BOT_USERNAME}?start',
+                                #         "enforce": False
+                                #     },
+                                #     "capture": True,
+                                #     "description": f'Подписка DomVPN на {days} дн.',
+                                #     "save_payment_method": True,
+                                #     "metadata": {
+                                #         'user_id': call.message.chat.id,
+                                #         'telegram_user_id': call.message.chat.id,
+                                #     }
+                                # }, )
+                                payment = Payment.create({
+                                    "amount": {
+                                        "value": str(price),
+                                        "currency": "RUB"
+                                    },
+                                    "confirmation": {
+                                        "type": "redirect",
+                                        "return_url": f'https://t.me/{BOT_USERNAME}?start',
+                                        "enforce": False
+                                    },
+                                    "capture": True,
+                                    "description": f'Подписка DomVPN на {days} дн.',
+                                    "save_payment_method": True,
+                                    "metadata": {
+                                        'user_id': call.message.chat.id,
+                                        'telegram_user_id': call.message.chat.id,
+                                    },
+                                    "receipt": {
+                                        "customer": {
+                                            "email": call.message.from_user.email if hasattr(call.message.from_user, 'email') else "noemail@example.com",
+                                            # "phone": call.message.from_user.phone if hasattr(call.message.from_user, 'phone') else None
+                                        },
+                                        "items": [
+                                            {
+                                                "description": f'Подписка DomVPN на {days} дн.',
+                                                "quantity": "1.00",
+                                                "amount": {
+                                                    "value": str(price),
+                                                    "currency": "RUB"
+                                                },
+                                                "vat_code": 4,
+                                                "payment_subject": "service",
+                                                "payment_mode": "full_payment"
+                                            }
+                                        ]
+                                    }
+                                })
+
+                                Transaction.objects.create(status='pending', paid=False, amount=float(price), user=user,
+                                                           currency='RUB', income_info=IncomeInfo.objects.get(pk=1),
+                                                           side='Приход средств',
+                                                           description='Пополнение баланса пользователя',
+                                                           payment_id=payment.id)
+                                Logging.objects.create(log_level="INFO",
+                                                       message=f'[BOT] [Платёжный запрос на сумму {str(price)} р.]',
+                                                       datetime=datetime.now(), user=user)
+
+                                confirmation_url = payment.confirmation.confirmation_url
+                                payment_markup = InlineKeyboardMarkup()
+                                payment_markup.add(
+                                    InlineKeyboardButton(text=f'💳 Оплатить подписку {str(days)} дн. за {str(price)}р.',
+                                                         url=confirmation_url))
+                                payment_markup.add(
+                                    InlineKeyboardButton(text='Договор оферты', url='https://domvpn.store/oferta/'))
+                                payment_markup.add(InlineKeyboardButton(text=f'🔙 Назад', callback_data=f'back'))
+                                await bot.send_message(call.message.chat.id,
+                                                       f"Для оплаты подписки на {days} дн. нажмите на кнопку Оплатить и следуйте инструкциям:",
+                                                       reply_markup=payment_markup)
+                                await asyncio.sleep(10)
+                                await bot.send_message(call.message.chat.id, text=msg.after_payment,
+                                                       reply_markup=markup.proceed_to_profile())
+                            except Exception as e:
+                                print(f"Ошибка при создании платежа: {traceback.format_exc()}")
+                                await bot.send_message(call.message.chat.id,
+                                                       f"Произошла ошибка при оформлении подписки.  Попробуйте позже. {e}")
+
 
 
                     elif 'cancel_subscription' in data:
@@ -584,7 +628,8 @@ async def callback_query_handlers(call):
                 elif 'profile' in data:
                     user_id = user.user_id
                     income = user.income
-                    sub = str(user.subscription_expiration.strftime("%d.%m.%Y")) if user.subscription_status else 'Нет подписки'
+                    sub = str(user.subscription_expiration.strftime(
+                        "%d.%m.%Y")) if user.subscription_status else 'Нет подписки'
                     active = '📌  <b>Подписка:</b> ✅' if user.payment_method_id else ''
 
                     await bot.send_message(call.message.chat.id,
@@ -627,7 +672,8 @@ async def callback_query_handlers(call):
                                 currency='RUB',
                                 timestamp=datetime.now(),
                             )
-                            await bot.send_message(call.message.chat.id, text=msg.withdraw_request.format(str(user.income)),
+                            await bot.send_message(call.message.chat.id,
+                                                   text=msg.withdraw_request.format(str(user.income)),
                                                    reply_markup=markup.proceed_to_profile())
                             logger.info(
                                 f'[{call.message.chat.first_name} : {call.message.chat.username} : {call.message.chat.id}] [withdrawal request: {user} {user.income}]')
@@ -644,7 +690,8 @@ async def callback_query_handlers(call):
                     await bot.answer_callback_query(call.id, text=msg.popup_help, show_alert=True)
 
                 elif 'common_info' in data:
-                    await bot.send_message(call.message.chat.id, text=msg.commom_info, reply_markup=markup.help_markup())
+                    await bot.send_message(call.message.chat.id, text=msg.commom_info,
+                                           reply_markup=markup.help_markup())
 
                 elif 'back' in data:
                     await bot.send_message(chat_id=call.message.chat.id, text=msg.main_menu_choice,
@@ -656,6 +703,6 @@ async def callback_query_handlers(call):
 if __name__ == '__main__':
     bot.add_custom_filter(asyncio_filters.StateFilter(bot))
     loop = asyncio.get_event_loop()
-    loop.create_task(send_pending_messages())                                                          # MAILING
+    loop.create_task(send_pending_messages())  # MAILING
     loop.create_task(bot.polling(non_stop=True, request_timeout=100, timeout=100, skip_pending=True))  # TELEGRAM BOT
     loop.run_forever()

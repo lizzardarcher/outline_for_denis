@@ -617,6 +617,20 @@ def make_success(modeladmin, request, queryset):
 @admin.register(Logging)
 class LoggingAdmin(admin.ModelAdmin):
 
+    def delete_3_day_logs(self, request, obj=None):
+        """Удалить все логи старше 3 дней"""
+        Logging.objects.filter(datetime__lt=datetime.now() - timedelta(days=3)).delete()
+        self.message_user(request, "Все логи старше 3 дней были удалены")
+
+    delete_3_day_logs.short_description = "Удалить все логи старше 3 дней"
+
+    def delete_all_logs(self, request, obj=None):
+        """Удалить все логи"""
+        Logging.objects.all().delete()
+        self.message_user(request, "Все логи были удалены")
+
+    delete_all_logs.short_description = "Удалить все логи"
+
     def get_log_level(self, obj):
         if obj.log_level == 'INFO':
             return format_html('<div style="color:aqua;">%s</div>' % obj.log_level)
@@ -639,7 +653,7 @@ class LoggingAdmin(admin.ModelAdmin):
     list_display_links = ('user', 'message',)
     search_fields = ('message', 'user__username',)
     ordering = ['-datetime']
-    actions = [make_warning, make_debug, make_fatal, make_trace, make_success, make_info]
+    actions = [make_warning, make_debug, make_fatal, make_trace, make_success, make_info, delete_3_day_logs, delete_all_logs]
 
     def has_add_permission(self, request):
         if request.user.username == SUPPORT_ACCOUNT:

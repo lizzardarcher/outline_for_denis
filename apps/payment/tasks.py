@@ -15,12 +15,16 @@ def attempt_recurring_payment():
     Периодическая задача для списания средств с пользователей,
     у которых статус подписки False и есть payment_method_id.
     """
+
+
     users_to_charge = TelegramUser.objects.filter(
         subscription_status=False,
         payment_method_id__isnull=False,
         payment_method_id__gt='',
         permission_revoked=False
     )
+
+    Logging.objects.create(log_level="INFO", message=f'[CELERY] [TASK] [Периодическая задача] [Попытка списания средств] [количество пользователей: {users_to_charge.count()}]', datetime=datetime.now())
 
     for user in users_to_charge:
         if user.payment_method_id.__len__() > 10:
@@ -30,8 +34,21 @@ def attempt_recurring_payment():
                 currency = 'RUB'
 
                 # Настройка ЮKassa
-                Configuration.account_id = settings.YOOKASSA_SHOP_ID_BOT
-                Configuration.secret_key = settings.YOOKASSA_SECRET_BOT
+                try:
+                    last_log = Logging.objects.filter(user_id=user.user_id).order_by('-datetime').first()
+                    if '[BOT]' in last_log:
+                        Configuration.account_id = settings.YOOKASSA_SHOP_ID_BOT
+                        Configuration.secret_key = settings.YOOKASSA_SECRET_BOT
+                    else:
+                        Configuration.account_id = settings.YOOKASSA_SHOP_ID_SITE
+                        Configuration.secret_key = settings.YOOKASSA_SECRET_SITE
+                except:
+                    Configuration.account_id = settings.YOOKASSA_SHOP_ID_BOT
+                    Configuration.secret_key = settings.YOOKASSA_SECRET_BOT
+                try:
+                    email = user.user_profile.user.email if user.user_profile.user.email else "noemail@noemail.ru"
+                except:
+                    email = "noemail@noemail.ru"
 
                 payment = Payment.create({
                     "amount": {
@@ -40,7 +57,28 @@ def attempt_recurring_payment():
                     },
                     "capture": True,
                     "payment_method_id": user.payment_method_id,
-                    "description": f"Рекуррентный платеж для пользователя {user.user_id}"
+                    "payment_method": {
+                        "saved": True
+                    },
+                    "description": f"Рекуррентный платеж для пользователя {user.user_id} Подписка DomVPN",
+                    "receipt": {
+                        "customer": {
+                            "email": email,
+                        },
+                        "items": [
+                            {
+                                "description": "Рекуррентный платеж",
+                                "quantity": "1.00",
+                                "amount": {
+                                    "value": str(amount_to_charge),
+                                    "currency": currency
+                                },
+                                "vat_code": 4,
+                                "payment_subject": "service",
+                                "payment_mode": "full_payment"
+                            }
+                        ]
+                    }
                 })
 
                 if payment.status == 'succeeded':
@@ -55,7 +93,7 @@ def attempt_recurring_payment():
                                                income_info=IncomeInfo.objects.get(pk=1),
                                                description='Рекуррентный платеж')
                     msg = (
-                        f"Автосписание успешно! Пользователь {user.user_id} оплатил с {str(amount_to_charge)} {currency}. "
+                        f"[CELERY] Автосписание успешно! Пользователь {user.user_id} оплатил с {str(amount_to_charge)} {currency}. "
                            f""f"Подписка активирована до {user.subscription_expiration}"
                     )
 
@@ -86,7 +124,7 @@ def attempt_recurring_payment():
                     Logging.objects.create(log_level="SUCCESS", message=msg, datetime=datetime.now(), user=user)
 
                 elif payment.status == 'waiting_for_capture' or payment.status == 'pending':
-                    msg = f"Платеж для пользователя {user.user_id} в статусе {payment.status}. Требуется дополнительная проверка."
+                    msg = f"[CELERY] Платеж для пользователя {user.user_id} в статусе {payment.status}. Требуется дополнительная проверка."
                     Logging.objects.create(log_level="WARNING", message=msg, datetime=datetime.now(), user=user)
 
                 elif payment.status == 'canceled':
@@ -95,7 +133,7 @@ def attempt_recurring_payment():
                     user.payment_method_id = ''
                     user.save()
 
-                    message = f"Платеж отменен для пользователя {user.user_id}. Причина: {reason}. "
+                    message = f"[CELERY] Платеж отменен для пользователя {user.user_id}. Причина: {reason}. "
 
                     if reason == 'insufficient_funds':
                         message += "Недостаточно средств для списания. Пополните баланс."
@@ -160,7 +198,7 @@ def attempt_recurring_payment():
                     Logging.objects.create(log_level="WARNING", message=msg, datetime=datetime.now(), user=user)
 
                 else:
-                    msg = f"Неизвестный статус платежа {payment.status} для пользователя {user.user_id}."
+                    msg = f"[CELERY] Неизвестный статус платежа {payment.status} для пользователя {user.user_id}."
                     user.payment_method_id = ''
                     user.save()
                     Logging.objects.create(log_level="WARNING", message=msg, datetime=datetime.now(), user=user)
@@ -168,5 +206,5 @@ def attempt_recurring_payment():
             except Exception as e:
                 user.payment_method_id = ''
                 user.save()
-                msg = f"Ошибка при списании с пользователя {user.user_id}: {e}"
+                msg = f"[CELERY] Ошибка при списании с пользователя {user.user_id}: {e}"
                 Logging.objects.create(log_level="FATAL", message=msg, datetime=datetime.now(), user=user)

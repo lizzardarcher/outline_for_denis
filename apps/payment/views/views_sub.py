@@ -18,73 +18,93 @@ from bot.models import TelegramUser, Transaction, IncomeInfo, Logging, Prices, T
 
 
 class CreatePaymentView(View):
-    def post(self, request, *args, **kwargs):
-        messages.error(request, 'К сожалению, на данный момент мы не можем оказать услуги в связи с проблемами с платёжной системой. Приём оплаты возобновится примерно 15.09.')
-        return redirect('profile')
     # def post(self, request, *args, **kwargs):
-    #     try:
-    #         subscription = request.POST.get('subscription')
-    #
-    #         prices = Prices.objects.get(pk=1)
-    #         amount = 0
-    #         days = 0
-    #         if float(subscription) == float(prices.price_1):
-    #             amount = float(prices.price_1)
-    #             days = 31
-    #         elif float(subscription) == float(prices.price_2):
-    #             amount = float(prices.price_2)
-    #             days = 93
-    #         elif float(subscription) == float(prices.price_3):
-    #             amount = float(prices.price_3)
-    #             days = 184
-    #         elif float(subscription) == float(prices.price_4):
-    #             amount = float(prices.price_4)
-    #             days = 366
-    #         elif float(subscription) == float(prices.price_5):
-    #             amount = float(prices.price_5)
-    #             days = 3
-    #
-    #         # Настройка ЮKassa
-    #         Configuration.account_id = settings.YOOKASSA_SHOP_ID_SITE
-    #         Configuration.secret_key = settings.YOOKASSA_SECRET_SITE
-    #
-    #         payment = Payment.create({
-    #             "amount": {
-    #                 "value": str(amount),
-    #                 "currency": "RUB"
-    #             },
-    #             "confirmation": {
-    #                 "type": "redirect",
-    #                 "return_url": f'https://domvpn.store/payment/payment-success/?id=&date={datetime.now()}&amount={amount}',
-    #                 "enforce": False
-    #             },
-    #             "capture": True,
-    #             "description": f'Подписка DomVPN на {days} дн.',
-    #             "save_payment_method": True,
-    #             "metadata": {
-    #                 'user_id': request.user.id,
-    #                 'telegram_user_id': request.user.profile.telegram_user.user_id,
-    #             }
-    #         }, )
-    #
-    #         request.session['yookassa_payment_id'] = payment.id
-    #         request.session['yookassa_payment_amount'] = float(amount)
-    #
-    #         Transaction.objects.create(status='pending', paid=False, amount=amount,
-    #                                    user=request.user.profile.telegram_user,
-    #                                    currency='RUB', income_info=IncomeInfo.objects.get(pk=1), side='Приход средств',
-    #                                    description='Приобретение подписки', payment_id=payment.id)
-    #         Logging.objects.create(log_level="INFO", message=f'[WEB] [Платёжный запрос на сумму {str(amount)} р.]',
-    #                                datetime=datetime.now(), user=self.request.user.profile.telegram_user)
-    #
-    #         # Перенаправляем пользователя на страницу ЮKassa
-    #         return redirect(payment.confirmation.confirmation_url)
-    #
-    #     except Exception as e:
-    #         Logging.objects.create(log_level="DANGER",
-    #                                message=f'[WEB] [Ошибка платёжного запроса {str(traceback.format_exc())}]',
-    #                                datetime=datetime.now(), user=self.request.user.profile.telegram_user)
-    #         return redirect('profile')
+    #     messages.error(request, 'К сожалению, на данный момент мы не можем оказать услуги в связи с проблемами с платёжной системой. Приём оплаты возобновится примерно 15.09.')
+    #     return redirect('profile')
+    def post(self, request, *args, **kwargs):
+        try:
+            subscription = request.POST.get('subscription')
+
+            prices = Prices.objects.get(pk=1)
+            amount = 0
+            days = 0
+            if float(subscription) == float(prices.price_1):
+                amount = float(prices.price_1)
+                days = 31
+            elif float(subscription) == float(prices.price_2):
+                amount = float(prices.price_2)
+                days = 93
+            elif float(subscription) == float(prices.price_3):
+                amount = float(prices.price_3)
+                days = 184
+            elif float(subscription) == float(prices.price_4):
+                amount = float(prices.price_4)
+                days = 366
+            elif float(subscription) == float(prices.price_5):
+                amount = float(prices.price_5)
+                days = 3
+
+            # Настройка ЮKassa
+            Configuration.account_id = settings.YOOKASSA_SHOP_ID_SITE
+            Configuration.secret_key = settings.YOOKASSA_SECRET_SITE
+            email = request.user.email if request.user.email else "noemail@noemail.ru"
+            payment = Payment.create({
+                "amount": {
+                    "value": str(amount),
+                    "currency": "RUB"
+                },
+                "confirmation": {
+                    "type": "redirect",
+                    "return_url": f'https://domvpn.store/payment/payment-success/?id=&date={datetime.now()}&amount={amount}',
+                    "enforce": False
+                },
+                "capture": True,
+                "description": f'Подписка DomVPN на {days} дн.',
+                "save_payment_method": True,
+                "metadata": {
+                    'user_id': request.user.id,
+                    'telegram_user_id': request.user.profile.telegram_user.user_id,
+                },
+                "receipt": {
+                    "customer": {
+                        "email": email
+                        # "phone": request.user.profile.phone_number,
+                    },
+                    "items": [
+                        {
+                            "description": f'Подписка DomVPN на {days} дн.',
+                            "quantity": "1.00",
+                            "amount": {
+                                "value": str(amount),
+                                "currency": "RUB"
+                            },
+                            "vat_code": 4,
+                            "payment_subject": "service",
+                            "payment_mode": "full_payment"
+                        }
+                    ]
+                }
+            })
+
+            request.session['yookassa_payment_id'] = payment.id
+            request.session['yookassa_payment_amount'] = float(amount)
+
+            Transaction.objects.create(status='pending', paid=False, amount=amount,
+                                       user=request.user.profile.telegram_user,
+                                       currency='RUB', income_info=IncomeInfo.objects.get(pk=1), side='Приход средств',
+                                       description='Приобретение подписки', payment_id=payment.id)
+            Logging.objects.create(log_level="INFO", message=f'[WEB] [Платёжный запрос на сумму {str(amount)} р.]',
+                                   datetime=datetime.now(), user=self.request.user.profile.telegram_user)
+
+            # Перенаправляем пользователя на страницу ЮKassa
+            return redirect(payment.confirmation.confirmation_url)
+
+        except Exception as e:
+            Logging.objects.create(log_level="DANGER",
+                                   message=f'[WEB] [Ошибка платёжного запроса {str(traceback.format_exc())}]',
+                                   datetime=datetime.now(), user=self.request.user.profile.telegram_user)
+            return redirect('profile')
+
 
 
 class PaymentSuccessView(TemplateView):
