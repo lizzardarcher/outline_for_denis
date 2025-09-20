@@ -109,7 +109,7 @@ class WithdrawalRequestInline(admin.TabularInline):
 
 class TransactionInline(TabularInlinePaginated, admin.TabularInline):
     model = Transaction
-    fields = ('amount', 'currency', 'user', 'side')
+    fields = ('amount', 'currency', 'user', 'side', 'payment_id',)
     ordering = ['-timestamp']
     per_page = 50
 
@@ -341,7 +341,7 @@ class TelegramReferralAdmin(admin.ModelAdmin):
 @admin.register(Transaction)
 class TransactionAdmin(admin.ModelAdmin):
     list_display = ('timestamp', 'amount', 'currency', 'status', 'description', 'paid', 'payment_id', 'user', 'side')
-    list_display_links = ('user',)
+    list_display_links = ('user', 'payment_id',)
     ordering = ['-timestamp']
     search_fields = ('user__username', 'user__first_name', 'user__last_name', 'user__user_id')
     def has_add_permission(self, request):

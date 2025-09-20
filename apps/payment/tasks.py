@@ -34,17 +34,8 @@ def attempt_recurring_payment():
                 currency = 'RUB'
 
                 # Настройка ЮKassa
-                try:
-                    last_log = Logging.objects.filter(user_id=user.user_id).order_by('-datetime').first()
-                    if '[BOT]' in last_log:
-                        Configuration.account_id = settings.YOOKASSA_SHOP_ID_BOT
-                        Configuration.secret_key = settings.YOOKASSA_SECRET_BOT
-                    else:
-                        Configuration.account_id = settings.YOOKASSA_SHOP_ID_SITE
-                        Configuration.secret_key = settings.YOOKASSA_SECRET_SITE
-                except:
-                    Configuration.account_id = settings.YOOKASSA_SHOP_ID_BOT
-                    Configuration.secret_key = settings.YOOKASSA_SECRET_BOT
+                Configuration.account_id = settings.YOOKASSA_SHOP_ID_BOT
+                Configuration.secret_key = settings.YOOKASSA_SECRET_BOT
                 try:
                     email = user.user_profile.user.email if user.user_profile.user.email else "noemail@noemail.ru"
                 except:
@@ -130,8 +121,6 @@ def attempt_recurring_payment():
                 elif payment.status == 'canceled':
                     cancellation_details = payment.cancellation_details
                     reason = cancellation_details.reason if cancellation_details else "Unknown reason"
-                    user.payment_method_id = ''
-                    user.save()
 
                     message = f"[CELERY] Платеж отменен для пользователя {user.user_id}. Причина: {reason}. "
 
@@ -139,39 +128,63 @@ def attempt_recurring_payment():
                         message += "Недостаточно средств для списания. Пополните баланс."
 
                     elif reason == 'payment_method_restricted':
+                        user.payment_method_id = ''
+                        user.save()
                         message += "Операции с платежным средством запрещены (карта заблокирована и т.п.). Обратитесь в банк."
 
                     elif reason == 'permission_revoked':
+                        user.payment_method_id = ''
+                        user.save()
                         message += "Вы отозвали разрешение на подписку. Подтвердите подписку заново."
 
                     elif reason == 'card_expired':
+                        user.payment_method_id = ''
+                        user.save()
                         message += "Истек срок действия карты. Обновите данные карты."
 
                     elif reason == 'country_forbidden':
+                        user.payment_method_id = ''
+                        user.save()
                         message += "Нельзя заплатить банковской картой, выпущенной в этой стране. Используйте другую карту."
 
                     elif reason == 'fraud_suspected':
+                        user.payment_method_id = ''
+                        user.save()
                         message += "Платеж заблокирован из-за подозрения в мошенничестве. Свяжитесь с банком."
 
                     elif reason == 'issuer_unavailable':
+                        user.payment_method_id = ''
+                        user.save()
                         message += "Организация, выпустившая платежное средство, недоступна. Повторите попытку позже."
 
                     elif reason == 'payment_method_limit_exceeded':
+                        user.payment_method_id = ''
+                        user.save()
                         message += "Исчерпан лимит платежей для данного платежного средства или вашего магазина. Повторите попытку позже или используйте другое средство."
 
                     elif reason == 'invalid_card_number':
+                        user.payment_method_id = ''
+                        user.save()
                         message += "Неправильно указан номер карты. Обновите данные карты."
 
                     elif reason == 'invalid_csc':
+                        user.payment_method_id = ''
+                        user.save()
                         message += "Неправильно указан код CVV2 (CVC2, CID). Обновите данные карты."
 
                     elif reason == 'call_issuer':
+                        user.payment_method_id = ''
+                        user.save()
                         message += "Оплата отклонена по неизвестным причинам. Обратитесь в банк."
 
                     elif reason == '3d_secure_failed':
+                        user.payment_method_id = ''
+                        user.save()
                         message += "Не пройдена аутентификация по 3-D Secure. Повторите попытку, используя другое устройство или обратитесь в банк."
 
                     elif reason == 'general_decline':
+                        user.payment_method_id = ''
+                        user.save()
                         message += "Платеж отклонен. Обратитесь в банк."
 
                     elif reason == 'expired_on_capture':
@@ -184,6 +197,8 @@ def attempt_recurring_payment():
                         message += "Закончился срок жизни сделки. Создайте новую сделку и повторите оплату."
 
                     elif reason == 'identification_required':
+                        user.payment_method_id = ''
+                        user.save()
                         message += "Превышены ограничения на платежи для кошелька ЮMoney. Идентифицируйте кошелек или используйте другое средство."
 
                     elif reason == 'internal_timeout':
@@ -204,7 +219,5 @@ def attempt_recurring_payment():
                     Logging.objects.create(log_level="WARNING", message=msg, datetime=datetime.now(), user=user)
 
             except Exception as e:
-                user.payment_method_id = ''
-                user.save()
                 msg = f"[CELERY] Ошибка при списании с пользователя {user.user_id}: {e}"
                 Logging.objects.create(log_level="FATAL", message=msg, datetime=datetime.now(), user=user)
