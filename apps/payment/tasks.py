@@ -220,4 +220,7 @@ def attempt_recurring_payment():
 
             except Exception as e:
                 msg = f"[CELERY] Ошибка при списании с пользователя {user.user_id}: {e}"
+                if "This payment_method_id doesn't exist" in msg:
+                    user.payment_method_id = ''
+                    user.save()
                 Logging.objects.create(log_level="FATAL", message=msg, datetime=datetime.now(), user=user)
