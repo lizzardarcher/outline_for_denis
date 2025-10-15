@@ -53,8 +53,8 @@ def download_app():
     markup.add(InlineKeyboardButton(text=f'💻 MacOS (Outline)', url=f'https://apps.apple.com/ru/app/outline-secure-internet-access/id1356178125'))
     markup.add(InlineKeyboardButton(text=f'💻 Linux (Outline)', url=f'https://s3.amazonaws.com/outline-releases/client/linux/stable/Outline-Client.AppImage'))
 
-    markup.add( InlineKeyboardButton(text=f'📱 iPhone/iPad (Vless)',  url=f'https://apps.apple.com/ru/app/v2raytun/id6476628951'))
-    markup.add(InlineKeyboardButton(text=f'📱 Android (Vless)',       url=f'https://play.google.com/store/apps/details?id=com.v2raytun.android&hl=ru&pli=1'))
+    markup.add( InlineKeyboardButton(text=f'📱 iPhone/iPad (Vless)',  url=f'https://apps.apple.com/ru/app/v2box-v2ray-client/id6446814690'))
+    markup.add(InlineKeyboardButton(text=f'📱 Android (Vless)',       url=f'https://play.google.com/store/apps/details?id=dev.hexasoftware.v2box&hl=ru&pli=1'))
     markup.add(InlineKeyboardButton(text=f'📺 Android TV (Vless)',    url=f'https://play.google.com/store/apps/details?id=com.v2raytun.android&hl=ru&pli=1'))
     markup.add(InlineKeyboardButton(text=f'💻 Windows (Vless)',       url=f'https://github.com/InvisibleManVPN/InvisibleMan-XRayClient/releases'))
     markup.add(InlineKeyboardButton(text=f'💻 MacOS (Vless)',         url=f'https://apps.apple.com/pl/app/v2raytun/id6476628951'))
@@ -67,7 +67,7 @@ def download_app():
 
 def help_markup():
     markup = InlineKeyboardMarkup()
-    markup.add(InlineKeyboardButton(text='Ссылки на скачивание', url='https://telegra.ph/VPN--Ssylki-na-skachivanie-08-04'))
+    markup.add(InlineKeyboardButton(text='Ссылки на скачивание', url='https://telegra.ph/VPN--Ssylki-na-skachivanie-10-15'))
     markup.add(InlineKeyboardButton(text='Условия использования', url='https://telegra.ph/Usloviya-polzovaniya-servisom-VPN-TON-11-20'))
     markup.add(InlineKeyboardButton(text='Инструкция', url='https://telegra.ph/Instrukciya-VPN-11-20'))
     markup.add(InlineKeyboardButton(text='Договор оферты', url='https://domvpn.store/oferta/'))

@@ -1,7 +1,10 @@
+import traceback
+from datetime import timedelta
+
 from bot.main import django_orm
 from bot.models import *
 
-pairs_dict = {}
+# pairs_dict = {}
 
 # logs = Logging.objects.filter(message__icontains='celery')
 # [CELERY] Ошибка при списании с пользователя :
@@ -48,17 +51,27 @@ pairs_dict = {}
 if __name__ == '__main__':
     try:
         counter = 0
-        users = TelegramUser.objects.filter(subscription_status=False)
+        users = TelegramUser.objects.filter(subscription_status=False, permission_revoked=False, subscription_expiration__lt=datetime.now().date() - timedelta(days=3))
 
         for user in users:
             try:
                 if user.payment_method_id:
-                    transaction = Transaction.objects.filter(user=user, payment_id__isnull=False).first()
-                    user.payment_method_id = transaction.payment_id
-                    user.save()
-                    print(f"{counter}. Updated user {user.user_id} old payment_method_id {user.payment_method_id} with payment_method_id {transaction.payment_id}")
-                    counter += 1
+                    transaction_last = Transaction.objects.filter(user=user, status='succeeded', payment_id__isnull=False).last().payment_id
+                    last_celery_log = Logging.objects.filter(user=user, message__icontains='Ошибка при списании с пользователя').last()
+                    try:
+                        last_celery_log_payment_id = last_celery_log.message.split('}')[-1].split(':')[-1]
+                    except:
+                        last_celery_log_payment_id = None
+                    if user.payment_method_id != transaction_last:
+                        # user.payment_method_id = transaction_last
+                        # user.save()
+                        if user.payment_method_id == last_celery_log_payment_id:
+                            a = '✅'
+                        else:
+                            a = '❌'
+                        print(f"[{counter}] [{user.user_id}] [{user.payment_method_id}] --> [{transaction_last}] [LOG] [{a}]")
+                        counter += 1
             except:
-                pass
+                print(traceback.format_exc())
     except KeyboardInterrupt as e:
         pass

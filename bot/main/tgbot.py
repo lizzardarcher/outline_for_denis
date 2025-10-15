@@ -621,6 +621,7 @@ async def callback_query_handlers(call):
                                                message=f'[BOT] [ДЕЙСТВИЕ: ОТМЕНА ПОДПИСКИ ID Платежа: {user.payment_method_id}]',
                                                datetime=datetime.now(), user=user)
                         user.payment_method_id = None
+                        user.permission_revoked = True
                         user.save()
                         await bot.send_message(call.message.chat.id, text=msg.cancel_subscription_success,
                                                reply_markup=markup.start())

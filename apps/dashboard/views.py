@@ -43,6 +43,12 @@ class CancelSubscriptionView(LoginRequiredMixin, TemplateView):
         user.payment_method_id = None
         user.permission_revoked = True
         user.save()
+        Logging.objects.create(
+            log_level=" INFO",
+            message=f'[WEB] [Отмена подписки]',
+            datetime=datetime.now(),
+            user=self.request.user.profile.telegram_user
+        )
         messages.success(request, f'Подписка отменена! Ежемесячная оплата отменена.')
         return redirect('profile')
 
