@@ -16,7 +16,6 @@ def attempt_recurring_payment():
     у которых статус подписки False и есть payment_method_id.
     """
 
-
     users_to_charge = TelegramUser.objects.filter(
         subscription_status=False,
         payment_method_id__isnull=False,
@@ -24,10 +23,12 @@ def attempt_recurring_payment():
         permission_revoked=False
     )
 
-    Logging.objects.create(log_level="INFO", message=f'[CELERY] [TASK] [Периодическая задача] [Попытка списания средств] [количество пользователей: {users_to_charge.count()}]', datetime=datetime.now())
+    Logging.objects.create(log_level="INFO",
+                           message=f'[CELERY] [TASK] [Периодическая задача] [Попытка списания средств] [количество пользователей: {users_to_charge.count()}]',
+                           datetime=datetime.now())
 
     for user in users_to_charge:
-        if user.payment_method_id.__len__() > 10:
+        if user.payment_method_id.__len__() > 10 and '000' in user.payment_method_id:
             try:
                 # Сумма списания
                 amount_to_charge = Decimal(Prices.objects.get(pk=1).price_1)
@@ -36,6 +37,7 @@ def attempt_recurring_payment():
                 # Настройка ЮKassa
                 Configuration.account_id = settings.YOOKASSA_SHOP_ID_BOT
                 Configuration.secret_key = settings.YOOKASSA_SECRET_BOT
+
                 try:
                     email = user.user_profile.user.email if user.user_profile.user.email else "noemail@noemail.ru"
                 except:
@@ -85,7 +87,7 @@ def attempt_recurring_payment():
                                                description='Рекуррентный платеж')
                     msg = (
                         f"[CELERY] Автосписание успешно! Пользователь {user.user_id} оплатил с {str(amount_to_charge)} {currency}. "
-                           f""f"Подписка активирована до {user.subscription_expiration}"
+                        f""f"Подписка активирована до {user.subscription_expiration}"
                     )
 
                     REFERRAL_PERCENTAGES = {
@@ -108,7 +110,8 @@ def attempt_recurring_payment():
                                 continue
                             percent = REFERRAL_PERCENTAGES.get(level)
                             if percent:
-                                income = Decimal(user_to_pay.income) + (Decimal(amount_to_charge) * Decimal(percent) / 100)
+                                income = Decimal(user_to_pay.income) + (
+                                            Decimal(amount_to_charge) * Decimal(percent) / 100)
                                 user_to_pay.income = income
                                 user_to_pay.save()
 
@@ -219,7 +222,7 @@ def attempt_recurring_payment():
                     Logging.objects.create(log_level="WARNING", message=msg, datetime=datetime.now(), user=user)
 
             except Exception as e:
-                msg = f"[CELERY] Ошибка при списании с пользователя {user.user_id}: {e}"
+                msg = f"[CELERY] Ошибка при списании с пользователя {user.user_id}: {e}\nPayment Method ID:{user.payment_method_id}"
                 if "This payment_method_id doesn't exist" in msg:
                     user.payment_method_id = ''
                     user.save()

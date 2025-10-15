@@ -24,10 +24,10 @@ class TelegramUser(models.Model):
 
     top_up_balance_listener = models.BooleanField(default=False, verbose_name='Top up balance listener')
     withdrawal_listener = models.BooleanField(default=False, verbose_name='Withdrawal listener')
-    payment_method_id = models.CharField(max_length=1000, blank=True, null=True, default='', verbose_name='Payment Method ID')
+    payment_method_id = models.CharField(max_length=1000, blank=True, null=True, default='',
+                                         verbose_name='Payment Method ID')
     permission_revoked = models.BooleanField(default=False, verbose_name='Отменил подписку')
     next_payment_date = models.DateField(default=None, blank=True, null=True, verbose_name='Следующее списание')
-
 
     def __str__(self):
         if not self.last_name:
@@ -115,8 +115,10 @@ STATUS = (('pending', 'В ожидании'), ('succeeded', 'Успешно'), (
 
 
 class Transaction(models.Model):
-    income_info = models.ForeignKey('IncomeInfo', on_delete=models.SET_NULL, null=True, blank=True, related_name='Доходы')
-    user = models.ForeignKey(TelegramUser, on_delete=models.SET_NULL, null=True, blank=True, verbose_name='Пользователь')
+    income_info = models.ForeignKey('IncomeInfo', on_delete=models.SET_NULL, null=True, blank=True,
+                                    related_name='Доходы')
+    user = models.ForeignKey(TelegramUser, on_delete=models.SET_NULL, null=True, blank=True,
+                             verbose_name='Пользователь')
     amount = models.DecimalField(max_digits=10, decimal_places=2, verbose_name='Количество')
     currency = models.CharField(max_length=100, blank=True, null=True, verbose_name='Валюта')
     timestamp = models.DateTimeField(auto_now_add=True, verbose_name='Время')
@@ -125,8 +127,8 @@ class Transaction(models.Model):
                                    verbose_name='Описание платежа')
     payment_id = models.CharField(max_length=255, blank=True, null=True, default=None, verbose_name='ID платежа')
     paid = models.BooleanField(null=True, blank=True, default=False, verbose_name='Оплачено')
-    status = models.CharField(max_length=50, choices=STATUS, default='pending', null=True, blank=True, verbose_name='Статус')
-
+    status = models.CharField(max_length=50, choices=STATUS, default='pending', null=True, blank=True,
+                              verbose_name='Статус')
 
     def __str__(self):
         if self.status == 'pending':
@@ -138,7 +140,8 @@ class Transaction(models.Model):
         else:
             status = f"<span class='badge badge-secondary'>{self.status}</span>"
 
-        return mark_safe(f"Платеж на <span class='badge badge-info'>{self.amount}</span>p. {self.timestamp.strftime('%Y-%m-%d %H:%M')} {status} {str(self.user)}")
+        return mark_safe(
+            f"Платеж на <span class='badge badge-info'>{self.amount}</span>p. {self.timestamp.strftime('%Y-%m-%d %H:%M')} {status} {str(self.user)}")
 
     class Meta:
         verbose_name = 'Транзакция'
@@ -220,7 +223,6 @@ class GlobalSettings(models.Model):
     data_limit = models.BigIntegerField(blank=True, null=True, verbose_name='Data Limit GB')
     os_id = models.IntegerField(blank=True, null=True, verbose_name='OS id')
     software_id = models.IntegerField(blank=True, null=True, verbose_name='Software id')
-
 
     def __str__(self):
         return f"НАСТРОЙКИ: Количество VPN серверов: {str(self.server_amount)}"
@@ -374,9 +376,9 @@ class TelegramMessage(models.Model):
     send_to_subscribed = models.BooleanField(default=False, verbose_name='Отправить подписанным')
     send_to_notsubscribed = models.BooleanField(default=False, verbose_name='Отправить не подписанным')
     counter = models.PositiveIntegerField(default=0, verbose_name='Отправлено пользователям')
+
     def __str__(self):
         return f"Сообщение от {self.created_at.strftime('%Y-%m-%d %H:%M:%S')} [{self.status}] [Отправлено: {str(self.counter)} пользователям]"
-
 
     class Meta:
         verbose_name = 'Сообщение Telegram'

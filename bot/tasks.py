@@ -13,6 +13,7 @@ from bot.main.vless.MarzbanAPI import MarzbanAPI
 from bot.models import Logging, Transaction, IncomeInfo, TelegramUser, TelegramBot, VpnKey, TelegramMessage
 from bot.models import Server
 
+
 @shared_task
 def create_log_entry():
     Logging.objects.create(
@@ -20,6 +21,7 @@ def create_log_entry():
         message='CELERY TASKS TESTING'
     )
     return None
+
 
 @shared_task
 def update_generated_keys(*args, **kwargs):
@@ -32,6 +34,7 @@ def update_generated_keys(*args, **kwargs):
         server.keys_generated = server.vpnkey_set.all().count()
         server.save()
     return None
+
 
 @shared_task
 def update_total_income(*args, **kwargs):
@@ -69,11 +72,11 @@ def update_user_subscription_status():
                 pass
 
             Logging.objects.create(log_level='WARNING', message='[BOT] [Закончилась подписка у пользователя]',
-                              datetime=timezone.now(), user=user)
+                                   datetime=timezone.now(), user=user)
         except Exception as e:
             Logging.objects.create(log_level='FATAL',
-                              message=f'[BOT] [Ошибка при автообновлении статуса подписки:\n{traceback.format_exc()}]',
-                              datetime=timezone.now())
+                                   message=f'[BOT] [Ошибка при автообновлении статуса подписки:\n{traceback.format_exc()}]',
+                                   datetime=timezone.now())
 
     vpn_keys = VpnKey.objects.filter(user__subscription_status=False)
     for key in vpn_keys:
@@ -89,6 +92,7 @@ def update_user_subscription_status():
                 key.delete()
             except Exception:
                 pass
+
 
 @shared_task
 def message_sender():
