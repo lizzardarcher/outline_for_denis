@@ -1,0 +1,135 @@
+<!-- transactions/templates/transactions/analytics.html -->
+
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ежедневная Аналитика Транзакций</title>
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Chart.js Plugin Zoom CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background-color: #f4f4f4; color: #333; }
+        h1 { color: #0056b3; }
+        .chart-container {
+            position: relative;
+            margin: 0 auto;
+            height: 400px; /* Fixed height for the chart container */
+            width: 80%;    /* Responsive width for the chart container */
+            max-width: 900px;
+            background-color: #fff;
+            padding: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            border-radius: 8px;
+        }
+        .controls {
+            text-align: center;
+            margin-top: 15px;
+        }
+        .controls button {
+            padding: 8px 15px;
+            font-size: 1rem;
+            cursor: pointer;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            transition: background-color 0.3s ease;
+        }
+        .controls button:hover {
+            background-color: #0056b3;
+        }
+        .no-data { text-align: center; color: #777; margin-top: 20px; font-style: italic; }
+    </style>
+</head>
+<body>
+    <h1>Ежедневная Аналитика Успешных Транзакций</h1>
+
+    <p>
+        Сумма транзакций со статусом: <strong>{{ status_filter }}</strong>, сгруппированная по дате.
+        <br>
+        <i>Используйте колесо мыши для масштабирования (зума) по оси X, перетаскивайте мышью для прокрутки (панорамирования).</i>
+    </p>
+
+    {% if chart_data_json.labels %}
+    <div class="chart-container">
+        <canvas id="dailyAnalyticsChart"></canvas>
+    </div>
+    <div class="controls">
+        <button id="resetZoomBtn">Сбросить зум</button>
+    </div>
+    {% else %}
+        <p class="no-data">Нет успешных транзакций для отображения.</p>
+    {% endif %}
+
+    <script>
+        // Get Chart data from view.py context
+        const chartData = {{ chart_data_json|safe }};
+        // Check if there's data to display before attempting to render the chart
+        if (chartData.labels && chartData.labels.length > 0) {
+            // Register the zoom plugin
+            // This is crucial for the plugin to work with Chart.js 3+
+            Chart.register(ChartZoom);
+
+            const ctx = document.getElementById('dailyAnalyticsChart').getContext('2d');
+
+            const myChart = new Chart(ctx, {
+                type: 'bar',
+                data: chartData,
+                options: {
+                    responsive: true, // Chart will resize with its container
+                    maintainAspectRatio: false, // Allows chart to take specific height/width
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Общая сумма'
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Дата'
+                            }
+                        }
+                    },
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Ежедневная сумма успешных транзакций'
+                        },
+                        zoom: {
+                            zoom: {
+                                wheel: {
+                                    enabled: true, // Enable zooming with mouse wheel
+                                },
+                                pinch: {
+                                    enabled: true // Enable zooming with pinch gestures on touchscreens
+                                },
+                                mode: 'x', // Zoom only horizontally
+                                speed: 100 // Zoom speed
+                            },
+                            pan: {
+                                enabled: true, // Enable panning (dragging to scroll)
+                                mode: 'x', // Pan only horizontally
+                                speed: 100 // Pan speed
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Add event listener for the reset zoom button
+            document.getElementById('resetZoomBtn').addEventListener('click', () => {
+                myChart.resetZoom();
+            });
+
+        }
+    </script>
+
+    <p style="margin-top: 30px;"><a href="/">Вернуться на главную</a></p>
+</body>
+</html>

@@ -2,9 +2,13 @@ from datetime import timedelta, datetime, date
 
 from django.conf import settings
 from django.contrib import messages
+from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.messages.views import SuccessMessageMixin
-from django.shortcuts import get_object_or_404, redirect
+from django.db.models import Sum
+from django.db.models.functions import TruncDate
+from django.http import JsonResponse
+from django.shortcuts import get_object_or_404, redirect, render
 from django.views.generic import TemplateView
 
 from apps.dashboard.outline_vpn.outline_client import delete_user_keys, create_new_key
@@ -148,3 +152,48 @@ class UpdateSubscriptionView(LoginRequiredMixin, TemplateView):
             Logging.objects.create(log_level="DANGER", message=f'[WEB] Ошибка обновления подписки DAYS - [{str(days)}] AMOUNT [{str(amount)}]', datetime=datetime.now(), user=self.request.user.profile.telegram_user)
 
         return redirect('profile')
+
+
+
+@login_required
+def daily_transaction_analytics(request):
+    """
+    Calculates the sum of successful transactions for each day and returns the data
+    in a format suitable for Chart.js.
+    """
+    SUCCESS_STATUS = 'succeeded'
+
+    daily_successful_transactions = Transaction.objects.filter(
+        status=SUCCESS_STATUS
+    ).annotate(
+        date=TruncDate('timestamp')
+    ).values('date').annotate(
+        total_amount=Sum('amount')
+    ).order_by('date')
+
+    labels = [item['date'].strftime('%Y-%m-%d') for item in daily_successful_transactions]
+    data = [float(item['total_amount']) for item in daily_successful_transactions]
+
+    chart_data = {
+        'labels': labels,
+        'datasets': [{
+            'label': 'Сумма успешных транзакций',
+            'data': data,
+            'backgroundColor': 'rgba(54, 162, 235, 0.5)',
+            'borderColor': 'rgba(54, 162, 235, 1)',
+            'borderWidth': 1
+        }]
+    }
+
+    # If it's an AJAX request (e.g., for API endpoints, though not strictly used here for initial render)
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return JsonResponse(chart_data)
+
+    context = {
+        'chart_data_json': chart_data,
+        'status_filter': SUCCESS_STATUS,
+    }
+    if request.user.is_superuser:
+        return render(request, 'dashboard/analytics.html', context)
+    else:
+        return redirect('home')
