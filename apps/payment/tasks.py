@@ -22,6 +22,8 @@ def attempt_recurring_payment():
         payment_method_id__gt='',
         permission_revoked=False
     )
+    # ids = [1299988107,]
+    # users_to_charge = TelegramUser.objects.filter(user_id__in=ids)
 
     Logging.objects.create(log_level="INFO",
                            message=f'[CELERY] [TASK] [Периодическая задача] [Попытка списания средств] [количество пользователей: {users_to_charge.count()}]',
@@ -137,6 +139,7 @@ def attempt_recurring_payment():
 
                     elif reason == 'permission_revoked':
                         user.payment_method_id = ''
+                        user.permission_revoked = True
                         user.save()
                         message += "Вы отозвали разрешение на подписку. Подтвердите подписку заново."
 
@@ -156,12 +159,10 @@ def attempt_recurring_payment():
                         message += "Платеж заблокирован из-за подозрения в мошенничестве. Свяжитесь с банком."
 
                     elif reason == 'issuer_unavailable':
-                        user.payment_method_id = ''
                         user.save()
                         message += "Организация, выпустившая платежное средство, недоступна. Повторите попытку позже."
 
                     elif reason == 'payment_method_limit_exceeded':
-                        user.payment_method_id = ''
                         user.save()
                         message += "Исчерпан лимит платежей для данного платежного средства или вашего магазина. Повторите попытку позже или используйте другое средство."
 

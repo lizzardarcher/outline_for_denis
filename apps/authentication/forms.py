@@ -57,8 +57,7 @@ class UserRegistrationForm(forms.Form):
         tg_user = TelegramUser.objects.create(
             user_id=random.randint(2345678909800, 9923456789000),
             username=username,
-            subscription_status=True,
-            subscription_expiration=datetime.now() + timedelta(days=3),
+            subscription_status=False,
         )
 
         try:

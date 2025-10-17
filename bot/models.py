@@ -110,6 +110,7 @@ SIDE = (
 DESCRIPTION = (
     ('1 MONTH', '1 месяц'), ('3 MONTH', '3 месяца'),
     ('6 MONTH', '6 месяцев'), ('1 YEAR', '1 год'),)
+
 STATUS = (('pending', 'В ожидании'), ('succeeded', 'Успешно'), ('canceled', 'Отменено'), ('failed', 'Ошибка'),
           ('refunded', 'Возврат'), ('captured', 'Захвачено'))
 
@@ -123,7 +124,7 @@ class Transaction(models.Model):
     currency = models.CharField(max_length=100, blank=True, null=True, verbose_name='Валюта')
     timestamp = models.DateTimeField(auto_now_add=True, verbose_name='Время')
     side = models.CharField(max_length=100, blank=True, null=True, choices=SIDE, verbose_name='Направление транзакции')
-    description = models.CharField(max_length=255, choices=DESCRIPTION, blank=True, null=True, default=None,
+    description = models.CharField(max_length=255, blank=True, null=True, default=None,
                                    verbose_name='Описание платежа')
     payment_id = models.CharField(max_length=255, blank=True, null=True, default=None, verbose_name='ID платежа')
     paid = models.BooleanField(null=True, blank=True, default=False, verbose_name='Оплачено')

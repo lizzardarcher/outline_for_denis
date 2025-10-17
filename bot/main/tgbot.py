@@ -1,11 +1,8 @@
 import asyncio
-import logging
 import random
-import sys
 import traceback
 from datetime import datetime, timedelta, date
 
-from django.contrib.messages.api import success
 from yookassa import Configuration, Payment
 
 import django_orm
@@ -17,7 +14,6 @@ from telebot.asyncio_storage import StateMemoryStorage
 from telebot.asyncio_handler_backends import State, StatesGroup
 from telebot.types import InlineKeyboardButton, InlineKeyboardMarkup
 
-from bot.main.vless.MarzbanAPI import MarzbanAPI
 from bot.models import TelegramBot, Prices, TelegramMessage, Logging
 from bot.models import TelegramUser
 from bot.models import TelegramReferral
@@ -32,24 +28,16 @@ from bot.models import Logging as lg
 from bot.main.utils import msg
 from bot.main.utils import markup
 
+from bot.main.vless.MarzbanAPI import MarzbanAPI
+
 from bot.main.utils.utils import return_matches
+
 from bot.main.outline_client import create_new_key
 from bot.main.outline_client import delete_user_keys
 
-logger = logging.getLogger(__name__)
-logging.basicConfig(
-    format='%(asctime)s %(levelname) -8s %(message)s',
-    level=logging.DEBUG,
-    datefmt='%Y.%m.%d %I:%M:%S',
-    handlers=[
-        # TimedRotatingFileHandler(filename=log_path, when='D', interval=1, backupCount=5),
-        logging.StreamHandler(stream=sys.stderr)
-    ],
-)
 
 bot = AsyncTeleBot(token=TelegramBot.objects.all().first().token, state_storage=StateMemoryStorage())
 bot.parse_mode = 'HTML'
-DEBUG = settings.DEBUG
 BOT_USERNAME = settings.BOT_USERNAME
 KEY_LIMIT = settings.KEY_LIMIT
 
@@ -98,7 +86,6 @@ async def send_pending_messages():
 async def update_user_subscription_status():
     while True:
         users = TelegramUser.objects.filter(subscription_expiration__lt=timezone.now(), subscription_status=True)
-        logger.info(f'[Всего просроченных пользователей] [{users.count()}] [Текущее время: {timezone.now()}]')
         for user in users:
             try:
                 user.subscription_status = False
@@ -110,7 +97,6 @@ async def update_user_subscription_status():
                 lg.objects.create(log_level='WARNING', message='[BOT] [Закончилась подписка у пользователя]',
                                   datetime=datetime.now(), user=user)
             except Exception as e:
-                logger.error(f'[Ошибка при автообновлении статуса подписки {user} :\n{traceback.format_exc()}]')
                 lg.objects.create(log_level='FATAL',
                                   message=f'[BOT] [Ошибка при автообновлении статуса подписки:\n{traceback.format_exc()}]',
                                   datetime=datetime.now())
@@ -139,9 +125,6 @@ async def start(message):
     2. Создание реферальной связи до 5 ур.
     """
     if message.chat.type == 'private':
-        print(message.text)
-        logger.info(
-            f'[{message.from_user.first_name} : {message.from_user.username} : {message.from_user.id}] [msg: {message.text}]')
         try:
             TelegramUser.objects.create(user_id=message.from_user.id,
                                         username=message.from_user.username,
@@ -149,7 +132,6 @@ async def start(message):
                                         last_name=message.from_user.last_name,
                                         subscription_status=False,
                                         subscription_expiration=datetime.now() - timedelta(days=1))
-            # await bot.send_message(chat_id=message.chat.id, text=msg.new_user_bonus)
             lg.objects.create(log_level='INFO', message='[BOT] [Создан новый пользователь]', datetime=datetime.now(),
                               user=TelegramUser.objects.get(user_id=message.from_user.id))
             if message.text.split(' ')[-1].isdigit():
@@ -171,15 +153,13 @@ async def start(message):
                                 new_referral = TelegramReferral.objects.create(referrer=current_referrer,
                                                                                referred=referred,
                                                                                level=current_level + 1)
-                                logger.info(f'Создана новая реферальная связь {new_referral}')
                                 lg.objects.create(log_level='INFO',
                                                   message=f'[BOT] [Создана новая реферальная связь {new_referral}]',
                                                   datetime=datetime.now(),
                                                   user=TelegramUser.objects.get(user_id=message.from_user.id))
                         except:
-                            logger.error(f'{traceback.format_exc()}')
+                            ...
                     except:
-                        logger.error(f'{traceback.format_exc()}')
                         lg.objects.create(log_level='FATAL', message=f'[BOT] [ОШИБКА:\n{traceback.format_exc()}]',
                                           datetime=datetime.now(),
                                           user=TelegramUser.objects.get(user_id=message.from_user.id))
@@ -201,7 +181,6 @@ async def got_payment(message):
     """
     Обработка платежа
     """
-    print(message)
     await bot.send_message(chat_id=message.chat.id, text='Success', reply_markup=markup.back())
 
 
@@ -242,7 +221,7 @@ async def get_text(message):
                     await bot.send_message(chat_id=user_id, text=text)
                     count += 1
                 except:
-                    print(traceback.format_exc())
+                    ...
         elif message.content_type == 'photo':
 
             for user_id in user_ids:
@@ -250,7 +229,7 @@ async def get_text(message):
                     await bot.send_photo(chat_id=user_id, photo=message.photo[0].file_id, caption=text)
                     count += 1
                 except:
-                    print(traceback.format_exc())
+                    ...
 
         elif message.content_type == 'video':
 
@@ -259,7 +238,7 @@ async def get_text(message):
                     await bot.send_video(chat_id=user_id, video=message.video[0].file_id, caption=text)
                     count += 1
                 except:
-                    print(traceback.format_exc())
+                    ...
     await bot.send_message(chat_id=message.chat.id,
                            text=f'Рассылка закончена. Сообщение:\n{text}\n отправлено {count} пользователям')
 
@@ -276,8 +255,6 @@ async def handle_referral(message):
     Обработка входящего значения при попытке пополнения баланса
     """
     if message.chat.type == 'private':
-        logger.info(
-            f'[{message.from_user.first_name} : {message.from_user.username} : {message.from_user.id}] [msg: {message.text}]')
         update_sub_status(user=TelegramUser.objects.get(user_id=message.chat.id))
         user = TelegramUser.objects.get(user_id=message.chat.id)
         if user.top_up_balance_listener:
@@ -298,7 +275,6 @@ async def handle_referral(message):
             except:
                 await bot.send_message(chat_id=message.chat.id, text=msg.start_payment_error.format(message.text),
                                        reply_markup=markup.back())
-                logger.error(f'{traceback.format_exc()}')
                 lg.objects.create(log_level='FATAL',
                                   message=f'[BOT] [Ошибка при пополнении баланса:\n{traceback.format_exc()}]',
                                   datetime=datetime.now(), user=user)
@@ -321,8 +297,6 @@ async def callback_query_handlers(call):
     else:
         try:
             data = call.data.split(':')
-            print(
-                f'[{call.message.chat.first_name}:{call.message.chat.username}:{call.message.chat.id}] [data: {call.data}]')
             user = TelegramUser.objects.get(user_id=call.message.chat.id)
             update_sub_status(user=user)
             country_list = [x.name for x in Country.objects.all()]
@@ -347,11 +321,10 @@ async def callback_query_handlers(call):
                 elif 'app_installed' in data:
                     await bot.send_message(chat_id=call.message.chat.id, text=msg.app_installed,
                                            reply_markup=markup.start())
-                    if user.subscription_status and not VpnKey.objects.filter(user=user):
-                        server = random.choice(Server.objects.filter(is_active=True, keys_generated__lte=KEY_LIMIT))
-                        logger.info(f"[app_installed] [SERVER] [{server}]")
-                        key = await create_new_key(server, user)
-                        await bot.send_message(chat_id=user.user_id, text=msg.trial_key.format(key))
+                    # if user.subscription_status and not VpnKey.objects.filter(user=user):
+                    #     server = random.choice(Server.objects.filter(is_active=True, keys_generated__lte=KEY_LIMIT))
+                    #     key = await create_new_key(server, user)
+                    #     await bot.send_message(chat_id=user.user_id, text=msg.trial_key.format(key))
 
                 elif 'manage' in data:
                     await bot.send_message(call.message.chat.id, msg.choose_protocol,
@@ -375,7 +348,6 @@ async def callback_query_handlers(call):
                                                                reply_markup=markup.get_new_key(country, 'outline'))
 
                                 except:
-                                    logger.error(f'[{user}] : {traceback.format_exc()}')
                                     await bot.send_message(call.message.chat.id, text=msg.get_new_key,
                                                            reply_markup=markup.get_new_key(country, 'outline'))
                         else:
@@ -397,7 +369,6 @@ async def callback_query_handlers(call):
                                         await bot.send_message(call.message.chat.id, text=msg.get_new_key,
                                                                reply_markup=markup.get_new_key(country, 'vless'))
                                 except:
-                                    logger.error(f'[{user}] : {traceback.format_exc()}')
                                     await bot.send_message(call.message.chat.id, text=msg.get_new_key,
                                                            reply_markup=markup.get_new_key(country, 'vless'))
                         else:
@@ -418,7 +389,6 @@ async def callback_query_handlers(call):
 
                     if 'get_new_key' in call.data or 'swap_key' in call.data:
                         protocol = call.data.split(':')[1]
-                        print(f"[get_new_key] [PROTOCOL] [{protocol}]")
                         if user.subscription_status:
                             try:
                                 country = call.data.split('_')[-1]
@@ -427,7 +397,6 @@ async def callback_query_handlers(call):
                                     is_activated_vless=True,
                                     country__name=country,
                                     keys_generated__lte=200).order_by('keys_generated').first()
-                                logger.info(f"[get_new_key] [SERVER] [{server}]")
 
                                 VpnKey.objects.filter(user=user).delete()  # Удаляем все предыдущие ключи
                                 wait_msg = await bot.send_message(call.message.chat.id,
@@ -435,7 +404,6 @@ async def callback_query_handlers(call):
                                 MarzbanAPI().delete_user(username=str(user.user_id))
                                 await asyncio.sleep(2)
                                 await bot.delete_message(wait_msg.chat.id, wait_msg.message_id)
-                                print(f"[get_new_key] [Удалили предыдущие ключи] [{user}]")
 
                                 MarzbanAPI().create_user(username=str(user.user_id))  # Генерируем новый ключ
                                 success, result = MarzbanAPI().get_user(username=str(user.user_id))
@@ -445,24 +413,15 @@ async def callback_query_handlers(call):
                                 for link in links:
 
                                     if protocol == 'outline':
-                                        if server.ip_address in link:
-                                            print(
-                                                f"[SERVER IP {server.ip_address, server.country}:{server.ip_address in link}] [ss:// in link {'ss://' in link}] [vless:// not in link {'vless://' not in link}]")
-                                            print(link)
                                         if server.ip_address in link and "ss://" in link and not "vless://" in link:
                                             key = link
                                             break
 
                                     if protocol == 'vless':
-                                        if server.ip_address in link:
-                                            print(
-                                                f"[SERVER IP {server.ip_address, server.country}:{server.ip_address in link}] [ss:// in link {'ss://' in link}]")
-                                            print(link)
                                         if server.ip_address in link and "vless://" in link:
                                             key = link
                                             break
 
-                                print(f"KEY: {key}")
                                 key = VpnKey.objects.create(server=server, user=user, key_id=user.user_id,
                                                             name=str(user.user_id), password=str(user.user_id),
                                                             port=1040, method=protocol, access_url=key,
@@ -472,7 +431,7 @@ async def callback_query_handlers(call):
                                                        text=f'{msg.key_avail}\n<code>{key.access_url}</code>',
                                                        reply_markup=markup.key_menu(country, protocol))
                             except:
-                                logger.error(f'{traceback.format_exc()}')
+                                ...
                         else:
                             await bot.send_message(call.message.chat.id, msg.no_subscription,
                                                    reply_markup=markup.get_subscription())
@@ -579,7 +538,7 @@ async def callback_query_handlers(call):
                                 Transaction.objects.create(status='pending', paid=False, amount=float(price), user=user,
                                                            currency='RUB', income_info=IncomeInfo.objects.get(pk=1),
                                                            side='Приход средств',
-                                                           description='Пополнение баланса пользователя',
+                                                           description='Приобретение подписки',
                                                            payment_id=payment.id)
                                 Logging.objects.create(log_level="INFO",
                                                        message=f'[BOT] [Платёжный запрос на сумму {str(price)} р.]',
@@ -600,7 +559,6 @@ async def callback_query_handlers(call):
                                 await bot.send_message(call.message.chat.id, text=msg.after_payment,
                                                        reply_markup=markup.proceed_to_profile())
                             except Exception as e:
-                                print(f"Ошибка при создании платежа: {traceback.format_exc()}")
                                 await bot.send_message(call.message.chat.id,
                                                        f"Произошла ошибка при оформлении подписки.  Попробуйте позже. {e}")
 
@@ -676,8 +634,6 @@ async def callback_query_handlers(call):
                             await bot.send_message(call.message.chat.id,
                                                    text=msg.withdraw_request.format(str(user.income)),
                                                    reply_markup=markup.proceed_to_profile())
-                            logger.info(
-                                f'[{call.message.chat.first_name} : {call.message.chat.username} : {call.message.chat.id}] [withdrawal request: {user} {user.income}]')
                         else:
                             await bot.send_message(call.message.chat.id,
                                                    text=msg.withdraw_request_not_enough.format(str(user.income)),
@@ -698,7 +654,7 @@ async def callback_query_handlers(call):
                     await bot.send_message(chat_id=call.message.chat.id, text=msg.main_menu_choice,
                                            reply_markup=markup.start())
         except:
-            print(traceback.format_exc())
+            ...
 
 
 if __name__ == '__main__':

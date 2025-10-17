@@ -109,7 +109,7 @@ class WithdrawalRequestInline(admin.TabularInline):
 
 class TransactionInline(TabularInlinePaginated, admin.TabularInline):
     model = Transaction
-    fields = ('amount', 'currency', 'user', 'side', 'payment_id',)
+    fields = ('amount', 'description', 'user','payment_id',)
     ordering = ['-timestamp']
     per_page = 50
 
@@ -219,6 +219,7 @@ class TelegramUserAdmin(admin.ModelAdmin):
     list_display_links = (
         'join_date', 'first_name', 'last_name', 'username', 'subscription_status', 'subscription_expiration', 'balance',
         'income')
+    list_filter = ['join_date', 'subscription_status', 'permission_revoked', 'subscription_expiration']
     search_fields = ('first_name', 'last_name', 'username', 'user_id')
     readonly_fields = ('join_date', 'first_name', 'last_name', 'username', 'user_id',)
     exclude = ('data_limit', 'top_up_balance_listener', 'withdrawal_listener')
@@ -343,7 +344,9 @@ class TransactionAdmin(admin.ModelAdmin):
     list_display = ('timestamp', 'amount', 'currency', 'status', 'description', 'paid', 'payment_id', 'user', 'side')
     list_display_links = ('user', 'payment_id',)
     ordering = ['-timestamp']
-    search_fields = ('user__username', 'user__first_name', 'user__last_name', 'user__user_id')
+    search_fields = ('user__username', 'user__first_name', 'user__last_name', 'user__user_id', 'description', 'payment_id',)
+    list_filter = ['timestamp', 'description']
+
     def has_add_permission(self, request):
         if request.user.username == SUPPORT_ACCOUNT:
             return False
@@ -654,7 +657,7 @@ class LoggingAdmin(admin.ModelAdmin):
     search_fields = ('message', 'user__username',)
     ordering = ['-datetime']
     actions = [make_warning, make_debug, make_fatal, make_trace, make_success, make_info, delete_3_day_logs, delete_all_logs]
-
+    list_filter = ['log_level', 'datetime']
     def has_add_permission(self, request):
         if request.user.username == SUPPORT_ACCOUNT:
             return False
