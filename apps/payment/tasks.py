@@ -26,7 +26,7 @@ def attempt_recurring_payment():
     # users_to_charge = TelegramUser.objects.filter(user_id__in=ids)
 
     Logging.objects.create(log_level="INFO",
-                           message=f'[CELERY] [TASK] [Периодическая задача] [Начало] [количество пользователей: {users_to_charge.count()}]',
+                           message=f'[CELERY] [Списание] [Начало] [количество пользователей: {users_to_charge.count()}]',
                            datetime=datetime.now())
     success = 0
     canceled = 0
@@ -242,6 +242,6 @@ def attempt_recurring_payment():
 
     Logging.objects.create(
         log_level="INFO",
-        message=f"[CELERY] [TASK] [Периодическая задача] [Конец] [успешно: {str(success)} | отменено: {str(canceled)} | ошибка: {str(failed)} | неизвестно: {str(unknown)}]",
+        message=f"[CELERY] [Списание] [Конец] [успешно: {str(success)} | отменено: {str(canceled)} | ошибка: {str(failed)} | неизвестно: {str(unknown)}]",
         datetime=datetime.now()
     )
