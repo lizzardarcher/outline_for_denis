@@ -2,12 +2,13 @@ import os
 
 from django.contrib import admin
 from django.contrib.auth.models import Group, User
+from django.db.models import Q
 from django.utils.html import format_html
 from django.conf import settings
 from django_celery_beat.models import *
 from django_admin_inline_paginator.admin import TabularInlinePaginated
 from django.urls import path, reverse
-from django.shortcuts import render
+from django.shortcuts import render, redirect
 
 from bot.models import *
 
@@ -339,21 +340,14 @@ class TelegramReferralAdmin(admin.ModelAdmin):
         return actions
 
 
+
 @admin.register(Transaction)
 class TransactionAdmin(admin.ModelAdmin):
     list_display = ('timestamp', 'amount', 'currency', 'status', 'description', 'paid', 'payment_id', 'user', 'side')
     list_display_links = ('user', 'payment_id',)
     ordering = ['-timestamp']
     search_fields = ('user__username', 'user__first_name', 'user__last_name', 'user__user_id', 'description', 'payment_id',)
-    list_filter = ['timestamp', 'description']
-
-    # actions = ['export_selected_as_xlsx']
-    #
-    # def export_selected_as_xlsx(self, request, queryset):
-    #     Здесь можно ограничить количество или проверять права
-        # return export_transactions_xlsx(queryset, filename_prefix='transactions_selected')
-    #
-    # export_selected_as_xlsx.short_description = "Выгрузить выбранные в Excel"
+    list_filter = ['timestamp', 'description', 'paid', 'status']
 
     def has_add_permission(self, request):
         if request.user.username == SUPPORT_ACCOUNT:
@@ -624,6 +618,29 @@ def make_warning(modeladmin, request, queryset):
 def make_success(modeladmin, request, queryset):
     queryset.update(log_level="SUCCESS")
 
+class PredefinedTransactionKeywordFilter(admin.SimpleListFilter):
+    title = "Ключевые слова"
+    parameter_name = "keyword"
+
+    KEYWORDS = (
+        ("[CELERY]", "[CELERY]"),
+        ("[BOT]", "[BOT]"),
+        ("[WEB]", "[WEB]"),
+        ("ДЕЙСТВИЕ", "[ДЕЙСТВИЕ]"),
+        ("[Закончилась подписка у пользователя]", "[Закончилась подписка у пользователя]"),
+    )
+
+    def lookups(self, request, model_admin):
+        return self.KEYWORDS
+
+    def queryset(self, request, queryset):
+        value = self.value()
+        if not value:
+            return queryset
+
+        return queryset.filter(
+                Q(message__icontains=value)
+            )
 
 @admin.register(Logging)
 class LoggingAdmin(admin.ModelAdmin):
@@ -665,7 +682,7 @@ class LoggingAdmin(admin.ModelAdmin):
     search_fields = ('message', 'user__username',)
     ordering = ['-datetime']
     actions = [make_warning, make_debug, make_fatal, make_trace, make_success, make_info, delete_3_day_logs, delete_all_logs]
-    list_filter = ['log_level', 'datetime']
+    list_filter = [PredefinedTransactionKeywordFilter, 'log_level', 'datetime']
     def has_add_permission(self, request):
         if request.user.username == SUPPORT_ACCOUNT:
             return False

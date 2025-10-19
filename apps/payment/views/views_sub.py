@@ -378,8 +378,6 @@ class TransactionExcelExportView(LoginRequiredMixin, View):
     AGG_SUCCESS_STATUS = 'succeeded'  # для листа Income_Aggregates фильтр status='succeeded'
 
     def get(self, request, *args, **kwargs):
-        qs = Transaction.objects.select_related('user', 'income_info').order_by('timestamp')
-
         # -----------------------
         # Подготовка агрегатов успешных транзакций (для колонок successful_today/month/year)
         # -----------------------
@@ -462,47 +460,6 @@ class TransactionExcelExportView(LoginRequiredMixin, View):
         # Создаём Excel книгу и листы
         # -----------------------
         wb = Workbook()
-        ws1 = wb.active
-        ws1.title = "Transactions"
-
-        headers = [
-            "user_str",
-            "amount",
-            "timestamp",
-            "description",
-            "payment_id",
-            "status",
-            "successful_today",
-            "successful_month",
-            "successful_year",
-        ]
-        ws1.append(headers)
-
-        # Заполняем лист Transactions
-        for obj in qs:
-            user_id = obj.user_id
-            ts = obj.timestamp
-            day_key = (user_id, ts.date())
-
-            month_start = ts.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-            year_start = ts.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
-
-            successful_today = daily_map.get(day_key, 0)
-            successful_month = monthly_map.get((user_id, month_start.date()), 0)
-            successful_year = yearly_map.get((user_id, year_start.date()), 0)
-
-            row = [
-                str(obj.user) if obj.user else None,
-                str(obj.amount) if obj.amount is not None else None,
-                ts.isoformat(),
-                obj.description,
-                obj.payment_id,
-                obj.status,
-                successful_today,
-                successful_month,
-                successful_year,
-            ]
-            ws1.append(row)
 
         # Создаём второй лист для агрегатов дохода
         ws2 = wb.create_sheet(title="Income_Aggregates")
