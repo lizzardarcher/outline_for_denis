@@ -347,6 +347,14 @@ class TransactionAdmin(admin.ModelAdmin):
     search_fields = ('user__username', 'user__first_name', 'user__last_name', 'user__user_id', 'description', 'payment_id',)
     list_filter = ['timestamp', 'description']
 
+    # actions = ['export_selected_as_xlsx']
+    #
+    # def export_selected_as_xlsx(self, request, queryset):
+    #     Здесь можно ограничить количество или проверять права
+        # return export_transactions_xlsx(queryset, filename_prefix='transactions_selected')
+    #
+    # export_selected_as_xlsx.short_description = "Выгрузить выбранные в Excel"
+
     def has_add_permission(self, request):
         if request.user.username == SUPPORT_ACCOUNT:
             return False

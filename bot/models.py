@@ -133,16 +133,14 @@ class Transaction(models.Model):
 
     def __str__(self):
         if self.status == 'pending':
-            status = f"<span class='badge badge-warning'>{self.status}</span>"
+            return f"⌚ {self.amount} {self.timestamp.strftime('%D-%m-%Y')}"
         elif self.status == 'succeeded':
-            status = f"<span class='badge badge-success'>{self.status}</span>"
+            return f"✅ {self.amount} {self.timestamp.strftime('%D-%m-%Y')}"
         elif self.status == 'canceled' or self.status == 'failed':
-            status = f"<span class='badge badge-danger'>{self.status}</span>"
+            return f"❌ {self.amount} {self.timestamp.strftime('%D-%m-%Y')}"
         else:
-            status = f"<span class='badge badge-secondary'>{self.status}</span>"
+            return f"❔ {self.amount} {self.timestamp.strftime('%D-%m-%Y')}"
 
-        return mark_safe(
-            f"Платеж на <span class='badge badge-info'>{self.amount}</span>p. {self.timestamp.strftime('%Y-%m-%d %H:%M')} {status} {str(self.user)}")
 
     class Meta:
         verbose_name = 'Транзакция'

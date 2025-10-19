@@ -22,12 +22,16 @@ def attempt_recurring_payment():
         payment_method_id__gt='',
         permission_revoked=False
     )
-    # ids = [1299988107,]
+    # ids = [8827810291215,]
     # users_to_charge = TelegramUser.objects.filter(user_id__in=ids)
 
     Logging.objects.create(log_level="INFO",
-                           message=f'[CELERY] [TASK] [Периодическая задача] [Попытка списания средств] [количество пользователей: {users_to_charge.count()}]',
+                           message=f'[CELERY] [TASK] [Периодическая задача] [Начало] [количество пользователей: {users_to_charge.count()}]',
                            datetime=datetime.now())
+    success = 0
+    canceled = 0
+    failed = 0
+    unknown = 0
 
     for user in users_to_charge:
         if user.payment_method_id.__len__() > 10 and '000' in user.payment_method_id:
@@ -77,7 +81,7 @@ def attempt_recurring_payment():
                 })
 
                 if payment.status == 'succeeded':
-
+                    success += 1
                     # Успешный платеж
                     user.subscription_status = True
                     user.subscription_expiration = timezone.now().date() + timedelta(days=31)
@@ -124,6 +128,7 @@ def attempt_recurring_payment():
                     Logging.objects.create(log_level="WARNING", message=msg, datetime=datetime.now(), user=user)
 
                 elif payment.status == 'canceled':
+                    canceled += 1
                     cancellation_details = payment.cancellation_details
                     reason = cancellation_details.reason if cancellation_details else "Unknown reason"
 
@@ -210,6 +215,7 @@ def attempt_recurring_payment():
 
                     elif reason == 'canceled_by_merchant':
                         message += "Платеж отменен. Свяжитесь с поддержкой."
+
                     else:
                         message += f"Неизвестная причина: {reason}"
 
@@ -217,14 +223,25 @@ def attempt_recurring_payment():
                     Logging.objects.create(log_level="WARNING", message=msg, datetime=datetime.now(), user=user)
 
                 else:
+                    unknown += 1
                     msg = f"[CELERY] Неизвестный статус платежа {payment.status} для пользователя {user.user_id}."
                     user.payment_method_id = ''
                     user.save()
                     Logging.objects.create(log_level="WARNING", message=msg, datetime=datetime.now(), user=user)
 
             except Exception as e:
+                failed += 1
                 msg = f"[CELERY] Ошибка при списании с пользователя {user.user_id}: {e}\nPayment Method ID:{user.payment_method_id}"
                 if "This payment_method_id doesn't exist" in msg:
                     user.payment_method_id = ''
                     user.save()
+                elif 'Payment method is not available' in msg:
+                    user.payment_method_id = ''
+                    user.save()
                 Logging.objects.create(log_level="FATAL", message=msg, datetime=datetime.now(), user=user)
+
+    Logging.objects.create(
+        log_level="INFO",
+        message=f"[CELERY] [TASK] [Периодическая задача] [Конец] [успешно: {str(success)} | отменено: {str(canceled)} | ошибка: {str(failed)} | неизвестно: {str(unknown)}]",
+        datetime=datetime.now()
+    )

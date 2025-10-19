@@ -69,35 +69,51 @@ from bot.models import *
 
 
 
-# if __name__ == '__main__':
-#     try:
-#         counter = 0
-#         users = TelegramUser.objects.filter(
-#             subscription_status=False,
-#             permission_revoked=False,
-#             payment_method_id__isnull=True,
-#         )
-#
-#         user_ids_from_telegram_users = [x.user_id for x in users]
-#
-#         all_relevant_payment_logs = Logging.objects.filter(user__user_id__in=user_ids_from_telegram_users, message__icontains='This payment_method is not saved')
-#
-#         log_ids_for_unique_users = all_relevant_payment_logs.values('user__user_id').annotate(min_id=Min('id')).values_list('min_id', flat=True)
-#
-#         payment_logs_deduplicated = Logging.objects.filter(id__in=log_ids_for_unique_users)
-#
-#         for log in payment_logs_deduplicated:
-#             try:
-#                 transaction = Transaction.objects.filter(user=log.user, status='succeeded').last()
-#                 if transaction.description != 'Рекуррентный платеж' and transaction.payment_id and transaction.user.permission_revoked == False and transaction.user.subscription_status == False:
-#                     print(counter, transaction.payment_id)
-#                     # transaction.user.payment_method_id = transaction.payment_id
-#                     # transaction.user.save()
-#                     counter += 1
-#             except:
-#                 pass
-#
-#     except KeyboardInterrupt as e:
-#         pass
-
-vpn_key = VpnKey.objects.filter(access_url='ss://Y2hhY2hhMjAtaWV0Zi1wb2x5MTMwNTpZRjEwZ0V0UGU3RUFuQTJEak9Cb2FI@185.142.33.24:22934/?outline=1#VPN').delete()
+if __name__ == '__main__':
+    # try:
+    #     counter = 0
+    #     users = TelegramUser.objects.filter(
+    #         subscription_status=False,
+    #         permission_revoked=False,
+    #         payment_method_id__isnull=True,
+    #     )
+    #
+    #     user_ids_from_telegram_users = [x.user_id for x in users]
+    #
+    #     all_relevant_payment_logs = Logging.objects.filter(user__user_id__in=user_ids_from_telegram_users, message__icontains='This payment_method is not saved')
+    #
+    #     log_ids_for_unique_users = all_relevant_payment_logs.values('user__user_id').annotate(min_id=Min('id')).values_list('min_id', flat=True)
+    #
+    #     payment_logs_deduplicated = Logging.objects.filter(id__in=log_ids_for_unique_users)
+    #
+    #     for log in payment_logs_deduplicated:
+    #         try:
+    #             transaction = Transaction.objects.filter(user=log.user, status='succeeded').last()
+    #             if transaction.description != 'Рекуррентный платеж' and transaction.payment_id and transaction.user.permission_revoked == False and transaction.user.subscription_status == False:
+    #                 print(counter, transaction.payment_id)
+    #                 # transaction.user.payment_method_id = transaction.payment_id
+    #                 # transaction.user.save()
+    #                 counter += 1
+    #         except:
+    #             pass
+    #
+    # except KeyboardInterrupt as e:
+    #     pass
+    counter = 1
+    logs = Logging.objects.filter(message__icontains="This payment_method_id doesn't exist", user__subscription_status=False, user__permission_revoked=False, )
+    log_user_ids = [log.user.user_id for log in logs]
+    # for log in logs:
+    #     print(counter, log.user.user_id, [t.payment_id for t in Transaction.objects.filter(description='Приобретение подписки', status='succeeded', user=log.user)])
+    #     counter+=1
+    transactions = Transaction.objects.filter(description='Приобретение подписки', status='succeeded', user__subscription_status=False, user__permission_revoked=False,)
+    for transaction in transactions:
+        print(counter, transaction.user.user_id, transaction.payment_id)
+        counter+=1
+    # users = TelegramUser.objects.filter(user_id__in=log_user_ids)
+    # for user in users:
+    #     try:
+    #         user.payment_method_id = Transaction.objects.filter(user=user, description='Приобретение подписки', status='succeeded').last().payment_id
+    #         user.save()
+    #         print(f"Updated user {user.user_id} with payment_method_id {Transaction.objects.filter(user=user, description='Приобретение подписки', status='succeeded').first().payment_id}")
+    #     except:
+    #         pass
