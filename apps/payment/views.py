@@ -111,7 +111,6 @@ class CreatePaymentView(View):
             return redirect('profile')
 
 
-
 class PaymentSuccessView(TemplateView):
     template_name = 'payments/payment_success.html'
 
