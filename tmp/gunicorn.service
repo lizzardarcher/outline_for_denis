@@ -1,0 +1,21 @@
+
+[Unit]
+Description=gunicorn daemon
+Requires=gunicorn.socket
+After=network.target
+
+[Service]
+Type=notify
+NotifyAccess=main
+User=root
+RuntimeDirectory=gunicorn
+WorkingDirectory=/opt/outline
+Environment="PYTHONPATH=/opt/outline"
+ExecStart=/opt/outline/venv/bin/gunicorn --timeout 120 -c gunicorn-cfg.py outline_for_denis.wsgi:application
+ExecReload=/bin/kill -s HUP $MAINPID
+KillMode=mixed
+TimeoutStopSec=5
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

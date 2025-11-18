@@ -1,0 +1,12 @@
+[Unit]
+Description=Таймер для перезапуска Celery Beat каждые 12 часов
+RefuseManualStart=no
+RefuseManualStop=no
+
+[Timer]
+OnCalendar=*-*-* 00,12:00:00
+Persistent=true
+Unit=celery_beat.service
+
+[Install]
+WantedBy=timers.target

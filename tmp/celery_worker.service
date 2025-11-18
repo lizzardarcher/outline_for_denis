@@ -1,0 +1,16 @@
+[Unit]
+Description=Celery Worker
+After=network.target redis.service
+
+[Service]
+User=root
+WorkingDirectory=/opt/outline
+Environment="PYTHONPATH=/opt/outline"
+ExecStart=/opt/outline/venv/bin/celery -A outline_for_denis worker -l info
+Restart=on-failure
+RestartSec=10
+KillMode=mixed
+TimeoutSec=30
+
+[Install]
+WantedBy=multi-user.target
