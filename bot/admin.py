@@ -278,6 +278,8 @@ class TelegramReferralAdmin(admin.ModelAdmin):
 
     raw_id_fields = ('referrer', 'referred')
     inlines = [ReferralTransactionInline]
+    list_filter = ['level']
+
 
     def has_view_permission(self, request, obj=None):
         if request.user.username == SUPPORT_ACCOUNT:
@@ -360,6 +362,8 @@ class WithdrawalRequestAdmin(admin.ModelAdmin):
     def has_delete_permission(self, request, obj=None):
         if request.user.username == SUPPORT_ACCOUNT:
             return False
+        else:
+            return True
 
     def has_change_permission(self, request, obj=None):
         if request.user.username == SUPPORT_ACCOUNT:
@@ -459,11 +463,13 @@ class VpnKey(admin.ModelAdmin):
         if not DEBUG:
             return False
         else:
-            return True
+            return False
 
     def has_delete_permission(self, request, obj=None):
         if request.user.username == SUPPORT_ACCOUNT:
             return False
+        else:
+            return True
 
     def has_change_permission(self, request, obj=None):
         if request.user.username == SUPPORT_ACCOUNT:
