@@ -26,60 +26,6 @@ admin.site.unregister(IntervalSchedule)
 admin.site.unregister(PeriodicTask)
 # admin.site.unregister(PeriodicTasks)
 
-@admin.register(PeriodicTask)
-class PeriodicTaskAdmin(admin.ModelAdmin):
-    list_display = ('name', 'task','interval', 'start_time', 'total_run_count', 'last_run_at', 'enabled')
-    def has_add_permission(self, request):
-        if request.user.username == SUPPORT_ACCOUNT:
-            return False
-        else:
-            return True
-
-    def has_delete_permission(self, request, obj=None):
-        if request.user.username == SUPPORT_ACCOUNT:
-            return False
-        else:
-            return True
-
-    def has_change_permission(self, request, obj=None):
-        if request.user.username == SUPPORT_ACCOUNT:
-            return False
-        else:
-            return True
-
-    def has_view_permission(self, request, obj=None):
-        if request.user.username == SUPPORT_ACCOUNT:
-            return False
-        else:
-            return True
-
-@admin.register(IntervalSchedule)
-class IntervalScheduleAdmin(admin.ModelAdmin):
-    def has_add_permission(self, request):
-        if request.user.username == SUPPORT_ACCOUNT:
-            return False
-        else:
-            return True
-
-    def has_delete_permission(self, request, obj=None):
-        if request.user.username == SUPPORT_ACCOUNT:
-            return False
-        else:
-            return True
-
-    def has_change_permission(self, request, obj=None):
-        if request.user.username == SUPPORT_ACCOUNT:
-            return False
-        else:
-            return True
-
-    def has_view_permission(self, request, obj=None):
-        if request.user.username == SUPPORT_ACCOUNT:
-            return False
-        else:
-            return True
-
-
 class WithdrawalRequestInline(admin.TabularInline):
     model = WithdrawalRequest
 
@@ -110,7 +56,7 @@ class WithdrawalRequestInline(admin.TabularInline):
 
 class TransactionInline(TabularInlinePaginated, admin.TabularInline):
     model = Transaction
-    fields = ('amount', 'description', 'user','payment_id',)
+    fields = ('amount', 'description', 'user', 'payment_id',)
     ordering = ['-timestamp']
     per_page = 50
 
@@ -211,6 +157,20 @@ class LogInline(admin.TabularInline):
     def has_change_permission(self, request, obj=None):
         return False
 
+
+class ReferralTransactionInline(admin.TabularInline):
+    model = ReferralTransaction
+    fields = ('referral', 'amount')
+    ordering = ['-timestamp']
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
 
 @admin.register(TelegramUser)
 class TelegramUserAdmin(admin.ModelAdmin):
@@ -314,6 +274,10 @@ class TelegramReferralAdmin(admin.ModelAdmin):
     list_display = ('referrer', 'referred', 'level')
     search_fields = ('referrer__username', 'referred__username', 'referrer__first_name', 'referred__first_name',
                      'referrer__last_name', 'referred__last_name', 'referrer__user_id', 'referred__user_id')
+    list_select_related = ('referrer', 'referred')
+
+    raw_id_fields = ('referrer', 'referred')
+    inlines = [ReferralTransactionInline]
 
     def has_view_permission(self, request, obj=None):
         if request.user.username == SUPPORT_ACCOUNT:
@@ -325,7 +289,7 @@ class TelegramReferralAdmin(admin.ModelAdmin):
         qs = super().get_queryset(request)
         if request.user.username == SUPPORT_ACCOUNT:
             return qs.none()  # Возвращаем пустой QuerySet
-        return qs
+        return qs.select_related('referrer', 'referred')
 
     def has_add_permission(self, request):
         if not DEBUG:
@@ -550,7 +514,6 @@ class ServerAdmin(admin.ModelAdmin):
 
     list_display = (
         'hosting', 'ip_address', 'user', 'password', 'rental_price', 'max_keys', 'get_key_generated', 'is_active',
-        'is_activated', 'is_activated_vless',
         'country', 'created_at')
     list_display_links = ('hosting',)
     # inlines = [VpnKeyInline]
@@ -851,3 +814,59 @@ class TelegramMessageAdmin(admin.ModelAdmin):
             return True
 
     readonly_fields = ('status', 'counter')
+
+
+@admin.register(PeriodicTask)
+class PeriodicTaskAdmin(admin.ModelAdmin):
+    list_display = ('name', 'task','interval', 'start_time', 'total_run_count', 'last_run_at', 'enabled')
+    def has_add_permission(self, request):
+        if request.user.username == SUPPORT_ACCOUNT:
+            return False
+        else:
+            return True
+
+    def has_delete_permission(self, request, obj=None):
+        if request.user.username == SUPPORT_ACCOUNT:
+            return False
+        else:
+            return True
+
+    def has_change_permission(self, request, obj=None):
+        if request.user.username == SUPPORT_ACCOUNT:
+            return False
+        else:
+            return True
+
+    def has_view_permission(self, request, obj=None):
+        if request.user.username == SUPPORT_ACCOUNT:
+            return False
+        else:
+            return True
+
+@admin.register(IntervalSchedule)
+class IntervalScheduleAdmin(admin.ModelAdmin):
+    def has_add_permission(self, request):
+        if request.user.username == SUPPORT_ACCOUNT:
+            return False
+        else:
+            return True
+
+    def has_delete_permission(self, request, obj=None):
+        if request.user.username == SUPPORT_ACCOUNT:
+            return False
+        else:
+            return True
+
+    def has_change_permission(self, request, obj=None):
+        if request.user.username == SUPPORT_ACCOUNT:
+            return False
+        else:
+            return True
+
+    def has_view_permission(self, request, obj=None):
+        if request.user.username == SUPPORT_ACCOUNT:
+            return False
+        else:
+            return True
+
+

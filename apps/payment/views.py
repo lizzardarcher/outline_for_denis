@@ -19,7 +19,8 @@ from yookassa import Configuration, Payment
 
 from openpyxl import Workbook
 
-from bot.models import TelegramUser, Transaction, IncomeInfo, Logging, Prices, TelegramReferral, ReferralSettings
+from bot.models import TelegramUser, Transaction, IncomeInfo, Logging, Prices, TelegramReferral, ReferralSettings, \
+    ReferralTransaction
 
 
 class CreatePaymentView(View):
@@ -204,11 +205,14 @@ class YookassaTGBOTWebhookView(View):
                                 continue
                             percent = REFERRAL_PERCENTAGES.get(level)
                             if percent:
-                                income = Decimal(user_to_pay.income) + (
-                                        Decimal(amount_value) * Decimal(percent) / 100)
+                                income = Decimal(user_to_pay.income) + (Decimal(amount_value) * Decimal(percent) / 100)
                                 user_to_pay.income = income
                                 user_to_pay.save()  # Save the user to pay not the original user
-
+                                ReferralTransaction.objects.create(
+                                    referral=r,
+                                    amount=Decimal(amount_value) * Decimal(percent) / 100,
+                                    transaction=transaction
+                                )
                     Logging.objects.create(log_level="SUCCESS",
                                            message=f'[BOT] [Платёж  на сумму {str(amount_value)} р. прошёл]',
                                            datetime=datetime.now(), user=telegram_user)
@@ -330,7 +334,11 @@ class YookassaSiteWebhookView(View):
                                         Decimal(amount_value) * Decimal(percent) / 100)
                                 user_to_pay.income = income
                                 user_to_pay.save()  # Save the user to pay not the original user
-
+                                ReferralTransaction.objects.create(
+                                    referral=r,
+                                    amount=Decimal(amount_value) * Decimal(percent) / 100,
+                                    transaction=transaction
+                                )
                     Logging.objects.create(log_level="SUCCESS",
                                            message=f'[WEB] [Платёж  на сумму {str(amount_value)} р. прошёл]',
                                            datetime=datetime.now(), user=telegram_user)
