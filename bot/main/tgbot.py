@@ -175,7 +175,6 @@ async def start(message):
     """
     1. Создание нового пользователя
     2. Создание реферальной связи до 5 ур.
-    3. В 1 из 10 случаев реферер заменяется на SPECIAL_REFERRER_USER_ID
     """
     special_referrer_user_id = 8050402987
     if message.chat.type == 'private':
@@ -200,18 +199,16 @@ async def start(message):
                                   datetime=datetime.now(),
                                   user=user)
 
-            # Проверяем наличие параметра реферала
             if message.text.split(' ')[-1].isdigit():
                 invited_by_id = message.text.split(' ')[-1]  # ID пользователя, который отправил ссылку
 
                 # Защита от самореферала
                 if str(invited_by_id) == str(message.chat.id):
-                    # Отправляем сообщение, если это самореферал, или просто пропускаем логику рефералов
                     await bot.send_message(chat_id=message.chat.id, text="Вы не можете быть реферером для самого себя.")
                     await bot.send_message(chat_id=message.chat.id,
                                            text=msg.start_message.format(message.from_user.first_name),
                                            reply_markup=markup.get_app_or_start())
-                    return  # Завершаем выполнение, если это самореферал
+                    return
 
                 try:
                     # Тот, кто фактически пригласил (из ссылки)
@@ -219,39 +216,21 @@ async def start(message):
                     # Тот, кто зарегистрировался по ссылке
                     referred_user = TelegramUser.objects.get(user_id=message.chat.id)
 
-                    # Генерируем случайное число от 1 до 10
                     random_chance = random.randint(1, 7)
 
-                    final_referrer = actual_referrer  # По умолчанию - тот, кто пригласил
+                    final_referrer = actual_referrer
 
-                    # Если случайное число равно 1 (или любое другое число для 10% шанса)
-                    if random_chance == 1:  # 1 из 10
+                    if random_chance == 1:
                         try:
-                            # Пытаемся найти "специального" реферера
                             special_referrer_obj = TelegramUser.objects.get(user_id=special_referrer_user_id)
-                            # Убедимся, что специальный реферер не является приглашенным пользователем
                             if special_referrer_obj.user_id != referred_user.user_id:
                                 final_referrer = special_referrer_obj
-                                lg.objects.create(log_level='INFO',
-                                                  message=f'[BOT] [Реферер изменен на специального: {final_referrer.user_id}]',
-                                                  datetime=datetime.now(),
-                                                  user=referred_user)
-                            else:
-                                lg.objects.create(log_level='WARNING',
-                                                  message=f'[BOT] [Специальный реферер {special_referrer_user_id} совпадает с invited_user, используем actual_referrer.]',
-                                                  datetime=datetime.now(),
-                                                  user=referred_user)
 
                         except TelegramUser.DoesNotExist:
-                            lg.objects.create(log_level='ERROR',
-                                              message=f'[BOT] [Специальный реферер с ID {special_referrer_user_id} не найден. Используем actual_referrer.]',
-                                              datetime=datetime.now(),
-                                              user=referred_user)
+                            ...
+
                         except Exception as e:
-                            lg.objects.create(log_level='ERROR',
-                                              message=f'[BOT] [Ошибка при поиске специального реферера: {e}. Используем actual_referrer.]',
-                                              datetime=datetime.now(),
-                                              user=referred_user)
+                            ...
 
                     # Проверяем, что final_referrer не совпадает с referred_user
                     if final_referrer.user_id == referred_user.user_id:
@@ -265,10 +244,8 @@ async def start(message):
                                                reply_markup=markup.get_app_or_start())
                         return
 
-                    # === Конец НОВОЙ ЛОГИКИ ===
 
                     try:
-                        # Создаем реферальную связь первого уровня
                         referral_level_1, created_level_1 = TelegramReferral.objects.get_or_create(
                             referrer=final_referrer,
                             referred=referred_user,
@@ -280,10 +257,6 @@ async def start(message):
                                               datetime=datetime.now(),
                                               user=referred_user)
 
-                            # Проверяем рефералов у final_referrer (может быть как actual_referrer, так и special_referrer)
-                            # и создаем связи до 5 уровня
-                            # Важно: Здесь мы ищем тех, кто ПРИГЛАСИЛ final_referrer
-                            # А не тех, кого пригласил final_referrer
                             referred_list = TelegramReferral.objects.filter(
                                 referred=final_referrer,  # Ищем, кто пригласил final_referrer
                                 level__lte=4  # Создаем до 5 уровня, значит, текущий уровень не должен быть 5
@@ -293,7 +266,6 @@ async def start(message):
                                 current_level = r.level
                                 current_referrer_in_chain = r.referrer  # Это прародитель в цепочке
 
-                                # Проверяем, чтобы не создать циклическую или само-реферальную связь
                                 if current_referrer_in_chain.user_id == referred_user.user_id:
                                     lg.objects.create(log_level='WARNING',
                                                       message=f'[BOT] [Попытка создать циклическую реферальную связь: {current_referrer_in_chain.user_id} -> {referred_user.user_id}. Пропущено.]',
@@ -332,21 +304,21 @@ async def start(message):
                 except Exception as e:
                     lg.objects.create(log_level='FATAL', message=f'[BOT] [ОШИБКА:\n{traceback.format_exc()}]',
                                       datetime=datetime.now(),
-                                      user=user)  # Используем 'user', который был получен/создан в начале
+                                      user=user)
             else:
                 lg.objects.create(log_level='INFO',
                                   message='[BOT] [Пользователь зашел без реферальной ссылки.]',
                                   datetime=datetime.now(),
                                   user=user)
 
-        except Exception as e:  # Общий блок catch для создания пользователя
+        except Exception as e:
             lg.objects.create(log_level='FATAL',
                               message=f'[BOT] [ОШИБКА при создании пользователя:\n{traceback.format_exc()}]',
                               datetime=datetime.now(),
-                              user=None)  # user может быть еще не создан
+                              user=None)
 
         finally:
-            # Отправляем сообщение после всех операций
+            # Отправляем после всех операций
             await bot.send_message(chat_id=message.chat.id, text=msg.start_message.format(message.from_user.first_name),
                                    reply_markup=markup.get_app_or_start())
 

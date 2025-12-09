@@ -2,7 +2,7 @@ import os
 
 from django.contrib import admin
 from django.contrib.auth.models import Group, User
-from django.db.models import Q
+from django.db.models import Q, Sum
 from django.utils.html import format_html
 from django.conf import settings
 from django_celery_beat.models import *
@@ -171,6 +171,12 @@ class ReferralTransactionInline(admin.TabularInline):
 
     def has_change_permission(self, request, obj=None):
         return False
+
+@admin.register(ReferralTransaction)
+class ReferralTransactionAdmin(admin.ModelAdmin):
+    list_display = ('referral', 'amount', 'timestamp')
+    list_display_links = ('referral', 'amount')
+
 
 @admin.register(TelegramUser)
 class TelegramUserAdmin(admin.ModelAdmin):
@@ -346,10 +352,71 @@ class TransactionAdmin(admin.ModelAdmin):
         return actions
 
 
+# @admin.register(WithdrawalRequest)
+# class WithdrawalRequestAdmin(admin.ModelAdmin):
+#     list_display = ('user', 'amount', 'status', 'currency', 'timestamp')
+#     list_editable = ['status']
+
 @admin.register(WithdrawalRequest)
 class WithdrawalRequestAdmin(admin.ModelAdmin):
-    list_display = ('user', 'amount', 'status', 'currency', 'timestamp')
-    list_editable = ['status']
+    list_display = ('user', 'amount', 'status', 'currency', 'timestamp', 'display_referral_income_total')
+    list_filter = ('status', 'currency', 'timestamp')
+    search_fields = ('user__username', 'user__first_name', 'user__last_name', 'user__user_id')
+
+    readonly_fields = ('user', 'display_referral_transactions', 'display_referral_income_total')
+
+    fieldsets = (
+        (None, {
+            'fields': ('user', 'amount', 'status', 'currency', 'timestamp')
+        }),
+        ('Реферальные начисления пользователя', {
+            'fields': ('display_referral_income_total', 'display_referral_transactions',)
+        }),
+    )
+
+    def display_referral_transactions(self, obj):
+        if not obj.user:
+            return "Пользователь не найден."
+
+        referral_transactions = ReferralTransaction.objects.filter(
+            Q(referral__referrer=obj.user) | Q(referral__referred=obj.user)
+        ).order_by('-timestamp')
+
+        if not referral_transactions.exists():
+            return format_html(
+                "<p>У этого пользователя нет зарегистрированных реферальных начислений. Начисления регистрируются с 27.11.25</p>")
+
+        html = "<ul style='padding-left: 20px;'>"
+
+        for rt in referral_transactions:
+            html += format_html(
+                f'<li>[ {str(rt.amount)}₽ ] от {rt.referral.referred.get_full_name()} |  {rt.timestamp.strftime("%Y-%m-%d %H:%M")}</li>',
+            )
+        html += "</ul>"
+        return format_html(html)
+
+    def display_referral_income_total(self, obj):
+        if not obj.user:
+            return "Пользователь не найден."
+
+        total_refs = ReferralTransaction.objects.filter(
+            Q(referral__referred=obj.user)
+        ).aggregate(total=Sum('amount'))['total']
+
+        if total_refs:
+            total_income = total_refs or 0.00
+        else:
+            total_income = obj.user.income
+        currency_symbol = "₽"
+
+        return format_html(
+            "<strong>Общий реферальный доход: {} {}</strong>",
+            total_income,
+            currency_symbol
+        )
+
+    display_referral_income_total.short_description = 'Общий реферальный доход'
+    display_referral_transactions.short_description = 'Список начислений'
 
     def has_add_permission(self, request):
         if request.user.username == SUPPORT_ACCOUNT:

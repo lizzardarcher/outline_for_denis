@@ -48,6 +48,14 @@ class TelegramUser(models.Model):
         verbose_name_plural = 'Пользователи ТГ'
         ordering = ['-join_date']
 
+    def get_full_name(self):
+        full_name = ''
+        if self.first_name:
+            full_name += f' {self.first_name} '
+        elif self.last_name:
+            full_name += f' {self.last_name} '
+        return full_name
+
 
 class UserProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
@@ -150,8 +158,6 @@ class Transaction(models.Model):
     class Meta:
         verbose_name = 'Транзакция'
         verbose_name_plural = 'Транзакции'
-
-
 
 
 class VpnKey(models.Model):
