@@ -6,21 +6,25 @@ from django.utils.safestring import mark_safe
 
 
 class TelegramUser(models.Model):
-    join_date = models.DateField(db_index=True,auto_now_add=True, verbose_name='Присоединился')
-    user_id = models.BigIntegerField(db_index=True,unique=True, verbose_name='user_id')
-    username = models.CharField(db_index=True,max_length=255, blank=True, null=True, verbose_name='username')
-    first_name = models.CharField(db_index=True,max_length=255, verbose_name='Имя')
-    last_name = models.CharField(db_index=True,max_length=255, blank=True, null=True, verbose_name='Фамилия')
+    join_date = models.DateField(db_index=True, auto_now_add=True, verbose_name='Присоединился')
+    user_id = models.BigIntegerField(db_index=True, unique=True, verbose_name='user_id')
+    username = models.CharField(db_index=True, max_length=255, blank=True, null=True, verbose_name='username')
+    first_name = models.CharField(db_index=True, max_length=255, verbose_name='Имя')
+    last_name = models.CharField(db_index=True, max_length=255, blank=True, null=True, verbose_name='Фамилия')
     photo_url = models.CharField(max_length=1000, default='', null=True, blank=True, verbose_name='Photo URL')
     is_banned = models.BooleanField(default=False, verbose_name='Забанен')
-    balance = models.DecimalField(max_digits=10, decimal_places=2, default=0.00, verbose_name='Баланс для активации подписок')
-    income = models.DecimalField(max_digits=10, decimal_places=2, default=0.00, verbose_name='Доход от реферальной программы')
+    balance = models.DecimalField(max_digits=10, decimal_places=2, default=0.00,
+                                  verbose_name='Баланс для активации подписок')
+    income = models.DecimalField(max_digits=10, decimal_places=2, default=0.00,
+                                 verbose_name='Доход от реферальной программы')
     subscription_status = models.BooleanField(default=False, verbose_name='Статус подписки')
-    subscription_expiration = models.DateField(default=None, blank=True, null=True, verbose_name='Дата окончания подписки')
+    subscription_expiration = models.DateField(default=None, blank=True, null=True,
+                                               verbose_name='Дата окончания подписки')
     data_limit = models.BigIntegerField(verbose_name='Data Limit', blank=True, null=True, default=0)
     top_up_balance_listener = models.BooleanField(default=False, verbose_name='Top up balance listener')
     withdrawal_listener = models.BooleanField(default=False, verbose_name='Withdrawal listener')
-    payment_method_id = models.CharField(max_length=1000, blank=True, null=True, default='', verbose_name='Payment Method ID')
+    payment_method_id = models.CharField(max_length=1000, blank=True, null=True, default='',
+                                         verbose_name='Payment Method ID')
     permission_revoked = models.BooleanField(default=False, verbose_name='Отменил подписку')
     next_payment_date = models.DateField(default=None, blank=True, null=True, verbose_name='Следующее списание')
 
@@ -71,8 +75,10 @@ class UserProfile(models.Model):
 
 
 class TelegramReferral(models.Model):
-    referrer = models.ForeignKey(TelegramUser,db_index=True,on_delete=models.CASCADE, related_name='given_referrals', verbose_name='Поделился ссылкой')
-    referred = models.ForeignKey(TelegramUser,db_index=True,on_delete=models.CASCADE, related_name='received_referrals', verbose_name='Зарегистрирован по ссылке')
+    referrer = models.ForeignKey(TelegramUser, db_index=True, on_delete=models.CASCADE, related_name='given_referrals',
+                                 verbose_name='Поделился ссылкой')
+    referred = models.ForeignKey(TelegramUser, db_index=True, on_delete=models.CASCADE,
+                                 related_name='received_referrals', verbose_name='Зарегистрирован по ссылке')
     level = models.IntegerField(default=0, verbose_name='Level')
 
     def __str__(self):
@@ -83,11 +89,14 @@ class TelegramReferral(models.Model):
         verbose_name_plural = 'Рефералы'
         unique_together = ('referrer', 'referred')
 
+
 class ReferralTransaction(models.Model):
-    referral = models.ForeignKey(TelegramReferral, db_index=True,on_delete=models.SET_NULL, null=True, blank=True, related_name='referral_connection', verbose_name='Реферальная связь')
-    transaction = models.ForeignKey('Transaction',db_index=True, on_delete=models.SET_NULL, null=True, blank=True, related_name='transaction', verbose_name='Платёж')
+    referral = models.ForeignKey(TelegramReferral, db_index=True, on_delete=models.SET_NULL, null=True, blank=True,
+                                 related_name='referral_connection', verbose_name='Реферальная связь')
+    transaction = models.ForeignKey('Transaction', db_index=True, on_delete=models.SET_NULL, null=True, blank=True,
+                                    related_name='transaction', verbose_name='Платёж')
     amount = models.DecimalField(max_digits=10, decimal_places=2, verbose_name='Количество')
-    timestamp = models.DateTimeField(db_index=True,auto_now_add=True, verbose_name='Время')
+    timestamp = models.DateTimeField(db_index=True, auto_now_add=True, verbose_name='Время')
 
     def __str__(self):
         return f'{str(self.referral.referrer)} от {str(self.referral.referred)} ({str(self.amount)}p.) {self.timestamp.strftime("%D-%m-%Y %H:%M")}'
@@ -95,6 +104,7 @@ class ReferralTransaction(models.Model):
     class Meta:
         verbose_name = 'Реферальное начисление'
         verbose_name_plural = 'Реферальные начисления'
+
 
 class TelegramBot(models.Model):
     username = models.CharField(max_length=255, unique=True, verbose_name='Username')
@@ -154,7 +164,6 @@ class Transaction(models.Model):
         else:
             return f"❔ {self.amount} {self.timestamp.strftime('%D-%m-%Y')}"
 
-
     class Meta:
         verbose_name = 'Транзакция'
         verbose_name_plural = 'Транзакции'
@@ -201,8 +210,10 @@ class Server(models.Model):
     script_out = models.JSONField(blank=True, null=True, verbose_name='Script Out Info JSON')
     country = models.ForeignKey('Country', on_delete=models.CASCADE, null=True, blank=True, verbose_name='Страна')
 
-    is_activated = models.BooleanField(editable=False, default=False, verbose_name='Сервер Активирован для Outline (не трогать)')
-    is_activated_vless = models.BooleanField(editable=False, default=False, verbose_name='Сервер Активирован для VLESS (не трогать)')
+    is_activated = models.BooleanField(editable=False, default=False,
+                                       verbose_name='Сервер Активирован для Outline (не трогать)')
+    is_activated_vless = models.BooleanField(editable=False, default=False,
+                                             verbose_name='Сервер Активирован для VLESS (не трогать)')
 
     def __str__(self):
         return f"{self.hosting} ({self.created_at}) {self.country.name}"
@@ -315,14 +326,9 @@ class WithdrawalRequest(models.Model):
     def save(self, *args, **kwargs):
         if not self.status:
             super(WithdrawalRequest, self).save(*args, **kwargs)
-        else:
-            # При изменении статуса на True, вычитаем средства из дохода всех пользователей
-            # Вычитаем доход из пользователя
-            # Создаём объект транзакции на вывод средств
-            user_balance_total = IncomeInfo.objects.get(pk=1).user_balance_total
-            IncomeInfo.objects.filter(id=1).update(user_balance_total=user_balance_total - self.amount)
-            income = TelegramUser.objects.get(user_id=self.user.user_id).income
-            TelegramUser.objects.filter(user_id=self.user.user_id).update(income=income - self.amount)
+        elif self.status:
+            self.user.income = self.user.income - self.amount
+            self.user.save()
             Transaction.objects.create(user=self.user, income_info=IncomeInfo.objects.get(pk=1),
                                        timestamp=datetime.now(), currency=self.currency, amount=self.amount,
                                        side='Вывод средств')
