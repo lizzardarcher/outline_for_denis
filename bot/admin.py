@@ -1,20 +1,18 @@
 import os
 
 from django.contrib import admin
-from django.contrib.auth.models import Group, User
+from django.contrib.auth.models import Group
 from django.db.models import Q, Sum
 from django.utils.html import format_html
-from django.conf import settings
 from django_celery_beat.models import *
 from django_admin_inline_paginator.admin import TabularInlinePaginated
-from django.urls import path, reverse
-from django.shortcuts import render, redirect
 
 from bot.models import *
 
 DEBUG = settings.DEBUG
 SUPPORT_ACCOUNT = settings.SUPPORT_ACCOUNT
-admin.site.site_header = "DomVPN BOT Админ Панель"
+DEV_ACCOUNT = settings.DEV_ACCOUNT
+admin.site.site_header = "Админ Панель"
 admin.site.site_title = "DomVPN BOT"
 admin.site.index_title = "Добро пожаловать в DomVPN BOT Админ Панель"
 admin.site.unregister(Group)
@@ -24,7 +22,44 @@ admin.site.unregister(SolarSchedule)
 admin.site.unregister(ClockedSchedule)
 admin.site.unregister(IntervalSchedule)
 admin.site.unregister(PeriodicTask)
-# admin.site.unregister(PeriodicTasks)
+
+
+class BaseAdmin(admin.ModelAdmin):
+
+    def has_permission(self, request, obj=None, permissions_to_check=None):
+        """
+        Проверяет права доступа пользователя, учитывая SUPPORT_ACCOUNT и DEBUG.
+        permissions_to_check: список кортежей, где каждый кортеж - (поле_модели, действие_admin)
+        Например: [('add', self.has_add_permission), ('change', self.has_change_permission)]
+        """
+        if request.user.username == SUPPORT_ACCOUNT:
+            return False
+        return True
+
+    def has_add_permission(self, request, obj=None):
+        return self.has_permission(request)
+
+    def has_delete_permission(self, request, obj=None):
+        return self.has_permission(request)
+
+    def has_change_permission(self, request, obj=None):
+        return self.has_permission(request)
+
+    def has_view_permission(self, request, obj=None):
+        return self.has_permission(request)
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        if request.user.username == SUPPORT_ACCOUNT:
+            return qs.none()
+        return qs
+
+    def get_actions(self, request):
+        actions = super().get_actions(request)
+        if 'delete_selected' in actions:
+            del actions['delete_selected']
+        return actions
+
 
 class WithdrawalRequestInline(admin.TabularInline):
     model = WithdrawalRequest
@@ -172,10 +207,20 @@ class ReferralTransactionInline(admin.TabularInline):
     def has_change_permission(self, request, obj=None):
         return False
 
+
 @admin.register(ReferralTransaction)
-class ReferralTransactionAdmin(admin.ModelAdmin):
+class ReferralTransactionAdmin(BaseAdmin):
     list_display = ('referral', 'amount', 'timestamp')
     list_display_links = ('referral', 'amount')
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(TelegramUser)
@@ -272,11 +317,11 @@ class TelegramBotAdmin(admin.ModelAdmin):
         Given a model instance save it to the database.
         """
         obj.save()
-        os.system('systemctl restart outline_for_denis-vpnbot.service')
+        os.system('systemctl restart telegram_bot.service')
 
 
 @admin.register(TelegramReferral)
-class TelegramReferralAdmin(admin.ModelAdmin):
+class TelegramReferralAdmin(BaseAdmin):
     list_display = ('referrer', 'referred', 'level')
     search_fields = ('referrer__username', 'referred__username', 'referrer__first_name', 'referred__first_name',
                      'referrer__last_name', 'referred__last_name', 'referrer__user_id', 'referred__user_id')
@@ -286,79 +331,43 @@ class TelegramReferralAdmin(admin.ModelAdmin):
     inlines = [ReferralTransactionInline]
     list_filter = ['level']
 
-
-    def has_view_permission(self, request, obj=None):
-        if request.user.username == SUPPORT_ACCOUNT:
-            return False
-        else:
-            return True
-
     def get_queryset(self, request):
         qs = super().get_queryset(request)
         if request.user.username == SUPPORT_ACCOUNT:
             return qs.none()  # Возвращаем пустой QuerySet
         return qs.select_related('referrer', 'referred')
 
+    def has_change_permission(self, request, obj=None):
+        return False
+
     def has_add_permission(self, request):
-        if not DEBUG:
-            return False
-        else:
-            return True
+        return False
 
-    def get_actions(self, request):
-        actions = super().get_actions(request)
-        if 'delete_selected' in actions:
-            del actions['delete_selected']
-        return actions
-
+    def has_delete_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(Transaction)
-class TransactionAdmin(admin.ModelAdmin):
+class TransactionAdmin(BaseAdmin):
     list_display = ('timestamp', 'amount', 'currency', 'status', 'description', 'paid', 'payment_id', 'user', 'side')
     list_display_links = ('user', 'payment_id',)
     ordering = ['-timestamp']
-    search_fields = ('user__username', 'user__first_name', 'user__last_name', 'user__user_id', 'description', 'payment_id',)
+    search_fields = ('user__username', 'user__first_name', 'user__last_name', 'user__user_id', 'description',
+                     'payment_id',)
     list_filter = ['timestamp', 'description', 'paid', 'status']
 
+    def has_change_permission(self, request, obj=None):
+        return True
+
     def has_add_permission(self, request):
-        if request.user.username == SUPPORT_ACCOUNT:
-            return False
-        if not DEBUG:
-            return False
-        else:
-            return True
+        return False
 
     def has_delete_permission(self, request, obj=None):
-        if request.user.username == SUPPORT_ACCOUNT:
-            return False
-        if not DEBUG:
-            return False
-        else:
-            return True
+        return False
 
-    def has_change_permission(self, request, obj=None):
-        if request.user.username == SUPPORT_ACCOUNT:
-            return False
-        if not DEBUG:
-            return False
-        else:
-            return True
-
-    def get_actions(self, request):
-        actions = super().get_actions(request)
-        if 'delete_selected' in actions:
-            del actions['delete_selected']
-        return actions
-
-
-# @admin.register(WithdrawalRequest)
-# class WithdrawalRequestAdmin(admin.ModelAdmin):
-#     list_display = ('user', 'amount', 'status', 'currency', 'timestamp')
-#     list_editable = ['status']
 
 @admin.register(WithdrawalRequest)
-class WithdrawalRequestAdmin(admin.ModelAdmin):
+class WithdrawalRequestAdmin(BaseAdmin):
     list_display = ('user', 'amount', 'status', 'currency', 'timestamp', 'display_referral_income_total')
     list_filter = ('status', 'currency', 'timestamp')
     search_fields = ('user__username', 'user__first_name', 'user__last_name', 'user__user_id')
@@ -418,106 +427,37 @@ class WithdrawalRequestAdmin(admin.ModelAdmin):
     display_referral_income_total.short_description = 'Общий реферальный доход'
     display_referral_transactions.short_description = 'Список начислений'
 
-    def has_add_permission(self, request):
-        if request.user.username == SUPPORT_ACCOUNT:
-            return False
-        if not DEBUG:
-            return False
-        else:
-            return True
-
-    def has_delete_permission(self, request, obj=None):
-        if request.user.username == SUPPORT_ACCOUNT:
-            return False
-        else:
-            return True
-
     def has_change_permission(self, request, obj=None):
-        if request.user.username == SUPPORT_ACCOUNT:
-            return False
-        if not DEBUG:
-            return False
-        else:
-            return True
-
-
-@admin.register(ReferralSettings)
-class ReferralSettingAdmin(admin.ModelAdmin):
+        return True
 
     def has_add_permission(self, request):
         return False
 
     def has_delete_permission(self, request, obj=None):
-        if request.user.username == SUPPORT_ACCOUNT:
-            return False
-        if not DEBUG:
-            return False
-        else:
-            return True
+        return False
 
-    def has_change_permission(self, request, obj=None):
-        if request.user.username == SUPPORT_ACCOUNT:
-            return False
-        else:
-            return True
 
-    def get_actions(self, request):
-        actions = super().get_actions(request)
-        if 'delete_selected' in actions:
-            del actions['delete_selected']
-        return actions
+@admin.register(ReferralSettings)
+class ReferralSettingAdmin(BaseAdmin):
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(IncomeInfo)
-class IncomeInfo(admin.ModelAdmin):
-    def has_view_permission(self, request, obj=None):
-        if request.user.username == SUPPORT_ACCOUNT:
-            return False
-        else:
-            return True
-
-    def get_queryset(self, request):
-        qs = super().get_queryset(request)
-        if request.user.username == SUPPORT_ACCOUNT:
-            return qs.none()  # Возвращаем пустой QuerySet
-        return qs
-
-    def get_actions(self, request):
-        actions = super().get_actions(request)
-        if 'delete_selected' in actions:
-            del actions['delete_selected']
-        return actions
-
+class IncomeInfo(BaseAdmin):
     exclude = ('user_balance_total', 'total_amount')
     inlines = [TransactionInline]
 
     def has_add_permission(self, request):
-        if request.user.username == SUPPORT_ACCOUNT:
-            return False
-        if not DEBUG:
-            return False
-        else:
-            return True
-
-    def has_delete_permission(self, request, obj=None):
-        if request.user.username == SUPPORT_ACCOUNT:
-            return False
-        if not DEBUG:
-            return False
-        else:
-            return True
-
-    def has_change_permission(self, request, obj=None):
-        if request.user.username == SUPPORT_ACCOUNT:
-            return False
-        if not DEBUG:
-            return False
-        else:
-            return True
+        return False
 
 
 @admin.register(VpnKey)
-class VpnKey(admin.ModelAdmin):
+class VpnKey(BaseAdmin):
     list_display = ('user', 'server', 'access_url', 'data_limit', 'created_at')
     list_display_links = ('user', 'server', 'access_url', 'data_limit', 'created_at')
     search_fields = ('access_url',)
@@ -525,54 +465,14 @@ class VpnKey(admin.ModelAdmin):
     ordering = ['server']
 
     def has_add_permission(self, request):
-        if request.user.username == SUPPORT_ACCOUNT:
-            return False
-        if not DEBUG:
-            return False
-        else:
-            return False
+        return False
 
     def has_delete_permission(self, request, obj=None):
-        if request.user.username == SUPPORT_ACCOUNT:
-            return False
-        else:
-            return True
-
-    def has_change_permission(self, request, obj=None):
-        if request.user.username == SUPPORT_ACCOUNT:
-            return False
-        if not DEBUG:
-            return False
-        else:
-            return True
+        return False
 
 
 @admin.register(Server)
-class ServerAdmin(admin.ModelAdmin):
-
-    def has_add_permission(self, request, obj=None):
-        if request.user.username == SUPPORT_ACCOUNT:
-            return False
-        else:
-            return True
-
-    def has_delete_permission(self, request, obj=None):
-        if request.user.username == SUPPORT_ACCOUNT:
-            return False
-        else:
-            return True
-
-    def has_change_permission(self, request, obj=None):
-        if request.user.username == SUPPORT_ACCOUNT:
-            return False
-        else:
-            return True
-
-    def get_queryset(self, request):
-        qs = super().get_queryset(request)
-        if request.user.username == SUPPORT_ACCOUNT:
-            return qs.none()  # Возвращаем пустой QuerySet
-        return qs
+class ServerAdmin(BaseAdmin):
 
     def get_key_generated(self, obj):
         if 0 < obj.keys_generated <= 100:
@@ -589,37 +489,11 @@ class ServerAdmin(admin.ModelAdmin):
         'hosting', 'ip_address', 'user', 'password', 'rental_price', 'max_keys', 'get_key_generated', 'is_active',
         'country', 'created_at')
     list_display_links = ('hosting',)
-    # inlines = [VpnKeyInline]
     ordering = ('country', 'ip_address')
 
 
 @admin.register(Country)
-class CountryAdmin(admin.ModelAdmin):
-
-    def has_view_permission(self, request, obj=...):
-        if request.user.username == SUPPORT_ACCOUNT:
-            return False
-        else:
-            return True
-
-    def has_add_permission(self, request, obj=None):
-        if request.user.username == SUPPORT_ACCOUNT:
-            return False
-        else:
-            return True
-
-    def has_delete_permission(self, request, obj=None):
-        if request.user.username == SUPPORT_ACCOUNT:
-            return False
-        else:
-            return True
-
-    def has_change_permission(self, request, obj=None):
-        if request.user.username == SUPPORT_ACCOUNT:
-            return False
-        else:
-            return True
-
+class CountryAdmin(BaseAdmin):
     list_display = ('name_for_app', 'is_active', 'name')
     list_display_links = ('name_for_app', 'name')
     inlines = [ServerInline]
@@ -654,6 +528,7 @@ def make_warning(modeladmin, request, queryset):
 def make_success(modeladmin, request, queryset):
     queryset.update(log_level="SUCCESS")
 
+
 class PredefinedTransactionKeywordFilter(admin.SimpleListFilter):
     title = "Ключевые слова"
     parameter_name = "keyword"
@@ -675,11 +550,12 @@ class PredefinedTransactionKeywordFilter(admin.SimpleListFilter):
             return queryset
 
         return queryset.filter(
-                Q(message__icontains=value)
-            )
+            Q(message__icontains=value)
+        )
+
 
 @admin.register(Logging)
-class LoggingAdmin(admin.ModelAdmin):
+class LoggingAdmin(BaseAdmin):
 
     def delete_3_day_logs(self, request, obj=None):
         """Удалить все логи старше 3 дней"""
@@ -717,67 +593,30 @@ class LoggingAdmin(admin.ModelAdmin):
     list_display_links = ('user', 'message',)
     search_fields = ('message', 'user__username',)
     ordering = ['-datetime']
-    actions = [make_warning, make_debug, make_fatal, make_trace, make_success, make_info, delete_3_day_logs, delete_all_logs]
+    actions = [make_warning, make_debug, make_fatal, make_trace, make_success, make_info, delete_3_day_logs,
+               delete_all_logs]
     list_filter = [PredefinedTransactionKeywordFilter, 'log_level', 'datetime']
-    def has_add_permission(self, request):
-        if request.user.username == SUPPORT_ACCOUNT:
-            return False
-        if not DEBUG:
-            return False
-        else:
-            return True
-
-    def has_delete_permission(self, request, obj=None):
-        if request.user.username == SUPPORT_ACCOUNT:
-            return False
-        if not DEBUG:
-            return False
-        else:
-            return True
 
     def has_change_permission(self, request, obj=None):
-        if request.user.username == SUPPORT_ACCOUNT:
-            return False
-        if not DEBUG:
-            return False
-        else:
-            return True
+        return False
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(User)
-class UserAdmin(admin.ModelAdmin):
+class UserAdmin(BaseAdmin):
+    search_fields = ('username', 'first_name', 'last_name', 'id')
 
-    def has_view_permission(self, request, obj=None):
-        if request.user.username == SUPPORT_ACCOUNT:
-            return False
-        else:
-            return True
-
-    def get_queryset(self, request):
-        qs = super().get_queryset(request)
-        if request.user.username == SUPPORT_ACCOUNT:
-            return qs.none()  # Возвращаем пустой QuerySet
-        return qs
-
-    def has_add_permission(self, request, obj=None):
-        if request.user.username == SUPPORT_ACCOUNT:
-            return False
-        else:
-            return True
+    def has_add_permission(self, request):
+        return False
 
     def has_delete_permission(self, request, obj=None):
-        if request.user.username == SUPPORT_ACCOUNT:
-            return False
-        else:
-            return True
+        return False
 
-    def has_change_permission(self, request, obj=None):
-        if request.user.username == SUPPORT_ACCOUNT:
-            return False
-        else:
-            return True
-
-    search_fields = ('username', 'first_name', 'last_name', 'id')
 
 @admin.register(Prices)
 class PricesAdmin(admin.ModelAdmin):
@@ -788,56 +627,14 @@ class PricesAdmin(admin.ModelAdmin):
     def has_delete_permission(self, request, obj=None):
         return False
 
-    def has_change_permission(self, request, obj=None):
-        if request.user.username == SUPPORT_ACCOUNT:
-            return False
-        else:
-            return True
-
 
 @admin.register(UserProfile)
-class UserProfileAdmin(admin.ModelAdmin):
+class UserProfileAdmin(BaseAdmin):
     list_display = ('user', 'telegram_user', 'referral_link')
     readonly_fields = ('referral_link',)
     search_fields = ('user__username', 'user__first_name', 'user__last_name', 'telegram_user__user_id',
                      'telegram_user__username')  # Search on related fields
     list_filter = ('telegram_user__is_banned', 'telegram_user__subscription_status')  # Filter by telegram user status.
-
-    # def has_view_permission(self, request, obj=None):
-    #     if request.user.username == SUPPORT_ACCOUNT:
-    #         return False
-    #     else:
-    #         return True
-
-    # def get_queryset(self, request):
-    #     qs = super().get_queryset(request)
-    #     if request.user.username == SUPPORT_ACCOUNT:
-    #         return qs.none()  # Возвращаем пустой QuerySet
-    #     return qs
-
-    def has_add_permission(self, request, obj=None):
-        # if request.user.username == SUPPORT_ACCOUNT:
-        #     return False
-        if not DEBUG:
-            return False
-        else:
-            return True
-
-    def has_delete_permission(self, request, obj=None):
-        # if request.user.username == SUPPORT_ACCOUNT:
-        #     return False
-        if not DEBUG:
-            return False
-        else:
-            return True
-
-    def has_change_permission(self, request, obj=None):
-        # if request.user.username == SUPPORT_ACCOUNT:
-        #     return False
-        if not DEBUG:
-            return False
-        else:
-            return True
 
     def referral_link(self, obj):
         """
@@ -852,94 +649,51 @@ class UserProfileAdmin(admin.ModelAdmin):
 
     referral_link.short_description = 'Referral Link'
 
+    def has_change_permission(self, request, obj=None):
+        return False
 
-@admin.register(TelegramMessage)
-class TelegramMessageAdmin(admin.ModelAdmin):
-
-    def has_view_permission(self, request, obj=None):
-        if request.user.username == SUPPORT_ACCOUNT:
-            return False
-        else:
-            return True
-
-    def get_queryset(self, request):
-        qs = super().get_queryset(request)
-        if request.user.username == SUPPORT_ACCOUNT:
-            return qs.none()  # Возвращаем пустой QuerySet
-        return qs
-
-    def has_add_permission(self, request, obj=None):
-        if request.user.username == SUPPORT_ACCOUNT:
-            return False
-        else:
-            return True
+    def has_add_permission(self, request):
+        return False
 
     def has_delete_permission(self, request, obj=None):
-        if request.user.username == SUPPORT_ACCOUNT:
-            return False
-        else:
-            return True
+        return False
+
+
+@admin.register(TelegramMessage)
+class TelegramMessageAdmin(BaseAdmin):
+    readonly_fields = ('status', 'counter')
 
     def has_change_permission(self, request, obj=None):
-        if request.user.username == SUPPORT_ACCOUNT:
-            return False
-        else:
-            return True
+        return False
 
-    readonly_fields = ('status', 'counter')
+    def has_add_permission(self, request):
+        return True
+
+    def has_delete_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(PeriodicTask)
-class PeriodicTaskAdmin(admin.ModelAdmin):
-    list_display = ('name', 'task','interval', 'start_time', 'total_run_count', 'last_run_at', 'enabled')
-    def has_add_permission(self, request):
-        if request.user.username == SUPPORT_ACCOUNT:
-            return False
-        else:
-            return True
+class PeriodicTaskAdmin(BaseAdmin):
+    list_display = ('name', 'task', 'interval', 'start_time', 'total_run_count', 'last_run_at', 'enabled')
 
-    def has_delete_permission(self, request, obj=None):
-        if request.user.username == SUPPORT_ACCOUNT:
-            return False
-        else:
-            return True
+    def has_add_permission(self, request):
+        return True
 
     def has_change_permission(self, request, obj=None):
-        if request.user.username == SUPPORT_ACCOUNT:
-            return False
-        else:
-            return True
+        return True
 
-    def has_view_permission(self, request, obj=None):
-        if request.user.username == SUPPORT_ACCOUNT:
-            return False
-        else:
-            return True
+    def has_delete_permission(self, request, obj=None):
+        return True
+
 
 @admin.register(IntervalSchedule)
-class IntervalScheduleAdmin(admin.ModelAdmin):
+class IntervalScheduleAdmin(BaseAdmin):
     def has_add_permission(self, request):
-        if request.user.username == SUPPORT_ACCOUNT:
-            return False
-        else:
-            return True
-
-    def has_delete_permission(self, request, obj=None):
-        if request.user.username == SUPPORT_ACCOUNT:
-            return False
-        else:
-            return True
+        return True
 
     def has_change_permission(self, request, obj=None):
-        if request.user.username == SUPPORT_ACCOUNT:
-            return False
-        else:
-            return True
+        return True
 
-    def has_view_permission(self, request, obj=None):
-        if request.user.username == SUPPORT_ACCOUNT:
-            return False
-        else:
-            return True
-
-
+    def has_delete_permission(self, request, obj=None):
+        return True

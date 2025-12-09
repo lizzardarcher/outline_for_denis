@@ -46,9 +46,9 @@ EMAIL_USE_TLS = True
 EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER')
 EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD')
 DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
-PASSWORD_RESET_TIMEOUT = 3600               # Токен действует 1 час (в секундах)
-EMAIL_TIMEOUT = 30                          # Таймаут подключения в секундах
-EMAIL_USE_LOCALTIME = True                  # Использовать локальное время в заголовках писем
+PASSWORD_RESET_TIMEOUT = 3600  # Токен действует 1 час (в секундах)
+EMAIL_TIMEOUT = 30  # Таймаут подключения в секундах
+EMAIL_USE_LOCALTIME = True  # Использовать локальное время в заголовках писем
 
 RECAPTCHA_PUBLIC_KEY = os.getenv('RECAPTCHA_PUBLIC_KEY')
 RECAPTCHA_PRIVATE_KEY = os.getenv('RECAPTCHA_PRIVATE_KEY')
@@ -68,6 +68,7 @@ YOOKASSA_SUCCESS_URL = 'https://dom-vpn.ru/dashboard/profile/'
 YOOKASSA_FAIL_URL = 'YOUR_FAIL_URL'
 
 INSTALLED_APPS = [
+    'jazzmin',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -85,6 +86,114 @@ INSTALLED_APPS = [
     'bot',
 ]
 
+
+JAZZMIN_SETTINGS = {
+    "site_header": "DOMVPNAdmin",
+    "site_logo": "images/vpn.png",
+    "login_logo": "images/vpn.png",
+    "login_logo_dark": "images/vpn.png",
+    "site_logo_classes": "img-circle",
+    "site_icon": None,
+    "welcome_sign": "Welcome to the DOMVPNAdmin",
+    "copyright": "DOMVPNAdmin",
+
+    "search_model": ["bot.TelegramUser"],
+
+    "topmenu_links": [
+
+        {"model": "bot.Server"},
+        {"model": "bot.TelegramMessage"},
+        {"model": "bot.Logging"},
+
+    ],
+
+    "show_sidebar": True,
+
+    "navigation_expanded": True,
+
+    "hide_apps": [],
+
+    "hide_models": ["bot.UserProfile"],
+
+    "icons": {
+        "auth": "fas fa-users-cog",
+        "auth.user": "fas fa-user",
+        "bot.Logging": "fa-regular fa-font-awesome",
+
+        "bot.TelegramBot": "fa-solid fa-robot",
+        "bot.TelegramMessage": "fa-solid fa-paper-plane",
+        "bot.TelegramUser": "fa-solid fa-user",
+        "bot.Server": "fa-solid fa-server",
+        "bot.VpnKey": "fa-solid fa-key",
+        "bot.Country": "fa-solid fa-globe",
+
+        "bot.ReferralSettings": "fa-solid fa-gears",
+        "bot.TelegramReferral": "fa-solid fa-people-arrows",
+        "bot.ReferralTransaction": "fa-solid fa-genderless",
+
+        "bot.Transaction": "fa-solid fa-money-check-dollar",
+        "bot.IncomeInfo": "fa-solid fa-coins",
+        "bot.Prices": "fa-solid fa-tag",
+        "bot.WithdrawalRequest": "fa-solid fa-bell",
+    },
+    "default_icon_parents": "fas fa-chevron-circle-right",
+    "default_icon_children": "fas fa-circle",
+
+    "related_modal_active": False,
+
+
+    "custom_css": None,
+    "custom_js": None,
+    "use_google_fonts_cdn": True,
+    "show_ui_builder": True,
+
+    ###############
+    # Change view #
+    ###############
+    # Render out the change view as a single form, or in tabs, current options are
+    # - single
+    # - horizontal_tabs (default)
+    # - vertical_tabs
+    # - collapsible
+    # - carousel
+    "changeform_format": "horizontal_tabs",
+    # override change forms on a per modeladmin basis
+    "changeform_format_overrides": {"auth.user": "collapsible", "auth.group": "vertical_tabs"},
+    # Add a language dropdown into the admin
+    # "language_chooser": True,
+}
+
+JAZZMIN_UI_TWEAKS = {
+    "navbar_small_text": False,
+    "footer_small_text": False,
+    "body_small_text": False,
+    "brand_small_text": False,
+    "brand_colour": False,
+    "accent": "accent-primary",
+    "navbar": "navbar-primary navbar-dark",
+    "no_navbar_border": False,
+    "navbar_fixed": False,
+    "layout_boxed": False,
+    "footer_fixed": False,
+    "sidebar_fixed": False,
+    "sidebar": "sidebar-dark-primary",
+    "sidebar_nav_small_text": False,
+    "sidebar_disable_expand": False,
+    "sidebar_nav_child_indent": False,
+    "sidebar_nav_compact_style": False,
+    "sidebar_nav_legacy_style": False,
+    "sidebar_nav_flat_style": True,
+    "theme": "cyborg",
+    "dark_mode_theme": "darkly",
+    "button_classes": {
+        "primary": "btn-primary",
+        "secondary": "btn-secondary",
+        "info": "btn-info",
+        "warning": "btn-warning",
+        "danger": "btn-danger",
+        "success": "btn-success"
+    }
+}
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -124,23 +233,23 @@ DATABASES = {
     }
 }
 
-CELERY_BROKER_URL = 'redis://localhost:6379/0'       # URL Redis брокера
-CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'   # URL для хранения результатов задач Celery
-CELERY_ACCEPT_CONTENT = ['application/json']         # Формат принимаемых сообщений
-CELERY_TASK_SERIALIZER = 'json'                      # Сериализация задач
-CELERY_RESULT_SERIALIZER = 'json'                    # Сериализация результатов
-CELERY_TIMEZONE = 'UTC'                              # Часовой пояс
-CELERY_TASK_TRACK_STARTED = True                     # Отслеживание состояния задач
-CELERY_TASK_TIME_LIMIT = 30 * 60                     # Ограничение времени выполнения задачи (в секундах, 30 минут)
+CELERY_BROKER_URL = 'redis://localhost:6379/0'  # URL Redis брокера
+CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'  # URL для хранения результатов задач Celery
+CELERY_ACCEPT_CONTENT = ['application/json']  # Формат принимаемых сообщений
+CELERY_TASK_SERIALIZER = 'json'  # Сериализация задач
+CELERY_RESULT_SERIALIZER = 'json'  # Сериализация результатов
+CELERY_TIMEZONE = 'UTC'  # Часовой пояс
+CELERY_TASK_TRACK_STARTED = True  # Отслеживание состояния задач
+CELERY_TASK_TIME_LIMIT = 30 * 60  # Ограничение времени выполнения задачи (в секундах, 30 минут)
 
-CELERY_ACKS_LATE = True                              # Подтверждение получения задачи после ее выполнения
-CELERY_PREFETCH_MULTIPLIER = 1                       # Количество задач, получаемых воркером за раз
-CELERYD_CONCURRENCY = 4                              # Количество процессов воркера
+CELERY_ACKS_LATE = True  # Подтверждение получения задачи после ее выполнения
+CELERY_PREFETCH_MULTIPLIER = 1  # Количество задач, получаемых воркером за раз
+CELERYD_CONCURRENCY = 4  # Количество процессов воркера
 
 CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers:DatabaseScheduler'
-CELERY_BEAT_MAX_LOOP_INTERVAL = 5                    # Проверять каждые 5 секунд
+CELERY_BEAT_MAX_LOOP_INTERVAL = 5  # Проверять каждые 5 секунд
 
-CELERY_TASK_ALWAYS_EAGER = True                      ### только для отладки
+CELERY_TASK_ALWAYS_EAGER = True  ### только для отладки
 
 CELERY_IMPORTS = [
     'bot.tasks',
@@ -205,5 +314,6 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 KEY_LIMIT = 200
 BOT_USERNAME = 'xDomvpn_Bot'
 SUPPORT_ACCOUNT = 'Domvpnsupport'
+DEV_ACCOUNT = 'megafoll'
 
 # LOGIN_URL= '/auth/accounts/login/'

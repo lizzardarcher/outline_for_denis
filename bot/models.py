@@ -201,8 +201,8 @@ class Server(models.Model):
     script_out = models.JSONField(blank=True, null=True, verbose_name='Script Out Info JSON')
     country = models.ForeignKey('Country', on_delete=models.CASCADE, null=True, blank=True, verbose_name='Страна')
 
-    is_activated = models.BooleanField(default=False, verbose_name='Сервер Активирован для Outline (не трогать)')
-    is_activated_vless = models.BooleanField(default=False, verbose_name='Сервер Активирован для VLESS (не трогать)')
+    is_activated = models.BooleanField(editable=False, default=False, verbose_name='Сервер Активирован для Outline (не трогать)')
+    is_activated_vless = models.BooleanField(editable=False, default=False, verbose_name='Сервер Активирован для VLESS (не трогать)')
 
     def __str__(self):
         return f"{self.hosting} ({self.created_at}) {self.country.name}"
