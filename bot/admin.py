@@ -343,8 +343,8 @@ class TelegramReferralAdmin(BaseAdmin):
     def has_add_permission(self, request):
         return False
 
-    def has_delete_permission(self, request, obj=None):
-        return False
+    # def has_delete_permission(self, request, obj=None):
+    #     return True
 
 
 @admin.register(Transaction)
@@ -434,7 +434,7 @@ class WithdrawalRequestAdmin(BaseAdmin):
         return False
 
     def has_delete_permission(self, request, obj=None):
-        return False
+        return True
 
 
 @admin.register(ReferralSettings)
@@ -448,8 +448,8 @@ class ReferralSettingAdmin(BaseAdmin):
 
 
 @admin.register(IncomeInfo)
-class IncomeInfo(BaseAdmin):
-    exclude = ('user_balance_total', 'total_amount')
+class IncomeInfoAdmin(BaseAdmin):
+    exclude = ('user_balance_total',)
     inlines = [TransactionInline]
 
     def has_add_permission(self, request):

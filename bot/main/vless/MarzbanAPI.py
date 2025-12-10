@@ -129,7 +129,7 @@ class MarzbanAPI:
             "data_limit": data_limit,
             "expire": expire,
             "inbounds": {
-                "vless": ["VLESS TCP REALITY"],
+                "vless": ["VLESS XHTTP REALITY"],
                 "shadowsocks": ["Shadowsocks TCP"]
             },
             "proxies": proxies or {
