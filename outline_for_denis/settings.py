@@ -135,7 +135,7 @@ JAZZMIN_SETTINGS = {
     "custom_css": None,
     "custom_js": None,
     "use_google_fonts_cdn": True,
-    # "show_ui_builder": True,
+    "show_ui_builder": True,
 
     # Render out the change view as a single form, or in tabs, current options are
     # - single
@@ -156,7 +156,8 @@ JAZZMIN_UI_TWEAKS = {
     "body_small_text": False,
     "brand_small_text": False,
     "brand_colour": False,
-    "accent": "accent-primary",
+    # "accent": "accent-primary",
+    "accent": "accent-light",
     "navbar": "navbar-primary navbar-dark",
     "no_navbar_border": False,
     "navbar_fixed": False,

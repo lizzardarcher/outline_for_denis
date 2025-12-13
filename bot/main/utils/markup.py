@@ -3,7 +3,7 @@ from telebot.types import InlineKeyboardButton
 from telebot.types import LabeledPrice
 from telebot.types import ShippingOption
 import django_orm
-from bot.models import Prices, Country, TelegramUser
+from bot.models import Prices, Country, TelegramUser, Server
 
 # from bot.models import *
 
@@ -91,7 +91,9 @@ def for_sender():
 
 def get_avail_location(protocol: str):
     markup = InlineKeyboardMarkup()
-    countries = Country.objects.filter(is_active=True)
+    # countries = Country.objects.filter(is_active=True)
+    servers = Server.objects.filter(is_active=True)
+    countries = set([x.country for x in servers])
     for country in countries:
         markup.add(InlineKeyboardButton(text=country.name_for_app, callback_data=f'country:{protocol}:{country.name}'))
     markup.add(btn_back)

@@ -63,6 +63,7 @@ class BaseAdmin(admin.ModelAdmin):
 
 class WithdrawalRequestInline(admin.TabularInline):
     model = WithdrawalRequest
+    show_change_link = True
 
     def has_add_permission(self, request, obj=None):
         if request.user.username == SUPPORT_ACCOUNT:
@@ -124,6 +125,9 @@ class TransactionInline(TabularInlinePaginated, admin.TabularInline):
 class VpnKeyInline(admin.TabularInline):
     model = VpnKey
     list_display_links = ('key_id', 'access_url')
+    show_change_link = True
+    fields = ('created_at', 'server', 'method', 'access_url', )
+    readonly_fields = ('created_at', 'server', 'method', 'access_url',)
 
     def has_add_permission(self, request, obj=None):
         if request.user.username == SUPPORT_ACCOUNT:
@@ -231,12 +235,15 @@ class TelegramUserAdmin(admin.ModelAdmin):
     list_display = (
         'join_date', 'first_name', 'last_name', 'username', 'subscription_status',
         'subscription_expiration', 'balance', 'referral_link', 'get_payment_method_id', 'permission_revoked', 'income')
-    list_display_links = (
-        'join_date', 'first_name', 'last_name', 'username', 'subscription_status', 'subscription_expiration', 'balance',
-        'income')
+    list_display_links = ('first_name', 'last_name', 'username')
     list_filter = ['join_date', 'subscription_status', 'permission_revoked', 'subscription_expiration']
     search_fields = ('first_name', 'last_name', 'username', 'user_id')
-    readonly_fields = ('join_date', 'first_name', 'last_name', 'username', 'user_id',)
+    fieldsets = ([
+        ('Основная информация', {'fields': ['join_date','first_name','last_name','username','user_id','photo_url', ],}),
+        ('Подписка', {'fields': ['is_banned','subscription_expiration','subscription_status','payment_method_id','permission_revoked',],}),
+        ('Реферальная программа', {'fields':['income']})
+    ])
+    readonly_fields = ('join_date', 'first_name', 'last_name', 'username', 'user_id', 'balance', 'income')
     exclude = ('data_limit', 'top_up_balance_listener', 'withdrawal_listener')
     ordering = ('-subscription_status', '-join_date',)
     empty_value_display = '---'
@@ -462,8 +469,10 @@ class IncomeInfoAdmin(BaseAdmin):
 
 @admin.register(VpnKey)
 class VpnKey(BaseAdmin):
-    list_display = ('user', 'server', 'access_url', 'data_limit', 'created_at')
-    list_display_links = ('user', 'server', 'access_url', 'data_limit', 'created_at')
+    list_display = ('user', 'server', 'access_url', 'created_at')
+    list_display_links = ('user', 'server', 'access_url', 'created_at')
+    fields = ('user', 'server', 'access_url', 'created_at')
+    readonly_fields = ('user', 'server', 'access_url', 'created_at')
     search_fields = ('access_url',)
     list_filter = ('server',)
     ordering = ['server']
@@ -493,6 +502,8 @@ class ServerAdmin(BaseAdmin):
         'hosting', 'ip_address', 'user', 'password', 'rental_price', 'max_keys', 'get_key_generated', 'is_active',
         'country', 'created_at')
     list_display_links = ('hosting',)
+    fields = ( 'hosting', 'ip_address', 'user', 'password', 'rental_price', 'max_keys', 'is_active', 'country', 'created_at')
+    readonly_fields = ('max_keys', 'created_at',)
     ordering = ('country', 'ip_address')
 
 

@@ -25,7 +25,7 @@ class TelegramUser(models.Model):
     withdrawal_listener = models.BooleanField(default=False, verbose_name='Withdrawal listener')
     payment_method_id = models.CharField(max_length=1000, blank=True, null=True, default='',
                                          verbose_name='Payment Method ID')
-    permission_revoked = models.BooleanField(default=False, verbose_name='Отменил подписку')
+    permission_revoked = models.BooleanField(default=False, verbose_name='Самостоятельно отменил автоплатёж')
     next_payment_date = models.DateField(default=None, blank=True, null=True, verbose_name='Следующее списание')
 
     def __str__(self):
