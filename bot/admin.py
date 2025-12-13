@@ -91,7 +91,8 @@ class WithdrawalRequestInline(admin.TabularInline):
 
 class TransactionInline(TabularInlinePaginated, admin.TabularInline):
     model = Transaction
-    fields = ('amount', 'description', 'user', 'payment_id',)
+    fields = ('timestamp', 'amount', 'description', 'user', 'payment_id',)
+    readonly_fields = ('timestamp', 'amount', 'description', 'user', 'payment_id',)
     ordering = ['-timestamp']
     per_page = 50
 
@@ -180,7 +181,8 @@ class ServerInline(admin.TabularInline):
 
 class LogInline(admin.TabularInline):
     model = Logging
-    fields = ('user', 'message')
+    fields = ('datetime','log_level', 'message')
+    readonly_fields = ('datetime','log_level', 'message')
     ordering = ['-datetime']
 
     def has_add_permission(self, request, obj=None):
@@ -195,7 +197,8 @@ class LogInline(admin.TabularInline):
 
 class ReferralTransactionInline(admin.TabularInline):
     model = ReferralTransaction
-    fields = ('referral', 'amount')
+    fields = ('timestamp','referral', 'amount')
+    readonly_fields = ('timestamp','referral', 'amount')
     ordering = ['-timestamp']
 
     def has_add_permission(self, request, obj=None):
@@ -350,14 +353,14 @@ class TelegramReferralAdmin(BaseAdmin):
 @admin.register(Transaction)
 class TransactionAdmin(BaseAdmin):
     list_display = ('timestamp', 'amount', 'currency', 'status', 'description', 'paid', 'payment_id', 'user', 'side')
+    readonly_fields = ('income_info', 'timestamp', 'amount', 'currency', 'status', 'description', 'paid', 'payment_id', 'user', 'side')
     list_display_links = ('user', 'payment_id',)
     ordering = ['-timestamp']
-    search_fields = ('user__username', 'user__first_name', 'user__last_name', 'user__user_id', 'description',
-                     'payment_id',)
+    search_fields = ('user__username', 'user__first_name', 'user__last_name', 'user__user_id', 'description', 'payment_id',)
     list_filter = ['timestamp', 'description', 'paid', 'status']
 
     def has_change_permission(self, request, obj=None):
-        return True
+        return False
 
     def has_add_permission(self, request):
         return False
@@ -388,7 +391,7 @@ class WithdrawalRequestAdmin(BaseAdmin):
             return "Пользователь не найден."
 
         referral_transactions = ReferralTransaction.objects.filter(
-            Q(referral__referrer=obj.user) | Q(referral__referred=obj.user)
+            Q(referral__referrer=obj.user)
         ).order_by('-timestamp')
 
         if not referral_transactions.exists():

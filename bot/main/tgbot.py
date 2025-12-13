@@ -34,7 +34,7 @@ from bot.main.utils.utils import return_matches
 
 from bot.main.outline_client import create_new_key
 from bot.main.outline_client import delete_user_keys
-
+from outline_for_denis.settings import SUPPORT_ACCOUNT
 
 bot = AsyncTeleBot(token=TelegramBot.objects.all().first().token, state_storage=StateMemoryStorage())
 bot.parse_mode = 'HTML'
@@ -786,6 +786,11 @@ async def callback_query_handlers(call):
                             await bot.send_message(call.message.chat.id,
                                                    text=msg.withdraw_request.format(str(user.income)),
                                                    reply_markup=markup.proceed_to_profile())
+                            try:
+                                await bot.send_message(TelegramUser.objects.filter(username=SUPPORT_ACCOUNT).first().user_id,
+                                                       text=f'Запрос на вывод средств от пользователя {user.get_full_name()} на сумму {str(user.income)}',)
+                            except:
+                                pass
                         else:
                             await bot.send_message(call.message.chat.id,
                                                    text=msg.withdraw_request_not_enough.format(str(user.income)),
