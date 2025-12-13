@@ -79,10 +79,10 @@ INSTALLED_APPS = [
 
 JAZZMIN_SETTINGS = {
     "site_header": "DOMVPNAdmin",
-    "site_logo": "images/vpn.png",
-    "login_logo": "images/vpn.png",
-    "login_logo_dark": "images/vpn.png",
-    "site_logo_classes": "img-circle",
+    "site_logo": "img/favicon.png",
+    "login_logo": "img/favicon.png",
+    "login_logo_dark": "img/favicon.png",
+    "site_logo_classes": "img-square",
     "site_icon": None,
     "welcome_sign": "Welcome to the DOMVPNAdmin",
     "copyright": "DOMVPNAdmin",
