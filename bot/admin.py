@@ -402,9 +402,10 @@ class WithdrawalRequestAdmin(BaseAdmin):
 
         for rt in referral_transactions:
             html += format_html(
-                f'<li>[ {str(rt.amount)}₽ ] от {rt.referral.referred.get_full_name()} |  {rt.timestamp.strftime("%Y-%m-%d %H:%M")}</li>',
+                f'<li>{rt.timestamp.strftime("%d-%m-%y")} [ {str(rt.amount)}₽ ] от {rt.referral.referred.get_full_name()} </li>',
             )
         html += "</ul>"
+        html += "<p>Начисления регистрируются с 27.11.25</p>"
         return format_html(html)
 
     def display_referral_income_total(self, obj):
