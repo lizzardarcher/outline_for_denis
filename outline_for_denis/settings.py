@@ -87,6 +87,7 @@ JAZZMIN_SETTINGS = {
     "welcome_sign": "Welcome to the DOMVPNAdmin",
     "copyright": "DOMVPNAdmin",
 
+
     "search_model": ["bot.TelegramUser"],
 
     "topmenu_links": [
