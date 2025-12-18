@@ -3,6 +3,7 @@ import traceback
 import paramiko
 from celery import shared_task
 from django.utils import timezone
+from django.contrib.admin.models import LogEntry
 
 from telebot import TeleBot
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
@@ -140,3 +141,11 @@ def reload_servers():
         except Exception as e:
             Logging.objects.create(log_level='ERROR', message=f'[CELERY] {traceback.format_exc()}')
             pass
+
+
+@shared_task
+def clear_log_entry():
+    try:
+        LogEntry.objects.all().delete()
+    except Exception as e:
+        pass

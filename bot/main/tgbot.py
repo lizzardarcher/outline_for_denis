@@ -3,6 +3,7 @@ import random
 import traceback
 from datetime import datetime, timedelta, date
 
+from django.db import transaction
 from yookassa import Configuration, Payment
 
 import django_orm
@@ -631,24 +632,6 @@ async def callback_query_handlers(call):
                                 Configuration.account_id = settings.YOOKASSA_SHOP_ID_BOT
                                 Configuration.secret_key = settings.YOOKASSA_SECRET_BOT
 
-                                # payment = Payment.create({
-                                #     "amount": {
-                                #         "value": str(price),
-                                #         "currency": "RUB"
-                                #     },
-                                #     "confirmation": {
-                                #         "type": "redirect",
-                                #         "return_url": f'https://t.me/{BOT_USERNAME}?start',
-                                #         "enforce": False
-                                #     },
-                                #     "capture": True,
-                                #     "description": f'Подписка DomVPN на {days} дн.',
-                                #     "save_payment_method": True,
-                                #     "metadata": {
-                                #         'user_id': call.message.chat.id,
-                                #         'telegram_user_id': call.message.chat.id,
-                                #     }
-                                # }, )
                                 payment = Payment.create({
                                     "amount": {
                                         "value": str(price),
@@ -765,36 +748,61 @@ async def callback_query_handlers(call):
 
                 elif 'withdraw' in data:
 
+                    # 1. Сначала проверяем минимальную сумму, чтобы не мучить базу лишними запросами
+                    if user.income < 500:
+                        await bot.send_message(
+                            chat_id=call.message.chat.id,
+                            text=msg.withdraw_request_not_enough.format(user.income),
+                            reply_markup=markup.proceed_to_profile()
+                        )
+                        return  # Выходим из условия
+
+                    # 2. Проверяем, был ли запрос сегодня (используем фильтр даты прямо в БД)
+                    today = timezone.now().date()
+                    has_requested_today = WithdrawalRequest.objects.filter(
+                        user=user,
+                        timestamp__date=today
+                    ).exists()
+
+                    if has_requested_today:
+                        await bot.send_message(
+                            chat_id=call.message.chat.id,
+                            text=msg.withdraw_request_duplicate.format(user.income),
+                            reply_markup=markup.proceed_to_profile()
+                        )
+                        return
+
+                    # 3. Если проверки пройдены
                     try:
-                        #  Проверка на количество запросов (можно 1 в сутки)
-                        timestamp = WithdrawalRequest.objects.filter(user=user).last().timestamp
-                        if timestamp.date() == date.today():
-                            await bot.send_message(
-                                chat_id=call.message.chat.id,
-                                text=msg.withdraw_request_duplicate.format(str(user.income)),
-                                reply_markup=markup.proceed_to_profile()
-                            )
-                    except:
-                        if user.income >= 500:
-                            #  Создание объекта запроса
-                            WithdrawalRequest.objects.create(
+                        with transaction.atomic():
+                            request = WithdrawalRequest.objects.create(
                                 user=user,
                                 amount=user.income,
-                                currency='RUB',
-                                timestamp=datetime.now(),
+                                currency='RUB'
                             )
-                            await bot.send_message(call.message.chat.id,
-                                                   text=msg.withdraw_request.format(str(user.income)),
-                                                   reply_markup=markup.proceed_to_profile())
+
+
+                        # 4. Уведомляем пользователя
+                        await bot.send_message(
+                            chat_id=call.message.chat.id,
+                            text=msg.withdraw_request.format(user.income),
+                            reply_markup=markup.proceed_to_profile()
+                        )
+
+                        # 5. Уведомляем администраторов (через цикл)
+                        admin_text = (f"💰 Запрос на вывод!\nПользователь: {user.get_full_name()}\nСумма: {user.income} RUB\n"
+                                      f"<a>{settings.CSRF_TRUSTED_ORIGINS[0]}/admindomvpnx/bot/withdrawalrequest/{str(request.id)}/change/</a>")
+                        for admin_id in [7516224613]:
                             try:
-                                await bot.send_message(TelegramUser.objects.filter(username=SUPPORT_ACCOUNT).first().user_id,
-                                                       text=f'Запрос на вывод средств от пользователя {user.get_full_name()} на сумму {str(user.income)}',)
-                            except:
-                                pass
-                        else:
-                            await bot.send_message(call.message.chat.id,
-                                                   text=msg.withdraw_request_not_enough.format(str(user.income)),
-                                                   reply_markup=markup.proceed_to_profile())
+                                await bot.send_message(admin_id, text=admin_text)
+                            except Exception as e:
+                                lg.objects.create(log_level='INFO', message=f'[BOT] [Ошибка отправки админу {admin_id}: {e}]',
+                                                  datetime=datetime.now(), user=user)
+
+                    except Exception as e:
+                        lg.objects.create(log_level='INFO', message=f'[BOT] [Ошибка при создании заявки: {e}]',
+                                          datetime=datetime.now(),user=user)
+                        await bot.send_message(call.message.chat.id, text="Произошла ошибка. Попробуйте позже.")
 
                 elif 'help' in data:
                     await bot.send_message(call.message.chat.id, text=msg.help_message, reply_markup=markup.start(),
