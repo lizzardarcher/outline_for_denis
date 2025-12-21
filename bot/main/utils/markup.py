@@ -1,3 +1,4 @@
+from django.conf import settings
 from telebot.types import InlineKeyboardMarkup
 from telebot.types import InlineKeyboardButton
 from telebot.types import LabeledPrice
@@ -9,7 +10,7 @@ from bot.models import Prices, Country, TelegramUser, Server
 
 
 btn_back = InlineKeyboardButton(text=f'🔙 Назад', callback_data=f'back')
-
+DOMAIN = settings.DOMAIN
 
 def get_app_or_start():
     markup = InlineKeyboardMarkup()
@@ -68,10 +69,10 @@ def download_app():
 def help_markup():
     markup = InlineKeyboardMarkup()
     markup.add(InlineKeyboardButton(text='Ссылки на скачивание', url='https://telegra.ph/VPN--Ssylki-na-skachivanie-10-15'))
-    markup.add(InlineKeyboardButton(text='Условия использования', url='https://telegra.ph/Usloviya-polzovaniya-servisom-VPN-TON-11-20'))
-    markup.add(InlineKeyboardButton(text='Инструкция', url='https://telegra.ph/Instrukciya-VPN-11-20'))
-    markup.add(InlineKeyboardButton(text='Договор оферты', url='https://domvpn.store/oferta/'))
-    markup.add(InlineKeyboardButton(text='Политика конфиденциальности', url='https://domvpn.store/policy/'))
+    markup.add(InlineKeyboardButton(text='Условия использования', url='https://telegra.ph/Usloviya-polzovaniya-servisom-DOM-VPN-12-21'))
+    markup.add(InlineKeyboardButton(text='Инструкция', url='https://telegra.ph/Instrukciya-DOM-VPN-12-21'))
+    markup.add(InlineKeyboardButton(text='Договор оферты', url=f'{DOMAIN}/oferta/'))
+    markup.add(InlineKeyboardButton(text='Политика конфиденциальности', url=f'{DOMAIN}/policy/'))
     markup.add(btn_back)
     return markup
 
@@ -131,7 +132,7 @@ def my_profile(user: TelegramUser):
     btn2 = InlineKeyboardButton(text=f'💲 Купить подписку', callback_data=f'account:choose_payment')
     btn3 = InlineKeyboardButton(text=f'🤝 Реферальная программа', callback_data=f'referral')
     btn4 = InlineKeyboardButton(text=f'🛑 Отменить подписку', callback_data=f'account:cancel_subscription')
-    btn5 = InlineKeyboardButton(text=f'Договор оферты', url=f'https://domvpn.store/oferta/')
+    btn5 = InlineKeyboardButton(text=f'Договор оферты', url=f'{DOMAIN}/oferta/')
     markup.row(btn2)
     markup.row(btn3)
     markup.row(btn4)
@@ -143,8 +144,7 @@ def my_profile(user: TelegramUser):
 def payment_menu(payment_type: str):
     markup = InlineKeyboardMarkup()
     markup.add(InlineKeyboardButton(text=f'Юкасса (СБП, Банковская карта)', callback_data=f'account:payment:ukassa:{payment_type}'))
-    # markup.add(InlineKeyboardButton(text=f'Через сайт (СБП, SperPay, ЮМoney)', url=f'https://domvpn.store/auth/accounts/login/'))
-    markup.add(InlineKeyboardButton(text='Оплачивая подписку я соглашаюсь с договором офертой', url='https://domvpn.store/oferta/'))
+    markup.add(InlineKeyboardButton(text='Оплачивая подписку я соглашаюсь с договором офертой', url=f'{DOMAIN}/oferta/'))
     markup.add(btn_back)
     return markup
 
