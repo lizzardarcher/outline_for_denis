@@ -146,6 +146,8 @@ def reload_servers():
 @shared_task
 def clear_log_entry():
     try:
-        LogEntry.objects.all().delete()
+        log_entry = LogEntry.objects.all()
+        if log_entry.exists():
+            log_entry.delete()
     except Exception as e:
         pass

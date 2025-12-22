@@ -243,7 +243,7 @@ class TelegramUserAdmin(admin.ModelAdmin):
         ('Подписка', {'fields': ['is_banned','subscription_expiration','subscription_status','payment_method_id','permission_revoked',],}),
         ('Реферальная программа', {'fields':['income']})
     ])
-    readonly_fields = ('join_date', 'first_name', 'last_name', 'username', 'user_id', 'balance', 'income')
+    readonly_fields = ('join_date', 'first_name', 'last_name', 'username', 'user_id')
     exclude = ('data_limit', 'top_up_balance_listener', 'withdrawal_listener')
     ordering = ('-subscription_status', '-join_date',)
     empty_value_display = '---'
@@ -480,8 +480,8 @@ class VpnKey(BaseAdmin):
     def has_add_permission(self, request):
         return False
 
-    def has_delete_permission(self, request, obj=None):
-        return False
+    # def has_delete_permission(self, request, obj=None):
+    #     return False
 
 
 @admin.register(Server)
