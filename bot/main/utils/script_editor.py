@@ -70,6 +70,25 @@ from bot.models import *
 
 
 if __name__ == '__main__':
+    # Transaction.objects.create(
+    #     income_info= IncomeInfo.objects.get(pk=1),
+    #     user= TelegramUser.objects.filter(username='penaltydodgers').last(),
+    #     amount = 720.00,
+    #     currency = 'RUB',
+    #     timestamp = datetime.now(),
+    #     side = 'Приход средств',
+    #     description= 'Приобретение подписки',
+    #     payment_id = '31057505-000f-5001-8000-1db5ab03e5aa',
+    #     paid = True,
+    #     status = 'succeeded',
+    # )
+    # user = TelegramUser.objects.filter(username='penaltydodgers').last()
+    # user.subscription_status =True
+    # user.subscription_expiration=datetime.now() + timedelta(days=93)
+    # user.save()
+    user = TelegramUser.objects.filter(username='lampbacol').last()
+    user.income = user.income + 675
+    user.save()
     # try:
     #     counter = 0
     #     users = TelegramUser.objects.filter(
@@ -99,16 +118,16 @@ if __name__ == '__main__':
     #
     # except KeyboardInterrupt as e:
     #     pass
-    counter = 1
-    logs = Logging.objects.filter(message__icontains="This payment_method_id doesn't exist", user__subscription_status=False, user__permission_revoked=False, )
-    log_user_ids = [log.user.user_id for log in logs]
+    # counter = 1
+    # logs = Logging.objects.filter(message__icontains="This payment_method_id doesn't exist", user__subscription_status=False, user__permission_revoked=False, )
+    # log_user_ids = [log.user.user_id for log in logs]
     # for log in logs:
     #     print(counter, log.user.user_id, [t.payment_id for t in Transaction.objects.filter(description='Приобретение подписки', status='succeeded', user=log.user)])
     #     counter+=1
-    transactions = Transaction.objects.filter(description='Приобретение подписки', status='succeeded', user__subscription_status=False, user__permission_revoked=False,)
-    for transaction in transactions:
-        print(counter, transaction.user.user_id, transaction.payment_id)
-        counter+=1
+    # transactions = Transaction.objects.filter(description='Приобретение подписки', status='succeeded', user__subscription_status=False, user__permission_revoked=False,)
+    # for transaction in transactions:
+    #     print(counter, transaction.user.user_id, transaction.payment_id)
+    #     counter+=1
     # users = TelegramUser.objects.filter(user_id__in=log_user_ids)
     # for user in users:
     #     try:

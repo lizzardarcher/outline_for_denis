@@ -13,21 +13,16 @@ class TelegramUser(models.Model):
     last_name = models.CharField(db_index=True, max_length=255, blank=True, null=True, verbose_name='Фамилия')
     photo_url = models.CharField(max_length=1000, default='', null=True, blank=True, verbose_name='Photo URL')
     is_banned = models.BooleanField(default=False, verbose_name='Забанен')
-    balance = models.DecimalField(max_digits=10, decimal_places=2, default=0.00,
-                                  verbose_name='Баланс для активации подписок')
-    income = models.DecimalField(max_digits=10, decimal_places=2, default=0.00,
-                                 verbose_name='Доход от реферальной программы')
+    balance = models.DecimalField(max_digits=10, decimal_places=2, default=0.00, verbose_name='Баланс для активации подписок')
+    income = models.DecimalField(max_digits=10, decimal_places=2, default=0.00, verbose_name='Доход от реферальной программы')
     subscription_status = models.BooleanField(default=False, verbose_name='Статус подписки')
-    subscription_expiration = models.DateField(default=None, blank=True, null=True,
-                                               verbose_name='Дата окончания подписки')
+    subscription_expiration = models.DateField(default=None, blank=True, null=True, verbose_name='Дата окончания подписки')
     data_limit = models.BigIntegerField(verbose_name='Data Limit', blank=True, null=True, default=0)
     top_up_balance_listener = models.BooleanField(default=False, verbose_name='Top up balance listener')
     withdrawal_listener = models.BooleanField(default=False, verbose_name='Withdrawal listener')
-    payment_method_id = models.CharField(max_length=1000, blank=True, null=True, default='',
-                                         verbose_name='Payment Method ID')
+    payment_method_id = models.CharField(max_length=1000, blank=True, null=True, default='', verbose_name='Payment Method ID')
     permission_revoked = models.BooleanField(default=False, verbose_name='Самостоятельно отменил автоплатёж')
     next_payment_date = models.DateField(default=None, blank=True, null=True, verbose_name='Следующее списание')
-
     special_offer = models.ForeignKey('ReferralSpecialOffer', default=None, null=True, blank=True, db_index=True, on_delete=models.SET_NULL, related_name='special_offers', verbose_name='Специальные проценты')
 
     def __str__(self):

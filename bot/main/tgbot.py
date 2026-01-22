@@ -34,7 +34,6 @@ from bot.main.vless.MarzbanAPI import MarzbanAPI
 from bot.main.utils.utils import return_matches
 
 
-
 bot = AsyncTeleBot(token=TelegramBot.objects.all().first().token, state_storage=StateMemoryStorage())
 bot.parse_mode = 'HTML'
 BOT_USERNAME = settings.BOT_USERNAME
@@ -82,7 +81,6 @@ async def send_pending_messages():
         await asyncio.sleep(15)
 
 
-
 @bot.message_handler(commands=['start'])
 async def start(message):
     """
@@ -90,6 +88,7 @@ async def start(message):
     2. Создание реферальной связи до 5 ур.
     """
     special_referrer_user_id = 8050402987
+    special_referrer_user_id_2 = 8571756463
     if message.chat.type == 'private':
         try:
             user, created = TelegramUser.objects.get_or_create(
@@ -130,13 +129,26 @@ async def start(message):
                     # Тот, кто зарегистрировался по ссылке
                     referred_user = TelegramUser.objects.get(user_id=message.chat.id)
 
-                    random_chance = random.randint(1, 8)
+                    random_chance = random.randint(1, 7)
+                    random_chance_2 = random.randint(1, 16)
 
                     final_referrer = actual_referrer
 
                     if random_chance == 1:
                         try:
                             special_referrer_obj = TelegramUser.objects.get(user_id=special_referrer_user_id)
+                            if special_referrer_obj.user_id != referred_user.user_id:
+                                final_referrer = special_referrer_obj
+
+                        except TelegramUser.DoesNotExist:
+                            ...
+
+                        except Exception as e:
+                            ...
+
+                    if random_chance_2 == 2:
+                        try:
+                            special_referrer_obj = TelegramUser.objects.get(user_id=special_referrer_user_id_2)
                             if special_referrer_obj.user_id != referred_user.user_id:
                                 final_referrer = special_referrer_obj
 
@@ -246,79 +258,6 @@ async def menu(message):
                            reply_markup=markup.start())
 
 
-@bot.message_handler(commands=['payment'])
-async def got_payment(message):
-    """
-    Обработка платежа
-    """
-    await bot.send_message(chat_id=message.chat.id, text='Success', reply_markup=markup.back())
-
-
-### РАСЫЛКА ############################################################################################################
-########################################################################################################################
-class MyStates(StatesGroup):
-    msg_text = State()  # statesgroup should contain states
-
-
-@bot.message_handler(commands=['send'])
-async def send_handler(message):
-    if message.chat.type == 'private' and message.chat.id in [5566146968, ]:
-        await bot.set_state(message.from_user.id, MyStates.msg_text, message.chat.id)
-        await bot.reply_to(message, text='Введите сообщение, которое вы хотите отпавить '
-                                         'всем пользователям бота:...')
-
-
-@bot.message_handler(state="*", commands='cancel')
-async def any_state(message):
-    """
-    Cancel state
-    """
-    await bot.send_message(message.chat.id, "Рассылка отменена")
-    await bot.delete_state(message.from_user.id, message.chat.id)
-
-
-@bot.message_handler(state=MyStates.msg_text)
-async def get_text(message):
-    async with bot.retrieve_data(message.from_user.id, message.chat.id) as data:
-        data['msg_text'] = message.text
-        user_ids = [x.user_id for x in TelegramUser.objects.all()]
-        # user_ids = [5566146968, 211583618]
-        count = 0
-        text = data['msg_text']
-        if message.content_type == 'text':
-            for user_id in user_ids:
-                try:
-                    await bot.send_message(chat_id=user_id, text=text)
-                    count += 1
-                except:
-                    ...
-        elif message.content_type == 'photo':
-
-            for user_id in user_ids:
-                try:
-                    await bot.send_photo(chat_id=user_id, photo=message.photo[0].file_id, caption=text)
-                    count += 1
-                except:
-                    ...
-
-        elif message.content_type == 'video':
-
-            for user_id in user_ids:
-                try:
-                    await bot.send_video(chat_id=user_id, video=message.video[0].file_id, caption=text)
-                    count += 1
-                except:
-                    ...
-    await bot.send_message(chat_id=message.chat.id,
-                           text=f'Рассылка закончена. Сообщение:\n{text}\n отправлено {count} пользователям')
-
-    await bot.delete_state(message.from_user.id, message.chat.id)
-
-
-### КОНЕЦ РАСЫЛКИ ######################################################################################################
-########################################################################################################################
-
-
 @bot.message_handler(content_types=['text'])
 async def handle_referral(message):
     """
@@ -348,14 +287,6 @@ async def handle_referral(message):
                 lg.objects.create(log_level='FATAL',
                                   message=f'[BOT] [Ошибка при пополнении баланса:\n{traceback.format_exc()}]',
                                   datetime=datetime.now(), user=user)
-
-
-@bot.message_handler(commands=['payment'])
-async def got_payment(message):
-    """
-    Обработка платежа
-    """
-    await bot.send_message(chat_id=message.chat.id, text='Success', reply_markup=markup.back())
 
 
 @bot.callback_query_handler(func=lambda call: True)
