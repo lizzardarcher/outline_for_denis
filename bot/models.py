@@ -28,6 +28,8 @@ class TelegramUser(models.Model):
     permission_revoked = models.BooleanField(default=False, verbose_name='Самостоятельно отменил автоплатёж')
     next_payment_date = models.DateField(default=None, blank=True, null=True, verbose_name='Следующее списание')
 
+    special_offer = models.ForeignKey('ReferralSpecialOffer', default=None, null=True, blank=True, db_index=True, on_delete=models.SET_NULL, related_name='special_offers', verbose_name='Специальные проценты')
+
     def __str__(self):
         if not self.last_name:
             last_name = ''
@@ -104,6 +106,22 @@ class ReferralTransaction(models.Model):
     class Meta:
         verbose_name = 'Реферальное начисление'
         verbose_name_plural = 'Реферальные начисления'
+
+
+class ReferralSpecialOffer(models.Model):
+    especial_for_user = models.CharField(max_length=100, blank=True, null=True, verbose_name='Специально для пользователя (напишите username или Имя)')
+    level_1_percentage = models.IntegerField(blank=True, null=True, verbose_name='Level 1 Percentage')
+    level_2_percentage = models.IntegerField(blank=True, null=True, verbose_name='Level 2 Percentage')
+    level_3_percentage = models.IntegerField(blank=True, null=True, verbose_name='Level 3 Percentage')
+    level_4_percentage = models.IntegerField(blank=True, null=True, verbose_name='Level 4 Percentage')
+    level_5_percentage = models.IntegerField(blank=True, null=True, verbose_name='Level 5 Percentage')
+
+    def __str__(self):
+        return f"Level 1 ({self.level_1_percentage}%) --- Level 2: ({self.level_2_percentage}%) --- Level 3 ({self.level_3_percentage}%) --- Level 4 ({self.level_4_percentage}%) --- Level 5 ({self.level_5_percentage}%)"
+
+    class Meta:
+        verbose_name = 'Специальное предложение'
+        verbose_name_plural = 'Специальные предложения'
 
 
 class TelegramBot(models.Model):

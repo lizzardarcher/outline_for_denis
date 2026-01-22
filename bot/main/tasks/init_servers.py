@@ -140,7 +140,7 @@ echo "Script completed successfully."
 if __name__ == '__main__':
 
     while True:
-        init_outline_servers()
+        # init_outline_servers()
         init_vless_servers()
         sleep(60)
 

@@ -127,6 +127,7 @@ JAZZMIN_SETTINGS = {
         "bot.IncomeInfo": "fa-solid fa-coins",
         "bot.Prices": "fa-solid fa-tag",
         "bot.WithdrawalRequest": "fa-solid fa-bell",
+        "bot.ReferralSpecialOffer": "fa-solid fa-percent",
     },
     "default_icon_parents": "fas fa-chevron-circle-right",
     "default_icon_children": "fas fa-circle",

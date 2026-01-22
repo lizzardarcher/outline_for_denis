@@ -32,11 +32,26 @@ class ProfileView(LoginRequiredMixin, SuccessMessageMixin, TemplateView):
         context['countries'] = Country.objects.filter(is_active=True)
         context['subscription'] = Prices.objects.get(id=1)
         context['referral'] = ReferralSettings.objects.get(pk=1)
+
         context['inv_1_lvl'] = TelegramReferral.objects.filter(referrer=self.request.user.profile.telegram_user, level=1).__len__()
         context['inv_2_lvl'] = TelegramReferral.objects.filter(referrer=self.request.user.profile.telegram_user, level=2).__len__()
         context['inv_3_lvl'] = TelegramReferral.objects.filter(referrer=self.request.user.profile.telegram_user, level=3).__len__()
         context['inv_4_lvl'] = TelegramReferral.objects.filter(referrer=self.request.user.profile.telegram_user, level=4).__len__()
         context['inv_5_lvl'] = TelegramReferral.objects.filter(referrer=self.request.user.profile.telegram_user, level=5).__len__()
+
+        if self.request.user.profile.telegram_user.special_offer:
+            context['per_1'] = self.request.user.profile.telegram_user.special_offer.level_1_percentage
+            context['per_2'] = self.request.user.profile.telegram_user.special_offer.level_2_percentage
+            context['per_3'] = self.request.user.profile.telegram_user.special_offer.level_3_percentage
+            context['per_4'] = self.request.user.profile.telegram_user.special_offer.level_4_percentage
+            context['per_5'] = self.request.user.profile.telegram_user.special_offer.level_5_percentage
+        else:
+            context['per_1'] = ReferralSettings.objects.get(pk=1).level_1_percentage
+            context['per_2'] = ReferralSettings.objects.get(pk=1).level_2_percentage
+            context['per_3'] = ReferralSettings.objects.get(pk=1).level_3_percentage
+            context['per_4'] = ReferralSettings.objects.get(pk=1).level_4_percentage
+            context['per_5'] = ReferralSettings.objects.get(pk=1).level_5_percentage
+
         context['transactions'] = Transaction.objects.filter(user=self.request.user.profile.telegram_user).order_by('-timestamp')
         return context
 

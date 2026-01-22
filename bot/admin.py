@@ -241,7 +241,7 @@ class TelegramUserAdmin(admin.ModelAdmin):
     fieldsets = ([
         ('Основная информация', {'fields': ['join_date','first_name','last_name','username','user_id','photo_url', ],}),
         ('Подписка', {'fields': ['is_banned','subscription_expiration','subscription_status','payment_method_id','permission_revoked',],}),
-        ('Реферальная программа', {'fields':['income']})
+        ('Реферальная программа', {'fields':['income', 'special_offer']})
     ])
     readonly_fields = ('join_date', 'first_name', 'last_name', 'username', 'user_id')
     exclude = ('data_limit', 'top_up_balance_listener', 'withdrawal_listener')
@@ -284,6 +284,11 @@ class TelegramUserAdmin(admin.ModelAdmin):
         if 'delete_selected' in actions:
             del actions['delete_selected']
         return actions
+
+
+@admin.register(ReferralSpecialOffer)
+class ReferralSpecialOfferAdmin(BaseAdmin):
+    list_display = ('level_1_percentage','level_2_percentage','level_3_percentage','level_4_percentage','level_5_percentage',)
 
 
 @admin.register(TelegramBot)

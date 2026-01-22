@@ -1,7 +1,7 @@
 import asyncio
 import random
 import traceback
-from datetime import datetime, timedelta, date
+from datetime import datetime, timedelta
 
 from django.db import transaction
 from yookassa import Configuration, Payment
@@ -15,7 +15,7 @@ from telebot.asyncio_storage import StateMemoryStorage
 from telebot.asyncio_handler_backends import State, StatesGroup
 from telebot.types import InlineKeyboardButton, InlineKeyboardMarkup
 
-from bot.models import TelegramBot, Prices, TelegramMessage, Logging
+from bot.models import TelegramBot, Prices, TelegramMessage, Logging, ReferralSettings
 from bot.models import TelegramUser
 from bot.models import TelegramReferral
 from bot.models import VpnKey
@@ -33,9 +33,7 @@ from bot.main.vless.MarzbanAPI import MarzbanAPI
 
 from bot.main.utils.utils import return_matches
 
-from bot.main.outline_client import create_new_key
-from bot.main.outline_client import delete_user_keys
-from outline_for_denis.settings import SUPPORT_ACCOUNT
+
 
 bot = AsyncTeleBot(token=TelegramBot.objects.all().first().token, state_storage=StateMemoryStorage())
 bot.parse_mode = 'HTML'
@@ -84,92 +82,6 @@ async def send_pending_messages():
         await asyncio.sleep(15)
 
 
-async def update_user_subscription_status():
-    while True:
-        users = TelegramUser.objects.filter(subscription_expiration__lt=timezone.now(), subscription_status=True)
-        for user in users:
-            try:
-                user.subscription_status = False
-                user.save()
-                try:
-                    await bot.send_message(chat_id=user.user_id, text=msg.subscription_expired)
-                except:
-                    pass
-                lg.objects.create(log_level='WARNING', message='[BOT] [Закончилась подписка у пользователя]',
-                                  datetime=datetime.now(), user=user)
-            except Exception as e:
-                lg.objects.create(log_level='FATAL',
-                                  message=f'[BOT] [Ошибка при автообновлении статуса подписки:\n{traceback.format_exc()}]',
-                                  datetime=datetime.now())
-
-        vpn_keys = VpnKey.objects.filter(user__subscription_status=False)
-        for key in vpn_keys:
-            if key.protocol == 'outline':
-                try:
-                    await delete_user_keys(user=key.user)
-                except:
-                    pass
-            elif key.protocol == 'vless':
-                try:
-                    MarzbanAPI().delete_user(username=str(key.user.user_id))
-                    key.delete()
-                except:
-                    pass
-
-        await asyncio.sleep(60 * 60 * 12)
-
-
-# @bot.message_handler(commands=['start'])
-# async def start(message):
-#     """
-#     1. Создание нового пользователя
-#     2. Создание реферальной связи до 5 ур.
-#     """
-#     if message.chat.type == 'private':
-#         try:
-#             TelegramUser.objects.create(user_id=message.from_user.id,
-#                                         username=message.from_user.username,
-#                                         first_name=message.from_user.first_name,
-#                                         last_name=message.from_user.last_name,
-#                                         subscription_status=False,
-#                                         subscription_expiration=datetime.now() - timedelta(days=1))
-#             lg.objects.create(log_level='INFO', message='[BOT] [Создан новый пользователь]', datetime=datetime.now(),
-#                               user=TelegramUser.objects.get(user_id=message.from_user.id))
-#             if message.text.split(' ')[-1].isdigit():
-#                 referred_by = message.text.split(' ')[-1]
-#                 same_user_check = str(referred_by) == str(message.chat.id)
-#                 if not same_user_check:
-#                     try:
-#                         referrer = TelegramUser.objects.get(user_id=referred_by)  # тот, от кого получена ссылка
-#                         referred = TelegramUser.objects.get(user_id=message.chat.id)  # тот, кто воспользовался ссылкой
-#                         try:
-#                             TelegramReferral.objects.create(referrer=referrer, referred=referred, level=1)
-#
-#                             #  Проверяем есть ли рефералы у того, кто отправил ссылку и получаем их список, если есть
-#                             referred_list = [x for x in
-#                                              TelegramReferral.objects.filter(referred=referrer, level__lte=4)]
-#                             for r in referred_list:
-#                                 current_level = r.level  # 1
-#                                 current_referrer = r.referrer
-#                                 new_referral = TelegramReferral.objects.create(referrer=current_referrer,
-#                                                                                referred=referred,
-#                                                                                level=current_level + 1)
-#                                 lg.objects.create(log_level='INFO',
-#                                                   message=f'[BOT] [Создана новая реферальная связь {new_referral}]',
-#                                                   datetime=datetime.now(),
-#                                                   user=TelegramUser.objects.get(user_id=message.from_user.id))
-#                         except:
-#                             ...
-#                     except:
-#                         lg.objects.create(log_level='FATAL', message=f'[BOT] [ОШИБКА:\n{traceback.format_exc()}]',
-#                                           datetime=datetime.now(),
-#                                           user=TelegramUser.objects.get(user_id=message.from_user.id))
-#
-#         except:
-#             ...
-#         await bot.send_message(chat_id=message.chat.id, text=msg.start_message.format(message.from_user.first_name),
-#                                reply_markup=markup.get_app_or_start())
-
 
 @bot.message_handler(commands=['start'])
 async def start(message):
@@ -214,10 +126,11 @@ async def start(message):
                 try:
                     # Тот, кто фактически пригласил (из ссылки)
                     actual_referrer = TelegramUser.objects.get(user_id=invited_by_id)
+
                     # Тот, кто зарегистрировался по ссылке
                     referred_user = TelegramUser.objects.get(user_id=message.chat.id)
 
-                    random_chance = random.randint(1, 7)
+                    random_chance = random.randint(1, 8)
 
                     final_referrer = actual_referrer
 
@@ -245,6 +158,10 @@ async def start(message):
                                                reply_markup=markup.get_app_or_start())
                         return
 
+                    # Проверяем, чтобы несколько поделившихся реферальной ссылкой не были рефералами для вновь вступившего пользователя
+                    duplicate = TelegramReferral.objects.filter(referred=referred_user.user_id, level=1)
+                    if duplicate.exists():
+                        return
 
                     try:
                         referral_level_1, created_level_1 = TelegramReferral.objects.get_or_create(
@@ -260,7 +177,7 @@ async def start(message):
 
                             referred_list = TelegramReferral.objects.filter(
                                 referred=final_referrer,  # Ищем, кто пригласил final_referrer
-                                level__lte=4  # Создаем до 5 уровня, значит, текущий уровень не должен быть 5
+                                level__lte=4              # Создаем до 5 уровня, значит, текущий уровень не должен быть 5
                             ).select_related('referrer')  # Оптимизация запроса
 
                             for r in referred_list:
@@ -739,11 +656,23 @@ async def callback_query_handlers(call):
                     inv_3_lvl = TelegramReferral.objects.filter(referrer=user, level=3).__len__()
                     inv_4_lvl = TelegramReferral.objects.filter(referrer=user, level=4).__len__()
                     inv_5_lvl = TelegramReferral.objects.filter(referrer=user, level=5).__len__()
+                    if not user.special_offer:
+                        per_1 = ReferralSettings.objects.get(pk=1).level_1_percentage
+                        per_2 = ReferralSettings.objects.get(pk=1).level_2_percentage
+                        per_3 = ReferralSettings.objects.get(pk=1).level_3_percentage
+                        per_4 = ReferralSettings.objects.get(pk=1).level_4_percentage
+                        per_5 = ReferralSettings.objects.get(pk=1).level_5_percentage
+                    else:
+                        per_1 = user.special_offer.level_1_percentage
+                        per_2 = user.special_offer.level_2_percentage
+                        per_3 = user.special_offer.level_3_percentage
+                        per_4 = user.special_offer.level_4_percentage
+                        per_5 = user.special_offer.level_5_percentage
                     referral_link = f"Твоя реферальная ссылка: <code>https://t.me/{bot_username}?start={referral_code}</code>\n"
                     await bot.send_message(call.message.chat.id,
-                                           text=referral_link + msg.referral.format(inv_1_lvl, inv_2_lvl, inv_3_lvl,
-                                                                                    inv_4_lvl,
-                                                                                    inv_5_lvl, user_income),
+                                           text=referral_link + msg.referral.format(
+                                               inv_1_lvl, inv_2_lvl, inv_3_lvl, inv_4_lvl, inv_5_lvl, user_income,
+                                                per_1, per_2, per_3, per_4, per_5),
                                            reply_markup=markup.withdraw_funds(call.message.chat.id))
 
                 elif 'withdraw' in data:
