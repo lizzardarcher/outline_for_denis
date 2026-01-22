@@ -110,14 +110,14 @@ class ReferralTransaction(models.Model):
 
 class ReferralSpecialOffer(models.Model):
     especial_for_user = models.CharField(max_length=100, blank=True, null=True, verbose_name='Специально для пользователя (напишите username или Имя)')
-    level_1_percentage = models.IntegerField(blank=True, null=True, verbose_name='Level 1 Percentage')
-    level_2_percentage = models.IntegerField(blank=True, null=True, verbose_name='Level 2 Percentage')
-    level_3_percentage = models.IntegerField(blank=True, null=True, verbose_name='Level 3 Percentage')
-    level_4_percentage = models.IntegerField(blank=True, null=True, verbose_name='Level 4 Percentage')
-    level_5_percentage = models.IntegerField(blank=True, null=True, verbose_name='Level 5 Percentage')
+    level_1_percentage = models.IntegerField(default=0, blank=False, null=False, verbose_name='Level 1 Percentage')
+    level_2_percentage = models.IntegerField(default=0, blank=False, null=False, verbose_name='Level 2 Percentage')
+    level_3_percentage = models.IntegerField(default=0, blank=False, null=False, verbose_name='Level 3 Percentage')
+    level_4_percentage = models.IntegerField(default=0, blank=False, null=False, verbose_name='Level 4 Percentage')
+    level_5_percentage = models.IntegerField(default=0, blank=False, null=False, verbose_name='Level 5 Percentage')
 
     def __str__(self):
-        return f"Level 1 ({self.level_1_percentage}%) --- Level 2: ({self.level_2_percentage}%) --- Level 3 ({self.level_3_percentage}%) --- Level 4 ({self.level_4_percentage}%) --- Level 5 ({self.level_5_percentage}%)"
+        return f"{self.especial_for_user} ({self.level_1_percentage}%) ({self.level_2_percentage}%) ({self.level_3_percentage}%) ({self.level_4_percentage}%) ({self.level_5_percentage}%)"
 
     class Meta:
         verbose_name = 'Специальное предложение'
