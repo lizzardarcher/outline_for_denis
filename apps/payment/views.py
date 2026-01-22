@@ -183,14 +183,22 @@ class YookassaTGBOTWebhookView(View):
                     Logging.objects.create(log_level="INFO",
                                            message=f'[BOT] [Обработка платежа] [{event_type}] [Сумма: {amount_value}] [Дни:{days}]',
                                            datetime=datetime.now(), user=telegram_user)
-
-                    REFERRAL_PERCENTAGES = {
-                        1: ReferralSettings.objects.get(pk=1).level_1_percentage,
-                        2: ReferralSettings.objects.get(pk=1).level_2_percentage,
-                        3: ReferralSettings.objects.get(pk=1).level_3_percentage,
-                        4: ReferralSettings.objects.get(pk=1).level_4_percentage,
-                        5: ReferralSettings.objects.get(pk=1).level_5_percentage,
-                    }
+                    if telegram_user.special_offer:
+                        referral_percentages = {
+                            1: telegram_user.special_offer.level_1_percentage,
+                            2: telegram_user.special_offer.level_2_percentage,
+                            3: telegram_user.special_offer.level_3_percentage,
+                            4: telegram_user.special_offer.level_4_percentage,
+                            5: telegram_user.special_offer.level_5_percentage,
+                        }
+                    else:
+                        referral_percentages = {
+                            1: ReferralSettings.objects.get(pk=1).level_1_percentage,
+                            2: ReferralSettings.objects.get(pk=1).level_2_percentage,
+                            3: ReferralSettings.objects.get(pk=1).level_3_percentage,
+                            4: ReferralSettings.objects.get(pk=1).level_4_percentage,
+                            5: ReferralSettings.objects.get(pk=1).level_5_percentage,
+                        }
 
                     referred_list = TelegramReferral.objects.filter(referred=telegram_user).select_related('referrer')
                     if referred_list:
@@ -203,7 +211,7 @@ class YookassaTGBOTWebhookView(View):
                             user_to_pay = users_to_pay.get(r.referrer.user_id)  # Access pre-fetched user
                             if not user_to_pay:
                                 continue
-                            percent = REFERRAL_PERCENTAGES.get(level)
+                            percent = referral_percentages.get(level)
                             if percent:
                                 income = Decimal(user_to_pay.income) + (Decimal(amount_value) * Decimal(percent) / 100)
                                 user_to_pay.income = income
@@ -309,13 +317,22 @@ class YookassaSiteWebhookView(View):
                                            message=f'[BOT] [Обработка платежа] [{event_type}] [Сумма: {amount_value}] [Дни:{days}]',
                                            datetime=datetime.now(), user=telegram_user)
 
-                    REFERRAL_PERCENTAGES = {
-                        1: ReferralSettings.objects.get(pk=1).level_1_percentage,
-                        2: ReferralSettings.objects.get(pk=1).level_2_percentage,
-                        3: ReferralSettings.objects.get(pk=1).level_3_percentage,
-                        4: ReferralSettings.objects.get(pk=1).level_4_percentage,
-                        5: ReferralSettings.objects.get(pk=1).level_5_percentage,
-                    }
+                    if telegram_user.special_offer:
+                        referral_percentages = {
+                            1: telegram_user.special_offer.level_1_percentage,
+                            2: telegram_user.special_offer.level_2_percentage,
+                            3: telegram_user.special_offer.level_3_percentage,
+                            4: telegram_user.special_offer.level_4_percentage,
+                            5: telegram_user.special_offer.level_5_percentage,
+                        }
+                    else:
+                        referral_percentages = {
+                            1: ReferralSettings.objects.get(pk=1).level_1_percentage,
+                            2: ReferralSettings.objects.get(pk=1).level_2_percentage,
+                            3: ReferralSettings.objects.get(pk=1).level_3_percentage,
+                            4: ReferralSettings.objects.get(pk=1).level_4_percentage,
+                            5: ReferralSettings.objects.get(pk=1).level_5_percentage,
+                        }
 
                     referred_list = TelegramReferral.objects.filter(referred=telegram_user).select_related('referrer')
                     if referred_list:
@@ -328,7 +345,7 @@ class YookassaSiteWebhookView(View):
                             user_to_pay = users_to_pay.get(r.referrer.user_id)  # Access pre-fetched user
                             if not user_to_pay:
                                 continue
-                            percent = REFERRAL_PERCENTAGES.get(level)
+                            percent = referral_percentages.get(level)
                             if percent:
                                 income = Decimal(user_to_pay.income) + (
                                         Decimal(amount_value) * Decimal(percent) / 100)
