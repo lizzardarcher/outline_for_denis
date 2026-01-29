@@ -96,7 +96,7 @@ def attempt_recurring_payment():
                         f""f"Подписка активирована до {user.subscription_expiration}"
                     )
 
-                    REFERRAL_PERCENTAGES = {
+                    referral_percentages = {
                         1: ReferralSettings.objects.get(pk=1).level_1_percentage,
                         2: ReferralSettings.objects.get(pk=1).level_2_percentage,
                         3: ReferralSettings.objects.get(pk=1).level_3_percentage,
@@ -114,7 +114,16 @@ def attempt_recurring_payment():
                             user_to_pay = users_to_pay.get(r.referrer.user_id)
                             if not user_to_pay:
                                 continue
-                            percent = REFERRAL_PERCENTAGES.get(level)
+                            percent = referral_percentages.get(level)
+                            if user_to_pay.special_offer:
+                                referral_percentages_2 = {
+                                    1: user_to_pay.special_offer.level_1_percentage,
+                                    2: user_to_pay.special_offer.level_2_percentage,
+                                    3: user_to_pay.special_offer.level_3_percentage,
+                                    4: user_to_pay.special_offer.level_4_percentage,
+                                    5: user_to_pay.special_offer.level_5_percentage,
+                                }
+                                percent = referral_percentages_2.get(level)
                             if percent:
                                 income = Decimal(user_to_pay.income) + (
                                             Decimal(amount_to_charge) * Decimal(percent) / 100)

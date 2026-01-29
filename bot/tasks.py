@@ -8,7 +8,6 @@ from django.contrib.admin.models import LogEntry
 from telebot import TeleBot
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 
-from bot.main.outline_client import sync_delete_user_keys
 from bot.main.utils import msg
 from bot.main.vless.MarzbanAPI import MarzbanAPI
 from bot.models import Logging, Transaction, IncomeInfo, TelegramUser, TelegramBot, VpnKey, TelegramMessage
@@ -81,18 +80,13 @@ def update_user_subscription_status():
 
     vpn_keys = VpnKey.objects.filter(user__subscription_status=False)
     for key in vpn_keys:
-        if key.protocol == 'outline':
-            try:
-                sync_delete_user_keys(user=key.user)
-            except Exception:
-                pass
-
-        elif key.protocol == 'vless':
-            try:
-                MarzbanAPI().delete_user(username=str(key.user.user_id))
-                key.delete()
-            except Exception:
-                pass
+        try:
+            MarzbanAPI().delete_user(username=str(key.user.user_id))
+            key.delete()
+        except Exception:
+            Logging.objects.create(log_level='FATAL',
+                                   message=f'[BOT] [Ошибка при удалении ключа:\n{traceback.format_exc()}]',
+                                   datetime=timezone.now())
 
 
 @shared_task
