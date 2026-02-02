@@ -93,7 +93,7 @@ def attempt_recurring_payment():
                                                description='Рекуррентный платеж')
                     msg = (
                         f"[CELERY] Автосписание успешно! Пользователь {user.user_id} оплатил с {str(amount_to_charge)} {currency}. "
-                        f""f"Подписка активирована до {user.subscription_expiration}"
+                        f"Подписка активирована до {user.subscription_expiration} ID платежа {user.payment_method_id}"
                     )
 
                     referral_percentages = {

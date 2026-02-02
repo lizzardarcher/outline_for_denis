@@ -16,6 +16,13 @@
           </advancedOptions>
         </fileTransfer>
       </webServer>
+      <webServer id="d56aa63b-19e5-4513-b216-3ca7465b3d49" name="База Данных">
+        <fileTransfer accessType="SFTP" host="185.246.118.194" port="22" sshConfigId="32b227e5-55b7-4021-b37d-ad3b3e68bebc" sshConfig="root@185.246.118.194:22 password">
+          <advancedOptions>
+            <advancedOptions dataProtectionLevel="Private" keepAliveTimeout="0" passiveMode="true" shareSSLContext="true" />
+          </advancedOptions>
+        </fileTransfer>
+      </webServer>
     </option>
     <groups>
       <group>

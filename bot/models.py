@@ -364,8 +364,7 @@ class Logging(models.Model):
     log_level = models.CharField(max_length=50, null=True, blank=True, choices=LOG_LEVEL, verbose_name='LOG LEVEL')
     message = models.TextField(max_length=4000, null=True, blank=True, verbose_name='Сообщение')
     datetime = models.DateTimeField(auto_now_add=True, verbose_name='Время')
-    user = models.ForeignKey(to='TelegramUser', null=True, blank=True, on_delete=models.SET_NULL,
-                             verbose_name='Аккаунт')
+    user = models.ForeignKey(to='TelegramUser', null=True, blank=True, on_delete=models.SET_NULL, verbose_name='Аккаунт')
 
     def __str__(self):
         return f'[{self.log_level}] {self.message} [{str(self.datetime)}] [{self.user}]'
