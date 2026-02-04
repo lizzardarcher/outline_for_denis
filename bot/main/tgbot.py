@@ -102,6 +102,14 @@ async def start(message):
                 }
             )
 
+            prices = {
+                'price_3_days': Prices.objects.get(pk=1).price_5,
+                'price_1_month': Prices.objects.get(pk=1).price_1,
+                'price_3_month': Prices.objects.get(pk=1).price_2,
+                'price_6_month': Prices.objects.get(pk=1).price_3,
+                'price_1_year': Prices.objects.get(pk=1).price_4,
+            }
+
             if created:
                 lg.objects.create(log_level='INFO', message='[BOT] [Создан новый пользователь]',
                                   datetime=datetime.now(),
@@ -118,7 +126,12 @@ async def start(message):
                 if str(invited_by_id) == str(message.chat.id):
                     await bot.send_message(chat_id=message.chat.id, text="Вы не можете быть реферером для самого себя.")
                     await bot.send_message(chat_id=message.chat.id,
-                                           text=msg.start_message.format(message.from_user.first_name),
+                                           text=msg.start_message.format(message.from_user.first_name,
+                                                                         prices['price_3_days'],
+                                                                         prices['price_1_month'],
+                                                                         prices['price_3_month'],
+                                                                         prices['price_6_month'],
+                                                                         prices['price_1_year'],),
                                            reply_markup=markup.get_app_or_start())
                     return
 
@@ -166,7 +179,12 @@ async def start(message):
                                           user=referred_user)
                         # Завершаем, чтобы не создавать реферал сам на себя
                         await bot.send_message(chat_id=message.chat.id,
-                                               text=msg.start_message.format(message.from_user.first_name),
+                                               text=msg.start_message.format(message.from_user.first_name,
+                                                                             prices['price_3_days'],
+                                                                             prices['price_1_month'],
+                                                                             prices['price_3_month'],
+                                                                             prices['price_6_month'],
+                                                                             prices['price_1_year'], ),
                                                reply_markup=markup.get_app_or_start())
                         return
 
@@ -248,13 +266,39 @@ async def start(message):
                               user=None)
 
         finally:
+            prices = {
+                'price_3_days': Prices.objects.get(pk=1).price_5,
+                'price_1_month': Prices.objects.get(pk=1).price_1,
+                'price_3_month': Prices.objects.get(pk=1).price_2,
+                'price_6_month': Prices.objects.get(pk=1).price_3,
+                'price_1_year': Prices.objects.get(pk=1).price_4,
+            }
             # Отправляем после всех операций
-            await bot.send_message(chat_id=message.chat.id, text=msg.start_message.format(message.from_user.first_name),
+            await bot.send_message(chat_id=message.chat.id,
+                                   text=msg.start_message.format(message.from_user.first_name,
+                                   prices['price_3_days'],
+                                   prices['price_1_month'],
+                                   prices['price_3_month'],
+                                   prices['price_6_month'],
+                                   prices['price_1_year'],),
                                    reply_markup=markup.get_app_or_start())
 
 @bot.message_handler(commands=['menu'])
 async def menu(message):
-    await bot.send_message(chat_id=message.chat.id, text=msg.start_message.format(message.from_user.first_name),
+    prices = {
+        'price_3_days': Prices.objects.get(pk=1).price_5,
+        'price_1_month': Prices.objects.get(pk=1).price_1,
+        'price_3_month': Prices.objects.get(pk=1).price_2,
+        'price_6_month': Prices.objects.get(pk=1).price_3,
+        'price_1_year': Prices.objects.get(pk=1).price_4,
+    }
+    await bot.send_message(chat_id=message.chat.id,
+                           text=msg.start_message.format(message.from_user.first_name,
+                           prices['price_3_days'],
+                           prices['price_1_month'],
+                           prices['price_3_month'],
+                           prices['price_6_month'],
+                           prices['price_1_year'],),
                            reply_markup=markup.start())
 
 
@@ -441,7 +485,28 @@ async def callback_query_handlers(call):
                         await bot.send_message(call.message.chat.id, text=msg.choose_subscription,
                                                reply_markup=markup.choose_subscription())
                     elif 'sub' in data:
-                        await bot.send_message(call.message.chat.id, text=msg.payment_menu,
+                        sub = None
+                        price = None
+                        prices = Prices.objects.get(pk=1)
+                        recurrent_price = prices.price_1
+                        if data[-1] == '1':
+                            sub = '1 Месяц'
+                            price = prices.price_1
+                        elif data[-1] == '2':
+                            sub = '3 Месяца'
+                            price = prices.price_2
+                        elif data[-1] == '3':
+                            sub = '6 Месяцев'
+                            price = prices.price_3
+                        elif data[-1] == '4':
+                            sub = '1 Год'
+                            price = prices.price_4
+                        elif data[-1] == '3_days_trial':
+                            sub = '3 Дня'
+                            price = prices.price_5
+                        await bot.send_message(call.message.chat.id, text=msg.payment_menu.format(
+                            sub, price, recurrent_price
+                        ),
                                                reply_markup=markup.payment_menu(data[-1]))
 
                     elif 'payment' in data:
