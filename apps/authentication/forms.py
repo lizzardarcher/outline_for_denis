@@ -1,8 +1,6 @@
 import random
-from datetime import datetime, timedelta
 
 from django import forms
-from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth.forms import PasswordResetForm, SetPasswordForm, PasswordChangeForm, AuthenticationForm, \
     UsernameField

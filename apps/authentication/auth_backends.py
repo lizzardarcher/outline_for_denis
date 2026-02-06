@@ -1,6 +1,5 @@
 import hashlib
 import hmac
-from datetime import datetime, timedelta
 
 from django.conf import settings
 from django.contrib import messages

@@ -8,7 +8,6 @@ import requests
 from django.conf import settings
 from django.http import HttpResponse
 from django.shortcuts import redirect
-from django.urls import reverse
 from django.utils.decorators import method_decorator
 from django.views import View
 from django.views.decorators.csrf import csrf_exempt

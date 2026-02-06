@@ -3,12 +3,7 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 import json
 import hashlib
-from urllib.parse import urlencode
 
-from django.contrib.auth.mixins import LoginRequiredMixin
-from django.db.models import Count, Q, Sum
-from django.db.models.functions import TruncDate, TruncYear, TruncMonth
-from django.urls import reverse
 from django.views.generic import TemplateView
 from django.shortcuts import redirect
 from django.conf import settings
@@ -18,8 +13,6 @@ from django.utils.decorators import method_decorator
 from django.http import HttpResponse
 
 from yookassa import Configuration, Payment
-
-from openpyxl import Workbook
 
 from bot.models import TelegramUser, Transaction, IncomeInfo, Logging, Prices, TelegramReferral, ReferralSettings, \
     ReferralTransaction

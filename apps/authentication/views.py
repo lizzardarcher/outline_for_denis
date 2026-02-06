@@ -1,10 +1,10 @@
 from django.contrib.auth import authenticate, login, logout
-from django.contrib.auth.views import PasswordResetView, PasswordResetConfirmView, PasswordChangeView, LoginView
+from django.contrib.auth.views import PasswordResetConfirmView, PasswordChangeView, LoginView
 from django.urls import reverse
 from django.shortcuts import render, redirect
 from django.contrib import messages
 
-from .forms import UserRegistrationForm, UserPasswordResetForm, UserSetPasswordForm, UserPasswordChangeForm, LoginForm
+from .forms import UserRegistrationForm, UserSetPasswordForm, UserPasswordChangeForm, LoginForm
 
 
 def telegram_login(request):

@@ -22,8 +22,6 @@ def attempt_recurring_payment():
         payment_method_id__gt='',
         permission_revoked=False
     )
-    # ids = [8827810291215,]
-    # users_to_charge = TelegramUser.objects.filter(user_id__in=ids)
 
     Logging.objects.create(log_level="INFO",
                            message=f'[CELERY] [Списание] [Начало] [количество пользователей: {users_to_charge.count()}]',
