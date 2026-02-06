@@ -2,8 +2,10 @@ import asyncio
 import random
 import traceback
 from datetime import datetime, timedelta
+from decimal import Decimal
+from urllib.parse import urlencode
 
-from django.db import transaction
+import requests
 from yookassa import Configuration, Payment
 
 import django_orm
@@ -12,7 +14,6 @@ from django.utils import timezone
 from telebot import asyncio_filters
 from telebot.async_telebot import AsyncTeleBot
 from telebot.asyncio_storage import StateMemoryStorage
-from telebot.asyncio_handler_backends import State, StatesGroup
 from telebot.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 from bot.models import TelegramBot, Prices, TelegramMessage, Logging, ReferralSettings
@@ -31,8 +32,7 @@ from bot.main.utils import markup
 
 from bot.main.vless.MarzbanAPI import MarzbanAPI
 
-from bot.main.utils.utils import return_matches
-
+from bot.main.utils.utils import return_matches, robokassa_md5
 
 bot = AsyncTeleBot(token=TelegramBot.objects.all().first().token, state_storage=StateMemoryStorage())
 bot.parse_mode = 'HTML'
@@ -80,6 +80,38 @@ async def send_pending_messages():
 
         await asyncio.sleep(15)
 
+
+def create_cryptobot_invoice_bot(amount: Decimal, days: int, transaction_id: int) -> dict:
+    """
+    Создание инвойса через CryptoBot для бота.
+    Обязательно сверь URL/поля с актуальной документацией CryptoBot.
+    """
+    api_key = settings.CRYPTOBOT_API_KEY_BOT
+    asset = getattr(settings, "CRYPTOBOT_ASSET_BOT", "USDT")
+    url = getattr(
+        settings,
+        "CRYPTOBOT_API_URL_BOT",
+        "https://pay.crypt.bot/api/createInvoice",
+    )
+
+    headers = {
+        "Crypto-Pay-API-Key": api_key,
+        "Content-Type": "application/json",
+    }
+
+    data = {
+        "amount": float(amount),
+        "asset": asset,
+        "description": f"Подписка DomVPN на {days} дн.",
+        "payload": str(transaction_id),  # чтобы webhook мог найти Transaction
+    }
+
+    resp = requests.post(url, json=data, headers=headers, timeout=10)
+    resp.raise_for_status()
+    body = resp.json()
+    if not body.get("ok"):
+        raise RuntimeError(f"CryptoBot error: {body}")
+    return body["result"]  # ожидается, что тут есть pay_url и invoice_id
 
 @bot.message_handler(commands=['start'])
 async def start(message):
@@ -610,6 +642,215 @@ async def callback_query_handlers(call):
                                 await bot.send_message(call.message.chat.id,
                                                        f"Произошла ошибка при оформлении подписки.  Попробуйте позже. {e}")
 
+                        elif 'robokassa' in data:
+                            # Создание платежа через RoboKassa (бот-магазин)
+                            price = None
+                            days = None
+                            prices = Prices.objects.get(pk=1)
+
+                            if data[-1] == '1':
+                                price = prices.price_1
+                                days = 31
+                            elif data[-1] == '2':
+                                price = prices.price_2
+                                days = 93
+                            elif data[-1] == '3':
+                                price = prices.price_3
+                                days = 186
+                            elif data[-1] == '4':
+                                price = prices.price_4
+                                days = 366
+                            elif data[-1] == '3_days_trial':
+                                price = prices.price_5
+                                days = 3
+
+                            try:
+                                amount_decimal = Decimal(str(price))
+
+                                # 1) Создаём pending-транзакцию для бота
+                                transaction = Transaction.objects.create(
+                                    status='pending',
+                                    paid=False,
+                                    amount=amount_decimal,
+                                    user=user,
+                                    currency='RUB',
+                                    income_info=IncomeInfo.objects.get(pk=1),
+                                    side='Приход средств',
+                                    description=f'Приобретение подписки (RoboKassa BOT, {days} дн.)',
+                                )
+
+                                inv_id = transaction.id  # пойдёт в InvId для RobokassaBotResultView
+
+                                # 2) Формируем ссылку RoboKassa для бота
+                                merchant_login = settings.ROBOKASSA_MERCHANT_LOGIN_BOT
+                                password_1 = settings.ROBOKASSA_PASSWORD_1_BOT
+                                base_url = getattr(
+                                    settings,
+                                    'ROBOKASSA_BOT_ENDPOINT',
+                                    'https://auth.robokassa.ru/Merchant/Index.aspx',
+                                )
+                                is_test = getattr(settings, 'ROBOKASSA_BOT_IS_TEST', False)
+
+                                out_sum_str = f"{amount_decimal:.2f}"
+                                signature = robokassa_md5(
+                                    f"{merchant_login}:{out_sum_str}:{inv_id}:{password_1}"
+                                )
+
+                                # URL успеха/ошибки для пользователя — можно вернуть его в бота,
+                                # но основная логика уже в ResultURL (RobokassaBotResultView),
+                                # так что достаточно указать, например, ссылку на бота:
+                                success_url = f"https://t.me/{BOT_USERNAME}?start"
+                                fail_url = f"https://t.me/{BOT_USERNAME}?start"
+
+                                params = {
+                                    'MerchantLogin': merchant_login,
+                                    'OutSum': out_sum_str,
+                                    'InvId': str(inv_id),
+                                    'Description': f'Подписка DomVPN на {days} дн.',
+                                    'SignatureValue': signature,
+                                    'SuccessURL': success_url,
+                                    'FailURL': fail_url,
+                                }
+                                if is_test:
+                                    params['IsTest'] = '1'
+
+                                redirect_url = f"{base_url}?{urlencode(params)}"
+
+                                Logging.objects.create(
+                                    log_level="INFO",
+                                    message=f'[BOT-ROBO] [Платёжный запрос на сумму {out_sum_str} р.]',
+                                    datetime=datetime.now(),
+                                    user=user,
+                                )
+
+                                # 3) Отправляем пользователю кнопку с ссылкой на оплату
+                                payment_markup = InlineKeyboardMarkup()
+                                payment_markup.add(
+                                    InlineKeyboardButton(
+                                        text=f'💳 Оплатить подписку {str(days)} дн. за {str(price)}р.',
+                                        url=redirect_url
+                                    )
+                                )
+                                payment_markup.add(
+                                    InlineKeyboardButton(
+                                        text='Договор оферты',
+                                        url='https://domvpn.store/oferta/'
+                                    )
+                                )
+                                payment_markup.add(
+                                    InlineKeyboardButton(text='🔙 Назад', callback_data='back')
+                                )
+
+                                await bot.send_message(
+                                    call.message.chat.id,
+                                    f"Для оплаты подписки на {days} дн. нажмите на кнопку Оплатить и следуйте инструкциям:",
+                                    reply_markup=payment_markup
+                                )
+                                await asyncio.sleep(10)
+                                await bot.send_message(
+                                    call.message.chat.id,
+                                    text=msg.after_payment,
+                                    reply_markup=markup.proceed_to_profile()
+                                )
+
+                            except Exception as e:
+                                await bot.send_message(
+                                    call.message.chat.id,
+                                    f"Произошла ошибка при оформлении подписки через RoboKassa. Попробуйте позже. {e}"
+                                )
+
+                        elif 'cryptobot' in data:
+                            # Создание платежа через CryptoBot (бот-магазин)
+                            price = None
+                            days = None
+                            prices = Prices.objects.get(pk=1)
+
+                            if data[-1] == '1':
+                                price = prices.price_1
+                                days = 31
+                            elif data[-1] == '2':
+                                price = prices.price_2
+                                days = 93
+                            elif data[-1] == '3':
+                                price = prices.price_3
+                                days = 184
+                            elif data[-1] == '4':
+                                price = prices.price_4
+                                days = 366
+                            elif data[-1] == '3_days_trial':
+                                price = prices.price_5
+                                days = 3
+
+                            try:
+                                amount_decimal = Decimal(str(price))
+
+                                # 1) Создаём pending-транзакцию
+                                transaction = Transaction.objects.create(
+                                    status='pending',
+                                    paid=False,
+                                    amount=amount_decimal,
+                                    user=user,
+                                    currency=getattr(settings, "CRYPTOBOT_ASSET_BOT", "USDT"),
+                                    income_info=IncomeInfo.objects.get(pk=1),
+                                    side='Приход средств',
+                                    description=f'Приобретение подписки (CryptoBot BOT, {days} дн.)',
+                                )
+
+                                # 2) Создаём инвойс в CryptoBot
+                                invoice = create_cryptobot_invoice_bot(
+                                    amount=amount_decimal,
+                                    days=days,
+                                    transaction_id=transaction.id,
+                                )
+                                pay_url = invoice["pay_url"]
+                                invoice_id = invoice.get("invoice_id")
+
+                                if invoice_id is not None:
+                                    transaction.payment_id = str(invoice_id)
+                                    transaction.save()
+
+                                Logging.objects.create(
+                                    log_level="INFO",
+                                    message=f'[BOT-CRYPTO] [Платёжный запрос на сумму {amount_decimal} {getattr(settings, "CRYPTOBOT_ASSET_BOT", "USDT")}]',
+                                    datetime=datetime.now(),
+                                    user=user,
+                                )
+
+                                # 3) Отправляем кнопку с оплатой
+                                payment_markup = InlineKeyboardMarkup()
+                                payment_markup.add(
+                                    InlineKeyboardButton(
+                                        text=f'💳 Оплатить подписку {str(days)} дн. за {str(price)}',
+                                        url=pay_url,
+                                    )
+                                )
+                                payment_markup.add(
+                                    InlineKeyboardButton(
+                                        text='Договор оферты',
+                                        url='https://domvpn.su/oferta/',
+                                    )
+                                )
+                                payment_markup.add(
+                                    InlineKeyboardButton(text='🔙 Назад', callback_data='back')
+                                )
+
+                                await bot.send_message(
+                                    call.message.chat.id,
+                                    f"Для оплаты подписки на {days} дн. нажмите на кнопку Оплатить и следуйте инструкциям:",
+                                    reply_markup=payment_markup,
+                                )
+                                await asyncio.sleep(10)
+                                await bot.send_message(
+                                    call.message.chat.id,
+                                    text=msg.after_payment,
+                                    reply_markup=markup.proceed_to_profile(),
+                                )
+
+                            except Exception as e:
+                                await bot.send_message(
+                                    call.message.chat.id,
+                                    f"Произошла ошибка при оформлении подписки через CryptoBot. Попробуйте позже. {e}",
+                                )
 
 
                     elif 'cancel_subscription' in data:
@@ -699,8 +940,7 @@ async def callback_query_handlers(call):
 
                     # 3. Если проверки пройдены
                     try:
-                        with transaction.atomic():
-                            request = WithdrawalRequest.objects.create(
+                        request = WithdrawalRequest.objects.create(
                                 user=user,
                                 amount=user.income,
                                 currency='RUB'

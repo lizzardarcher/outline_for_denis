@@ -364,11 +364,11 @@ class TelegramReferralAdmin(BaseAdmin):
 
 @admin.register(Transaction)
 class TransactionAdmin(BaseAdmin):
-    list_display = ('timestamp', 'amount', 'currency', 'status', 'description', 'paid', 'payment_id', 'user', 'side')
-    readonly_fields = ('income_info', 'timestamp', 'amount', 'currency', 'status', 'description', 'paid', 'payment_id', 'user', 'side')
+    list_display = ('timestamp', 'amount', 'currency', 'status', 'description', 'paid', 'payment_id', 'user', 'side', 'payment_system')
+    readonly_fields = ('income_info', 'timestamp', 'amount', 'currency', 'status', 'description', 'paid', 'payment_id', 'user', 'side', 'payment_system')
     list_display_links = ('user', 'payment_id',)
     ordering = ['-timestamp']
-    search_fields = ('user__username', 'user__first_name', 'user__last_name', 'user__user_id', 'description', 'payment_id',)
+    search_fields = ('user__username', 'user__first_name', 'user__last_name', 'user__user_id', 'description', 'payment_id', 'payment_system')
     list_filter = ['timestamp', 'description', 'paid', 'status']
 
     def has_change_permission(self, request, obj=None):

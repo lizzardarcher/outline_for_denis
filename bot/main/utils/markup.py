@@ -141,13 +141,35 @@ def my_profile(user: TelegramUser):
     return markup
 
 
+
 def payment_menu(payment_type: str):
     markup = InlineKeyboardMarkup()
-    markup.add(InlineKeyboardButton(text=f'Юкасса (СБП, Банковская карта)', callback_data=f'account:payment:ukassa:{payment_type}'))
-    markup.add(InlineKeyboardButton(text='Оплачивая подписку я соглашаюсь с договором офертой', url=f'{DOMAIN}/oferta/'))
+    markup.add(
+        InlineKeyboardButton(
+            text='Юкасса (СБП, Банковская карта)',
+            callback_data=f'account:payment:ukassa:{payment_type}'
+        )
+    )
+    # markup.add(
+    #     InlineKeyboardButton(
+    #         text='Криптовалюта (USDT, TON)',
+    #         callback_data=f'account:payment:cryptobot:{payment_type}'
+    #     )
+    # )
+    # markup.add(
+    #     InlineKeyboardButton(
+    #         text='Робокасса (карта/СБП)',
+    #         callback_data=f'account:payment:robokassa:{payment_type}'
+    #     )
+    # )
+    markup.add(
+        InlineKeyboardButton(
+            text='Оплачивая подписку я соглашаюсь с договором офертой',
+            url=f'{DOMAIN}/oferta/'
+        )
+    )
     markup.add(btn_back)
     return markup
-
 
 def choose_subscription():
     markup = InlineKeyboardMarkup()
