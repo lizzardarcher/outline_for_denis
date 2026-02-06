@@ -11,7 +11,6 @@ from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.generic import TemplateView
 
-from apps.dashboard.outline_vpn.outline_client import delete_user_keys, create_new_key
 from bot.main.MarzbanAPI import MarzbanAPI
 from bot.models import VpnKey, Server, TelegramUser, Country, Prices, UserProfile, ReferralSettings, TelegramReferral, \
     Transaction, Logging
@@ -87,16 +86,33 @@ class CreateNewKeyView(LoginRequiredMixin, TemplateView):
         user = user_profile.telegram_user
 
         if protocol == 'outline':
-            server = Server.objects.filter(is_active=True, is_activated=True, country=country,
+
+            server = Server.objects.filter(is_active=True, is_activated_vless=True, country=country,
                                            keys_generated__lte=KEY_LIMIT).order_by('keys_generated').first()
             if not server:
                 messages.error(request, f"Ошибка создания ключа! Нет доступных серверов для страны '{country.name}'.")
                 return redirect('profile')
 
-            delete_user_keys(user=user)               # Удаляем текущие ключи outline
-            create_new_key(server=server, user=user)  # Генерируем новый ключ outline
+
+            VpnKey.objects.filter(user=user).delete() #  Удаляем все предыдущие ключи
+
+            MarzbanAPI().create_user(username=str(user.user_id)) # Генерируем новый ключ vless
+            success, result = MarzbanAPI().get_user(username=str(user.user_id))
+            links = result['links']
+            key = "---"
+
+            for link in links:
+                if server.ip_address in link and "ss://" in link:
+                    key = link
+                    break
+
+            VpnKey.objects.create(server=server, user=user, key_id=user.user_id,
+                                        name=str(user.user_id), password=str(user.user_id),
+                                        port=1040, method='ss', access_url=key, protocol='outline')
+
             messages.success(request, f'Новый ключ создан!')
             Logging.objects.create(log_level=" INFO", message=f'[WEB] [Новый ключ создан]', datetime=datetime.now(), user=self.request.user.profile.telegram_user)
+
         elif protocol == 'vless':
 
             server = Server.objects.filter(is_active=True, is_activated_vless=True, country=country,
@@ -113,7 +129,8 @@ class CreateNewKeyView(LoginRequiredMixin, TemplateView):
             links = result['links']
             key = "---"
             for link in links:
-                if server.ip_address in link:
+
+                if server.ip_address in link and "vless://" in link:
                     key = link
                     break
 
