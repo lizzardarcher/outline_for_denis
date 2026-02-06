@@ -1,10 +1,7 @@
-import os
-from datetime import datetime, timedelta
-
 import requests
 import json
-import uuid
-import dotenv
+
+from django.conf import settings
 
 from bot.main import django_orm
 from bot.models import TelegramBot
@@ -20,11 +17,11 @@ class MarzbanAPI:
         Инициализирует экземпляр класса.
 
         Args:
-            api_url (str): URL API Marzban (например, "https://your-marzban-domain.com/api/").  Обязательно укажите '/api/' в конце!
+            api_url (str): URL API Marzban.
             api_token (str): Токен API для аутентификации.
         """
 
-        self.api_url = "https://mvless.ru/api"
+        self.api_url = settings.MARZBAN_API
         self.api_token = self.get_access_token()
         self.headers = {
             "Authorization": f"Bearer {self.api_token}",
@@ -112,19 +109,6 @@ class MarzbanAPI:
             tuple: (bool, dict) - (Успешно ли создан пользователь, данные пользователя или сообщение об ошибке)
         """
 
-        # data = {
-        #     "data_limit": data_limit,
-        #     "expire": expire,
-        #     "inbounds": {
-        #         "vless": ["VLESS TCP REALITY"],
-        #     },
-        #     "proxies": proxies or {
-        #         "vless": {},
-        #     },
-        #     "status": status,
-        #     "username": username
-        # }
-
         data = {
             "data_limit": data_limit,
             "expire": expire,
@@ -192,66 +176,3 @@ class MarzbanAPI:
         success, result = self._make_request("POST", f"/node", data=node)
         return success, result
 
-
-
-# Пример использования:
-# if __name__ == '__main__':
-#     marzban.add_node("178.208.78.170", "test")
-# #
-# #     # Замените на свои значения
-#     API_URL = "https://mvless.ru/api"
-#     API_TOKEN = TelegramBot.objects.all().first().marzban_api_key
-#
-#
-    # marzban = MarzbanAPI()
-# Пример создания пользователя с настройками
-# marzban = MarzbanAPI()
-# success, result = marzban.create_user(
-#     username="testuser2221112",
-#     data_limit_reset_strategy="monthly",
-#     # expire=int(round(datetime.now().timestamp() + (60 * 60 * 24 * 30))),  # 30 дней
-#     proxies={
-#         "vless": {
-#             "id": str(uuid.uuid4())
-#         }
-#     },
-# )
-#
-# if success:
-#     print("Пользователь создан:", result)
-# else:
-#     print("Ошибка создания пользователя:", result)
-
-
-# Получение информации о пользователе
-# success, result = marzban.get_user("testuser22212")
-# if success:
-#     links = result["links"]
-#     for link in links:
-#         print(link)
-# else:
-#     print("Ошибка получения информации о пользователе:", result)
-
-
-# # Получение конфигурации пользователя
-# success, result = marzban.get_user_configuration("testuser", "sing-box")
-# if success:
-#     print("Конфигурация пользователя:\n", result)  # Возможно, потребуется дополнительная обработка для форматирования
-# else:
-#     print("Ошибка получения конфигурации:", result)
-
-
-# Список пользователей
-#     success, result = marzban.list_users()
-#     if success:
-#         print("Список пользователей:", result)
-#     else:
-#         print("Ошибка получения списка пользователей:", result)
-
-
-# # Удаление пользователя
-# success, result = marzban.delete_user("ansel")
-# if success:
-#     print("Пользователь удален")
-# else:
-#     print("Ошибка удаления пользователя:", result)

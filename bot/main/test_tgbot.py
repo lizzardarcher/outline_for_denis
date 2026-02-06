@@ -17,7 +17,7 @@ from telebot.asyncio_storage import StateMemoryStorage
 from telebot.asyncio_handler_backends import State, StatesGroup
 from telebot.types import InlineKeyboardButton, InlineKeyboardMarkup
 
-from bot.main.vless.MarzbanAPI import MarzbanAPI
+from bot.main.MarzbanAPI import MarzbanAPI
 from bot.models import TelegramBot, Prices, TelegramMessage, Logging
 from bot.models import TelegramUser
 from bot.models import TelegramReferral
@@ -33,8 +33,7 @@ from bot.main.utils import msg
 from bot.main.utils import markup
 
 from bot.main.utils.utils import return_matches
-from bot.main.outline_client import create_new_key
-from bot.main.outline_client import delete_user_keys
+
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(

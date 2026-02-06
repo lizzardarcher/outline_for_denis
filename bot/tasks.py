@@ -9,7 +9,7 @@ from telebot import TeleBot
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 from bot.main.utils import msg
-from bot.main.vless.MarzbanAPI import MarzbanAPI
+from bot.main.MarzbanAPI import MarzbanAPI
 from bot.models import Logging, Transaction, IncomeInfo, TelegramUser, TelegramBot, VpnKey, TelegramMessage
 from bot.models import Server
 

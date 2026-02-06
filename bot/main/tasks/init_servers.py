@@ -3,7 +3,7 @@ import traceback
 from time import sleep
 import paramiko
 import django_orm
-from bot.main.vless.MarzbanAPI import MarzbanAPI
+from bot.main.MarzbanAPI import MarzbanAPI
 from bot.models import Server, Logging
 
 
@@ -140,7 +140,6 @@ echo "Script completed successfully."
 if __name__ == '__main__':
 
     while True:
-        # init_outline_servers()
         init_vless_servers()
         sleep(60)
 

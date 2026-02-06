@@ -12,7 +12,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.views.generic import TemplateView
 
 from apps.dashboard.outline_vpn.outline_client import delete_user_keys, create_new_key
-from bot.main.vless.MarzbanAPI import MarzbanAPI
+from bot.main.MarzbanAPI import MarzbanAPI
 from bot.models import VpnKey, Server, TelegramUser, Country, Prices, UserProfile, ReferralSettings, TelegramReferral, \
     Transaction, Logging
 

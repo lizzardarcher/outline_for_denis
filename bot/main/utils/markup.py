@@ -3,11 +3,9 @@ from telebot.types import InlineKeyboardMarkup
 from telebot.types import InlineKeyboardButton
 from telebot.types import LabeledPrice
 from telebot.types import ShippingOption
+
 import django_orm
 from bot.models import Prices, Country, TelegramUser, Server
-
-# from bot.models import *
-
 
 btn_back = InlineKeyboardButton(text=f'🔙 Назад', callback_data=f'back')
 DOMAIN = settings.DOMAIN
