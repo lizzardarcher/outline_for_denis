@@ -619,7 +619,8 @@ async def callback_query_handlers(call):
                                                            currency='RUB', income_info=IncomeInfo.objects.get(pk=1),
                                                            side='Приход средств',
                                                            description='Приобретение подписки',
-                                                           payment_id=payment.id)
+                                                           payment_id=payment.id,
+                                                           payment_system='YooKassaBot')
                                 Logging.objects.create(log_level="INFO",
                                                        message=f'[BOT] [Платёжный запрос на сумму {str(price)} р.]',
                                                        datetime=datetime.now(), user=user)

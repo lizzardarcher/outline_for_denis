@@ -150,9 +150,12 @@ STATUS = (('pending', 'В ожидании'), ('succeeded', 'Успешно'), (
           ('refunded', 'Возврат'), ('captured', 'Захвачено'))
 
 PAYMENT_SYSTEM = (
-    ('YooKassa', 'Юкасса'),
-    ('RoboKassa', 'Робокасса'),
-    ('CryptoBot', 'Криптобот'),
+    ('YooKassaBot', 'Юкасса Бот'),
+    ('YooKassaSite', 'Юкасса Сайт'),
+    ('RoboKassaBot', 'Робокасса Бот'),
+    ('RoboKassaSite', 'Робокасса Сайт'),
+    ('CryptoBotBot', 'Криптобот Бот'),
+    ('CryptoBotSite', 'Криптобот Сайт'),
 )
 
 class Transaction(models.Model):
@@ -170,7 +173,7 @@ class Transaction(models.Model):
     paid = models.BooleanField(null=True, blank=True, default=False, verbose_name='Оплачено')
     status = models.CharField(max_length=50, choices=STATUS, default='pending', null=True, blank=True,
                               verbose_name='Статус')
-    payment_system = models.CharField(max_length=255, blank=True, null=True, default='YooKassa', choices=PAYMENT_SYSTEM, verbose_name='Платёжная система')
+    payment_system = models.CharField(max_length=255, blank=True, null=True, default='YooKassaBot', choices=PAYMENT_SYSTEM, verbose_name='Платёжная система')
 
     def __str__(self):
         if self.status == 'pending':

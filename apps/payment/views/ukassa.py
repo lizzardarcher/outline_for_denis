@@ -96,7 +96,7 @@ class CreatePaymentView(View):
             Transaction.objects.create(status='pending', paid=False, amount=amount,
                                        user=request.user.profile.telegram_user,
                                        currency='RUB', income_info=IncomeInfo.objects.get(pk=1), side='Приход средств',
-                                       description='Приобретение подписки', payment_id=payment.id)
+                                       description='Приобретение подписки', payment_id=payment.id, payment_system='YooKassaSite')
             Logging.objects.create(log_level="INFO", message=f'[WEB] [Платёжный запрос на сумму {str(amount)} р.]',
                                    datetime=datetime.now(), user=self.request.user.profile.telegram_user)
 
@@ -317,7 +317,7 @@ class YookassaSiteWebhookView(View):
                         telegram_user.save()
 
                     Logging.objects.create(log_level="INFO",
-                                           message=f'[BOT] [Обработка платежа] [{event_type}] [Сумма: {amount_value}] [Дни:{days}]',
+                                           message=f'[WEB] [Обработка платежа] [{event_type}] [Сумма: {amount_value}] [Дни:{days}]',
                                            datetime=datetime.now(), user=telegram_user)
 
                     referral_percentages = {
