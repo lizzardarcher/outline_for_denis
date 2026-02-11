@@ -86,9 +86,9 @@ if __name__ == '__main__':
     # user.subscription_status =True
     # user.subscription_expiration=datetime.now() + timedelta(days=93)
     # user.save()
-    user = TelegramUser.objects.filter(username='lampbacol').last()
-    user.income = user.income + 675
-    user.save()
+    # user = TelegramUser.objects.filter(username='lampbacol').last()
+    # user.income = user.income + 675
+    # user.save()
     # try:
     #     counter = 0
     #     users = TelegramUser.objects.filter(
@@ -136,3 +136,17 @@ if __name__ == '__main__':
     #         print(f"Updated user {user.user_id} with payment_method_id {Transaction.objects.filter(user=user, description='Приобретение подписки', status='succeeded').first().payment_id}")
     #     except:
     #         pass
+    # payment_ids = Logging.objects.filter(message__contains='[CELERY] [SITE] ')
+    # for p in payment_ids:
+    #     pid = p.message.split('Payment Method ID:')[-1]
+    #     if '000' in pid:
+    #         print(f'CurrentID: {p.user.payment_method_id}')
+    #         p.user.payment_method_id = pid
+    #         p.user.save()
+    #         print(f'Now: {p.user.payment_method_id}')
+    #         print(f'Updated ID: {p.user.payment_method_id}')
+    successful_payment = Transaction.objects.filter(description='Рекуррентный платеж')
+    for payment in successful_payment:
+        user_pmd = TelegramUser.objects.filter(payment_method_id=payment.payment_id).last().payment_method_id
+        print(user_pmd)
+    # print(successful_payment)

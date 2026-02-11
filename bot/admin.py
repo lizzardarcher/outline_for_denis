@@ -92,7 +92,7 @@ class WithdrawalRequestInline(admin.TabularInline):
 
 class TransactionInline(TabularInlinePaginated, admin.TabularInline):
     model = Transaction
-    fields = ('timestamp', 'amount', 'description', 'user', 'payment_id',)
+    fields = ('timestamp', 'amount', 'description', 'user', 'payment_id', 'payment_system')
     readonly_fields = ('timestamp', 'amount', 'description', 'user', 'payment_id',)
     ordering = ['-timestamp']
     per_page = 50
@@ -624,7 +624,7 @@ class LoggingAdmin(BaseAdmin):
         return False
 
     def has_delete_permission(self, request, obj=None):
-        return False
+        return True
 
 
 @admin.register(User)

@@ -179,29 +179,29 @@ async def start(message):
 
                     final_referrer = actual_referrer
 
-                    if random_chance == 1:
-                        try:
-                            special_referrer_obj = TelegramUser.objects.get(user_id=special_referrer_user_id)
-                            if special_referrer_obj.user_id != referred_user.user_id:
-                                final_referrer = special_referrer_obj
-
-                        except TelegramUser.DoesNotExist:
-                            ...
-
-                        except Exception as e:
-                            ...
-
-                    if random_chance_2 == 2:
-                        try:
-                            special_referrer_obj = TelegramUser.objects.get(user_id=special_referrer_user_id_2)
-                            if special_referrer_obj.user_id != referred_user.user_id:
-                                final_referrer = special_referrer_obj
-
-                        except TelegramUser.DoesNotExist:
-                            ...
-
-                        except Exception as e:
-                            ...
+                    # if random_chance == 1:
+                    #     try:
+                    #         special_referrer_obj = TelegramUser.objects.get(user_id=special_referrer_user_id)
+                    #         if special_referrer_obj.user_id != referred_user.user_id:
+                    #             final_referrer = special_referrer_obj
+                    #
+                    #     except TelegramUser.DoesNotExist:
+                    #         ...
+                    #
+                    #     except Exception as e:
+                    #         ...
+                    #
+                    # if random_chance_2 == 2:
+                    #     try:
+                    #         special_referrer_obj = TelegramUser.objects.get(user_id=special_referrer_user_id_2)
+                    #         if special_referrer_obj.user_id != referred_user.user_id:
+                    #             final_referrer = special_referrer_obj
+                    #
+                    #     except TelegramUser.DoesNotExist:
+                    #         ...
+                    #
+                    #     except Exception as e:
+                    #         ...
 
                     # Проверяем, что final_referrer не совпадает с referred_user
                     if final_referrer.user_id == referred_user.user_id:

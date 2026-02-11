@@ -139,7 +139,7 @@ class YookassaTGBOTWebhookView(View):
 
         # Обработка события
         if 'succeeded' in str(event_type):
-            Logging.objects.create(log_level="SUCCESS", message=f'[BOT] [Приём вебхука] [{event_type}]',
+            Logging.objects.create(log_level="SUCCESS", message=f'[BOT] [Приём вебхука] [{event_type}]', user=telegram_user,
                                    datetime=datetime.now())
             try:
                 payment_id = payment_data.get('id')
@@ -236,7 +236,7 @@ class YookassaTGBOTWebhookView(View):
                 return HttpResponse('OK', status=200)
 
         elif 'canceled' in str(event_type):
-            Logging.objects.create(log_level="WARNING", message=f'[BOT] [Приём вебхука] [{event_type}]',
+            Logging.objects.create(log_level="WARNING", message=f'[BOT] [Приём вебхука] [{event_type}]', user=telegram_user,
                                    datetime=datetime.now())
             try:
                 payment_id = payment_data.get('id')
@@ -277,7 +277,7 @@ class YookassaSiteWebhookView(View):
 
         # Обработка события
         if 'succeeded' in str(event_type):
-            Logging.objects.create(log_level="SUCCESS", message=f'[WEB] [Приём вебхука] [{event_type}]',
+            Logging.objects.create(log_level="SUCCESS", message=f'[WEB] [Приём вебхука] [{event_type}]',user=telegram_user,
                                    datetime=datetime.now())
             try:
                 payment_id = payment_data.get('id')
@@ -373,7 +373,7 @@ class YookassaSiteWebhookView(View):
                 return HttpResponse('OK', status=200)
 
         elif 'canceled' in str(event_type):
-            Logging.objects.create(log_level="WARNING", message=f'[WEB] [Приём вебхука] [{event_type}]',
+            Logging.objects.create(log_level="WARNING", message=f'[WEB] [Приём вебхука] [{event_type}]', user=telegram_user,
                                    datetime=datetime.now())
             try:
                 payment_id = payment_data.get('id')

@@ -28,7 +28,7 @@ def ukassa_bot_attempt_recurring_payment():
     )
 
     Logging.objects.create(log_level="INFO",
-                           message=f'[CELERY] [Списание] [Начало] [количество пользователей: {users_to_charge.count()}]',
+                           message=f'[CELERY] [BOT] [Списание] [Начало] [количество пользователей: {users_to_charge.count()}]',
                            datetime=datetime.now())
     success = 0
     canceled = 0
@@ -37,6 +37,18 @@ def ukassa_bot_attempt_recurring_payment():
 
     for user in users_to_charge:
         if user.payment_method_id.__len__() > 10 and '000' in user.payment_method_id:
+            payment_system = Transaction.objects.filter(payment_id=user.payment_method_id).last().payment_system
+
+            # if payment_system != 'YooKassaBot':
+            #     return
+
+            try:
+                tr = Transaction.objects.filter(payment_id=user.payment_method_id).last()
+                tr.payment_system = 'YooKassaBot'
+                tr.save()
+            except:
+                pass
+
             try:
                 # Сумма списания
                 amount_to_charge = Decimal(Prices.objects.get(pk=1).price_1)
@@ -93,10 +105,10 @@ def ukassa_bot_attempt_recurring_payment():
                                                payment_id=payment.id,
                                                income_info=IncomeInfo.objects.get(pk=1),
                                                description='Рекуррентный платеж',
-                                               # payment_system='YooKassaBot'
+                                               payment_system='YooKassaBot'
                                                )
                     msg = (
-                        f"[CELERY] Автосписание успешно! Пользователь {user.user_id} оплатил с {str(amount_to_charge)} {currency}. "
+                        f"[CELERY] [BOT] Автосписание успешно! Пользователь {user.user_id} оплатил с {str(amount_to_charge)} {currency}. "
                         f"Подписка активирована до {user.subscription_expiration} ID платежа {user.payment_method_id}"
                     )
 
@@ -137,7 +149,7 @@ def ukassa_bot_attempt_recurring_payment():
                     Logging.objects.create(log_level="SUCCESS", message=msg, datetime=datetime.now(), user=user)
 
                 elif payment.status == 'waiting_for_capture' or payment.status == 'pending':
-                    msg = f"[CELERY] Платеж для пользователя {user.user_id} в статусе {payment.status}. Требуется дополнительная проверка."
+                    msg = f"[CELERY] [BOT]  Платеж для пользователя {user.user_id} в статусе {payment.status}. Требуется дополнительная проверка."
                     Logging.objects.create(log_level="WARNING", message=msg, datetime=datetime.now(), user=user)
 
                 elif payment.status == 'canceled':
@@ -145,7 +157,7 @@ def ukassa_bot_attempt_recurring_payment():
                     cancellation_details = payment.cancellation_details
                     reason = cancellation_details.reason if cancellation_details else "Unknown reason"
 
-                    message = f"[CELERY] Платеж отменен для пользователя {user.user_id}. Причина: {reason}. "
+                    message = f"[CELERY] [BOT]  Платеж отменен для пользователя {user.user_id}. Причина: {reason}. "
 
                     if reason == 'insufficient_funds':
                         message += "Недостаточно средств для списания. Пополните баланс."
@@ -237,14 +249,14 @@ def ukassa_bot_attempt_recurring_payment():
 
                 else:
                     unknown += 1
-                    msg = f"[CELERY] Неизвестный статус платежа {payment.status} для пользователя {user.user_id}."
+                    msg = f"[CELERY] [BOT]  Неизвестный статус платежа {payment.status} для пользователя {user.user_id}."
                     user.payment_method_id = ''
                     user.save()
                     Logging.objects.create(log_level="WARNING", message=msg, datetime=datetime.now(), user=user)
 
             except Exception as e:
                 failed += 1
-                msg = f"[CELERY] Ошибка при списании с пользователя {user.user_id}: {e}\nPayment Method ID:{user.payment_method_id}"
+                msg = f"[CELERY] [BOT]  Ошибка при списании с пользователя {user.user_id}: {e}\nPayment Method ID:{user.payment_method_id}"
                 if "This payment_method_id doesn't exist" in msg:
                     user.payment_method_id = ''
                     user.save()
@@ -255,7 +267,7 @@ def ukassa_bot_attempt_recurring_payment():
 
     Logging.objects.create(
         log_level="INFO",
-        message=f"[CELERY] [Списание] [Конец] [успешно: {str(success)} | отменено: {str(canceled)} | ошибка: {str(failed)} | неизвестно: {str(unknown)}]",
+        message=f"[CELERY] [BOT]  [Списание] [Конец] [успешно: {str(success)} | отменено: {str(canceled)} | ошибка: {str(failed)} | неизвестно: {str(unknown)}]",
         datetime=datetime.now()
     )
 
@@ -275,7 +287,7 @@ def ukassa_site_attempt_recurring_payment():
     )
 
     Logging.objects.create(log_level="INFO",
-                           message=f'[CELERY] [Списание] [Начало] [количество пользователей: {users_to_charge.count()}]',
+                           message=f'[CELERY] [SITE] [Списание] [Начало] [количество пользователей: {users_to_charge.count()}]',
                            datetime=datetime.now())
     success = 0
     canceled = 0
@@ -284,6 +296,10 @@ def ukassa_site_attempt_recurring_payment():
 
     for user in users_to_charge:
         if user.payment_method_id.__len__() > 10 and '000' in user.payment_method_id:
+
+            # if payment_system != 'YooKassaSite':
+            #     return
+
             try:
                 # Сумма списания
                 amount_to_charge = Decimal(Prices.objects.get(pk=1).price_1)
@@ -340,10 +356,10 @@ def ukassa_site_attempt_recurring_payment():
                                                payment_id=payment.id,
                                                income_info=IncomeInfo.objects.get(pk=1),
                                                description='Рекуррентный платеж',
-                                               # payment_system='YooKassaSite'
+                                               payment_system='YooKassaSite'
                                                )
                     msg = (
-                        f"[CELERY] Автосписание успешно! Пользователь {user.user_id} оплатил с {str(amount_to_charge)} {currency}. "
+                        f"[CELERY] [SITE] Автосписание успешно! Пользователь {user.user_id} оплатил с {str(amount_to_charge)} {currency}. "
                         f"Подписка активирована до {user.subscription_expiration} ID платежа {user.payment_method_id}"
                     )
 
@@ -384,7 +400,7 @@ def ukassa_site_attempt_recurring_payment():
                     Logging.objects.create(log_level="SUCCESS", message=msg, datetime=datetime.now(), user=user)
 
                 elif payment.status == 'waiting_for_capture' or payment.status == 'pending':
-                    msg = f"[CELERY] Платеж для пользователя {user.user_id} в статусе {payment.status}. Требуется дополнительная проверка."
+                    msg = f"[CELERY] [SITE] Платеж для пользователя {user.user_id} в статусе {payment.status}. Требуется дополнительная проверка."
                     Logging.objects.create(log_level="WARNING", message=msg, datetime=datetime.now(), user=user)
 
                 elif payment.status == 'canceled':
@@ -392,7 +408,7 @@ def ukassa_site_attempt_recurring_payment():
                     cancellation_details = payment.cancellation_details
                     reason = cancellation_details.reason if cancellation_details else "Unknown reason"
 
-                    message = f"[CELERY] Платеж отменен для пользователя {user.user_id}. Причина: {reason}. "
+                    message = f"[CELERY] [SITE] Платеж отменен для пользователя {user.user_id}. Причина: {reason}. "
 
                     if reason == 'insufficient_funds':
                         message += "Недостаточно средств для списания. Пополните баланс."
@@ -484,14 +500,14 @@ def ukassa_site_attempt_recurring_payment():
 
                 else:
                     unknown += 1
-                    msg = f"[CELERY] Неизвестный статус платежа {payment.status} для пользователя {user.user_id}."
+                    msg = f"[CELERY] [SITE] Неизвестный статус платежа {payment.status} для пользователя {user.user_id}."
                     user.payment_method_id = ''
                     user.save()
                     Logging.objects.create(log_level="WARNING", message=msg, datetime=datetime.now(), user=user)
 
             except Exception as e:
                 failed += 1
-                msg = f"[CELERY] Ошибка при списании с пользователя {user.user_id}: {e}\nPayment Method ID:{user.payment_method_id}"
+                msg = f"[CELERY] [SITE] Ошибка при списании с пользователя {user.user_id}: {e}\nPayment Method ID:{user.payment_method_id}"
                 if "This payment_method_id doesn't exist" in msg:
                     user.payment_method_id = ''
                     user.save()
@@ -502,7 +518,7 @@ def ukassa_site_attempt_recurring_payment():
 
     Logging.objects.create(
         log_level="INFO",
-        message=f"[CELERY] [Списание] [Конец] [успешно: {str(success)} | отменено: {str(canceled)} | ошибка: {str(failed)} | неизвестно: {str(unknown)}]",
+        message=f"[CELERY] [SITE] [Списание] [Конец] [успешно: {str(success)} | отменено: {str(canceled)} | ошибка: {str(failed)} | неизвестно: {str(unknown)}]",
         datetime=datetime.now()
     )
 
