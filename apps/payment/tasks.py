@@ -13,6 +13,7 @@ from bot.models import TelegramUser, Prices, Logging, Transaction, IncomeInfo, T
 
 YOOKASSA_API_BASE = "https://api.yookassa.ru/v3/payments"
 
+
 @shared_task
 def ukassa_bot_attempt_recurring_payment():
     """
@@ -37,17 +38,10 @@ def ukassa_bot_attempt_recurring_payment():
 
     for user in users_to_charge:
         if user.payment_method_id.__len__() > 10 and '000' in user.payment_method_id:
-            payment_system = Transaction.objects.filter(payment_id=user.payment_method_id).last().payment_system
+            # payment_system = Transaction.objects.filter(payment_id=user.payment_method_id).last().payment_system
 
             # if payment_system != 'YooKassaBot':
             #     return
-
-            try:
-                tr = Transaction.objects.filter(payment_id=user.payment_method_id).last()
-                tr.payment_system = 'YooKassaBot'
-                tr.save()
-            except:
-                pass
 
             try:
                 # Сумма списания
@@ -112,6 +106,13 @@ def ukassa_bot_attempt_recurring_payment():
                         f"Подписка активирована до {user.subscription_expiration} ID платежа {user.payment_method_id}"
                     )
 
+                    try:
+                        tr = Transaction.objects.filter(payment_id=user.payment_method_id).last()
+                        tr.payment_system = 'YooKassaBot'
+                        tr.save()
+                    except:
+                        pass
+
                     referral_percentages = {
                         1: ReferralSettings.objects.get(pk=1).level_1_percentage,
                         2: ReferralSettings.objects.get(pk=1).level_2_percentage,
@@ -142,7 +143,7 @@ def ukassa_bot_attempt_recurring_payment():
                                 percent = referral_percentages_2.get(level)
                             if percent:
                                 income = Decimal(user_to_pay.income) + (
-                                            Decimal(amount_to_charge) * Decimal(percent) / 100)
+                                        Decimal(amount_to_charge) * Decimal(percent) / 100)
                                 user_to_pay.income = income
                                 user_to_pay.save()
 
@@ -297,7 +298,9 @@ def ukassa_site_attempt_recurring_payment():
     for user in users_to_charge:
         if user.payment_method_id.__len__() > 10 and '000' in user.payment_method_id:
 
-            # if payment_system != 'YooKassaSite':
+            # payment_system = Transaction.objects.filter(payment_id=user.payment_method_id).last().payment_system
+
+            # if payment_system != 'YooKassaBot':
             #     return
 
             try:
@@ -393,7 +396,7 @@ def ukassa_site_attempt_recurring_payment():
                                 percent = referral_percentages_2.get(level)
                             if percent:
                                 income = Decimal(user_to_pay.income) + (
-                                            Decimal(amount_to_charge) * Decimal(percent) / 100)
+                                        Decimal(amount_to_charge) * Decimal(percent) / 100)
                                 user_to_pay.income = income
                                 user_to_pay.save()
 
@@ -594,7 +597,8 @@ def _process_payment_data(payment_data: dict, transaction: Transaction, telegram
                         # если поле subscription_expiration пустое, используем сейчас
                         if not getattr(telegram_user, "subscription_expiration", None):
                             telegram_user.subscription_expiration = timezone.now()
-                        telegram_user.subscription_expiration = telegram_user.subscription_expiration + timedelta(days=days)
+                        telegram_user.subscription_expiration = telegram_user.subscription_expiration + timedelta(
+                            days=days)
                         if payment_method_id:
                             telegram_user.payment_method_id = payment_method_id
                         telegram_user.permission_revoked = False
@@ -657,7 +661,8 @@ def _process_payment_data(payment_data: dict, transaction: Transaction, telegram
 
                         if percent:
                             try:
-                                income_new = Decimal(user_to_pay.income) + (Decimal(amount_value) * Decimal(percent) / 100)
+                                income_new = Decimal(user_to_pay.income) + (
+                                            Decimal(amount_value) * Decimal(percent) / 100)
                                 user_to_pay.income = income_new
                                 user_to_pay.save()
                                 ReferralTransaction.objects.create(
@@ -676,7 +681,8 @@ def _process_payment_data(payment_data: dict, transaction: Transaction, telegram
                                        datetime=timezone.now(), user=telegram_user)
 
         elif "canceled" in str(event_status):
-            Logging.objects.create(log_level="WARNING", message=f'[{source_label}] [Приём опроса] [canceled] [payment_id={transaction.payment_id}]',
+            Logging.objects.create(log_level="WARNING",
+                                   message=f'[{source_label}] [Приём опроса] [canceled] [payment_id={transaction.payment_id}]',
                                    datetime=timezone.now())
             try:
                 transaction.status = event_status
@@ -687,14 +693,15 @@ def _process_payment_data(payment_data: dict, transaction: Transaction, telegram
                                        message=f'[{source_label}] [Ошибка при обработке canceled] [payment_id={transaction.payment_id}] [{traceback.format_exc()}]',
                                        datetime=timezone.now(), user=telegram_user)
         else:
-            Logging.objects.create(log_level="DANGER", message=f'[{source_label}] [Неизвестный статус при опросе] [status={event_status}] [payment_id={transaction.payment_id}]', datetime=timezone.now())
+            Logging.objects.create(log_level="DANGER",
+                                   message=f'[{source_label}] [Неизвестный статус при опросе] [status={event_status}] [payment_id={transaction.payment_id}]',
+                                   datetime=timezone.now())
     except Exception:
         Logging.objects.create(log_level="DANGER", message=f'{traceback.format_exc()}', datetime=timezone.now())
 
 
-
 @shared_task(bind=True, name="yookassa_check_pending_bot")
-def yookassa_check_pending_bot(self):
+def ukassa_check_pending_bot(self):
     """
     Таск для опроса платежей ЮKassa (бот). Проходит по всем pending Transaction и пытается получить
     статус платежа, используя креды бота. Если платёж найден — обрабатывает (succeeded/canceled).
@@ -702,7 +709,8 @@ def yookassa_check_pending_bot(self):
     shop_id = getattr(settings, "YOOKASSA_SHOP_ID_BOT", None)
     secret = getattr(settings, "YOOKASSA_SECRET_BOT", None)
     if not shop_id or not secret:
-        Logging.objects.create(log_level="DANGER", message='[BOT] YOOKASSA credentials not configured', datetime=timezone.now())
+        Logging.objects.create(log_level="DANGER", message='[BOT] YOOKASSA credentials not configured',
+                               datetime=timezone.now())
         return
 
     pending_qs = Transaction.objects.filter(status="pending", paid=False, payment_id__isnull=False,
@@ -724,19 +732,20 @@ def yookassa_check_pending_bot(self):
             _process_payment_data(payment_data, transaction, telegram_user, source_label="BOT")
         except Exception:
             Logging.objects.create(log_level="DANGER",
-                                   message=f'[BOT] [Ошибка при опросе платежа {str(traceback.format_exc())}] [payment_id={getattr(transaction,"payment_id",None)}]',
+                                   message=f'[BOT] [Ошибка при опросе платежа {str(traceback.format_exc())}] [payment_id={getattr(transaction, "payment_id", None)}]',
                                    datetime=timezone.now())
 
 
 @shared_task(bind=True, name="yookassa_check_pending_site")
-def yookassa_check_pending_site(self):
+def ukassa_check_pending_site(self):
     """
     Таск для опроса платежей ЮKassa (сайт). Аналогично таску для бота, но использует креды сайта.
     """
     shop_id = getattr(settings, "YOOKASSA_SHOP_ID_SITE", None)
     secret = getattr(settings, "YOOKASSA_SECRET_SITE", None)
     if not shop_id or not secret:
-        Logging.objects.create(log_level="DANGER", message='[WEB] YOOKASSA credentials not configured', datetime=timezone.now())
+        Logging.objects.create(log_level="DANGER", message='[WEB] YOOKASSA credentials not configured',
+                               datetime=timezone.now())
         return
 
     pending_qs = Transaction.objects.filter(status="pending", paid=False, payment_id__isnull=False,
@@ -756,5 +765,5 @@ def yookassa_check_pending_site(self):
             _process_payment_data(payment_data, transaction, telegram_user, source_label="WEB")
         except Exception:
             Logging.objects.create(log_level="DANGER",
-                                   message=f'[WEB] [Ошибка при опросе платежа {str(traceback.format_exc())}] [payment_id={getattr(transaction,"payment_id",None)}]',
+                                   message=f'[WEB] [Ошибка при опросе платежа {str(traceback.format_exc())}] [payment_id={getattr(transaction, "payment_id", None)}]',
                                    datetime=timezone.now())

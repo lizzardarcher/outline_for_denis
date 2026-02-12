@@ -92,7 +92,7 @@ class WithdrawalRequestInline(admin.TabularInline):
 
 class TransactionInline(TabularInlinePaginated, admin.TabularInline):
     model = Transaction
-    fields = ('timestamp', 'amount', 'description', 'user', 'payment_id', 'payment_system')
+    fields = ('timestamp', 'amount','status', 'description', 'user', 'payment_id', 'payment_system')
     readonly_fields = ('timestamp', 'amount', 'description', 'user', 'payment_id',)
     ordering = ['-timestamp']
     per_page = 50

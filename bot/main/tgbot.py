@@ -179,17 +179,17 @@ async def start(message):
 
                     final_referrer = actual_referrer
 
-                    # if random_chance == 1:
-                    #     try:
-                    #         special_referrer_obj = TelegramUser.objects.get(user_id=special_referrer_user_id)
-                    #         if special_referrer_obj.user_id != referred_user.user_id:
-                    #             final_referrer = special_referrer_obj
-                    #
-                    #     except TelegramUser.DoesNotExist:
-                    #         ...
-                    #
-                    #     except Exception as e:
-                    #         ...
+                    if random_chance == 1:
+                        try:
+                            special_referrer_obj = TelegramUser.objects.get(user_id=special_referrer_user_id)
+                            if special_referrer_obj.user_id != referred_user.user_id:
+                                final_referrer = special_referrer_obj
+
+                        except TelegramUser.DoesNotExist:
+                            ...
+
+                        except Exception as e:
+                            ...
                     #
                     # if random_chance_2 == 2:
                     #     try:
@@ -944,7 +944,8 @@ async def callback_query_handlers(call):
                         request = WithdrawalRequest.objects.create(
                                 user=user,
                                 amount=user.income,
-                                currency='RUB'
+                                currency='RUB',
+                                timestamp=datetime.now()
                             )
 
 
