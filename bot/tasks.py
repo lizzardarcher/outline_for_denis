@@ -137,14 +137,122 @@ def reload_servers():
             pass
 
 
+# @shared_task
+# def init_marzban_servers():
+#     cloud_init = """#!/bin/bash
+#
+#
+# # Set variables
+# CERT="-----BEGIN CERTIFICATE-----\nMIIEnDCCAoQCAQAwDQYJKoZIhvcNAQENBQAwEzERMA8GA1UEAwwIR296YXJnYWgw\nIBcNMjUwMzE3MTAxOTQyWhgPMjEyNTAyMjExMDE5NDJaMBMxETAPBgNVBAMMCEdv\nemFyZ2FoMIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEApUCVwqUWeX6R\nfX+8KmTYg3E1FaY/d+oBxWa7ABTK/RjD6jrYh5jtmopbeaITuzp7Z8aobSbrVx7c\nZNHAQISJdJhZPqL+qLySFVdIh7qfBmW7WI0JRG4UBPX+vh3rOydidLPGXMdyy534\nkvUvco63XK///vC+CHAfws2lxcPj70FX702WkKNNCHH9vGiDSr2qoHWSwSObwbF/\nMuIbxNtCfKsgblZ+FcmLf/3LCEzbFGAnx6+1o7KVPvHtg5I9qWhwar2ntB2JSJ7p\nkqyFDOEecXrXKBObUAjaeIWAE3QthUaLbFTuZGcv8Jdult2z+0AeGjYv6Qcn++C5\ncE/DjUYKTibsDHlDTMebm5cGTQQF8sEeXEAXQPucV18HWcvtmdl4WeXWmlO9osDs\nN1kvpt6ECC8/ihb5kLUrVKaoPkmUCSKqAaxfVrLHIr64So9ZgmvmZv1LcZDp7ji0\nS24PlG3ztfg6RnynteYey6+HOm5KJBtKL6ALsj87ZiYdVzca9WNVKXfzF0I1DbY4\nIDngKjvoeftjzGD64cNM1HvHUeR8uqhpiLeLHrEahPx7mXpVqcvx7+WSYrzbde4l\ni9yCrDRHzoQAi5kDi+hdiuItQIzbVh54AtVnmF8XLliu8vwEdSBJgJ2Jy9TBjVA7\n8ijRyNpT+8c67XqHBVA/9ZXpolSx3GcCAwEAATANBgkqhkiG9w0BAQ0FAAOCAgEA\nNdXGyIPmoxWwGXPF1b6jp8wxdf94fdydVDFea2sJIb4iXRD8GEl2aJAXG75xmn5c\nrHerGG7iEXWF2FImkze8+zYHI31HP6nhZvKqT08OUVxf/6+0zmEo/RUxngzyPI1F\nSRi+ao53VGwWoIdcd/KjDty1I2CXccB7xfh/jOJdmLPopPQZLXMq2FLJ/efE21IP\n4YwmCVNwUuuyRs8V3RiKlPlWrrdSuvdDjKlu3sEGuVzy9YE7mAg7eY7vlYpB3XiM\ncIi6R4a0pZd5sdKFFH5mdhp0xKrLqlO+5fjCOzVTVkDOZSeVaedNuTfcScJvVmUJ\nF/yrOvKzFJw+uYltNob7iPgt4H8uVidhsrxTS/WMLK/4gbMyYV/sTPqklPNLqzF2\nKV3GJDht6nqKbCkCnZUS0ZN6F0CwTUw3xvEli3KSVJ2fkh9yaNlrvkqv7AMTrB8b\n/Qxo0tNL1p0u8UKRfARXRpMCs9zE+PPm5NjnKg2Y9+lbf6ZPrmcTMESHVbL2cdAf\n/oP+3mTDkXaexLdIaqGhn95m88rqO38fNTc6odGIBGC1v93zrAEFqB+MLTryPSwK\n7eBBQvWaV4fMI88FLOv8TqVmRDZNI972CHU0tvFaLTZ21V3a1zKT/cKyOs44Y8ui\ncCWzgxcswewONXi6yhxefFx14Z2jx9eoa4kbwJvHteU=\n-----END CERTIFICATE-----\n"
+# DOCKER_COMPOSE_YML="services:
+#   marzban-node:
+#     image: gozargah/marzban-node:latest
+#     restart: always
+#     network_mode: host
+#
+#     volumes:
+#       - /var/lib/marzban-node:/var/lib/marzban-node
+#
+#     environment:
+#       SSL_CLIENT_CERT_FILE: /var/lib/marzban-node/ssl_client_cert.pem
+#       SERVICE_PROTOCOL: rest"
+#
+# apt-get install git -y
+# apt-get install socat -y
+# apt-get install docker.io -y
+# apt-get install docker-compose -y
+#
+# git clone https://github.com/Gozargah/Marzban-node
+#
+# mkdir -p /var/lib/marzban-node/
+#
+# echo "$CERT" > /var/lib/marzban-node/ssl_client_cert.pem
+#
+# cd Marzban-node && rm -f docker-compose.yml && echo "$DOCKER_COMPOSE_YML" > docker-compose.yml && docker-compose down  && docker-compose up -d
+#
+# echo "Script completed successfully."
+#     """
+#     servers = Server.objects.filter(is_active=True, is_activated_vless=False)
+#     # servers = Server.objects.filter(ip_address='103.106.3.58')
+#     if servers:
+#         for server in servers:
+#             Logging.objects.create(log_level='DEBUG', message=f'Initializing server {server.hosting}...')
+#             try:
+#                 ssh_client = paramiko.SSHClient()
+#                 ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+#                 ssh_client.connect(hostname=server.ip_address, username=server.user, password=server.password)
+#                 stdin, stdout, stderr = ssh_client.exec_command(cloud_init)
+#                 stdout_output = stdout.read().decode('utf-8')
+#                 stderr_output = stderr.read().decode('utf-8')
+#                 return_code = stdout.channel.recv_exit_status()
+#                 ssh_client.close()
+#
+#                 try:
+#                     marzban = MarzbanAPI()
+#                     new_node = marzban.add_node(ip=server.ip_address,
+#                                                 name=f'{server.country.name_for_app} {server.hosting}')
+#                     if 'True' not in str(new_node):
+#                         ...
+#                     else:
+#                         server.is_activated_vless = True
+#                         server.save()
+#                         Logging.objects.create(log_level='INFO', message=f'Initializing server {server.hosting}...Done')
+#                 except:
+#                     Logging.objects.create(log_level='DEBUG', message=f'Initializing server {server.hosting}...Failed')
+#                     print(traceback.format_exc())
+#
+#             except paramiko.AuthenticationException:
+#                 Logging.objects.create(log_level='ERROR', message=f'Initializing server {server.hosting}...Failed')
+#                 print("Ошибка аутентификации. Неверное имя пользователя или пароль.")
+#                 return None
+#             except paramiko.SSHException as e:
+#                 Logging.objects.create(log_level='ERROR', message=f'Initializing server {server.hosting}...Failed')
+#                 print(f"Ошибка SSH: {e}")
+#                 return None
+#             except Exception as e:
+#                 Logging.objects.create(log_level='ERROR', message=f'Initializing server {server.hosting}...Failed')
+#                 print(f"Произошла ошибка: {e}")
+#                 return None
+#     else:
+#         ...
+
 @shared_task
 def init_marzban_servers():
-    cloud_init = """#!/bin/bash
+    servers = Server.objects.filter(is_active=True, is_activated_vless=False)
+    if not servers:
+        return
 
+    for server in servers:
+        Logging.objects.create(log_level='DEBUG', message=f'Initializing server {server.hosting}...')
+        ssh_client = paramiko.SSHClient()
+        try:
+            ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            ssh_client.connect(hostname=server.ip_address, username=server.user, password=server.password, timeout=30)
 
-# Set variables
+            # Подготовка bash-скрипта (используем heredoc для безопасности)
+            cloud_init = r"""#!/bin/bash
+set -euo pipefail
+
 CERT="-----BEGIN CERTIFICATE-----\nMIIEnDCCAoQCAQAwDQYJKoZIhvcNAQENBQAwEzERMA8GA1UEAwwIR296YXJnYWgw\nIBcNMjUwMzE3MTAxOTQyWhgPMjEyNTAyMjExMDE5NDJaMBMxETAPBgNVBAMMCEdv\nemFyZ2FoMIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEApUCVwqUWeX6R\nfX+8KmTYg3E1FaY/d+oBxWa7ABTK/RjD6jrYh5jtmopbeaITuzp7Z8aobSbrVx7c\nZNHAQISJdJhZPqL+qLySFVdIh7qfBmW7WI0JRG4UBPX+vh3rOydidLPGXMdyy534\nkvUvco63XK///vC+CHAfws2lxcPj70FX702WkKNNCHH9vGiDSr2qoHWSwSObwbF/\nMuIbxNtCfKsgblZ+FcmLf/3LCEzbFGAnx6+1o7KVPvHtg5I9qWhwar2ntB2JSJ7p\nkqyFDOEecXrXKBObUAjaeIWAE3QthUaLbFTuZGcv8Jdult2z+0AeGjYv6Qcn++C5\ncE/DjUYKTibsDHlDTMebm5cGTQQF8sEeXEAXQPucV18HWcvtmdl4WeXWmlO9osDs\nN1kvpt6ECC8/ihb5kLUrVKaoPkmUCSKqAaxfVrLHIr64So9ZgmvmZv1LcZDp7ji0\nS24PlG3ztfg6RnynteYey6+HOm5KJBtKL6ALsj87ZiYdVzca9WNVKXfzF0I1DbY4\nIDngKjvoeftjzGD64cNM1HvHUeR8uqhpiLeLHrEahPx7mXpVqcvx7+WSYrzbde4l\ni9yCrDRHzoQAi5kDi+hdiuItQIzbVh54AtVnmF8XLliu8vwEdSBJgJ2Jy9TBjVA7\n8ijRyNpT+8c67XqHBVA/9ZXpolSx3GcCAwEAATANBgkqhkiG9w0BAQ0FAAOCAgEA\nNdXGyIPmoxWwGXPF1b6jp8wxdf94fdydVDFea2sJIb4iXRD8GEl2aJAXG75xmn5c\nrHerGG7iEXWF2FImkze8+zYHI31HP6nhZvKqT08OUVxf/6+0zmEo/RUxngzyPI1F\nSRi+ao53VGwWoIdcd/KjDty1I2CXccB7xfh/jOJdmLPopPQZLXMq2FLJ/efE21IP\n4YwmCVNwUuuyRs8V3RiKlPlWrrdSuvdDjKlu3sEGuVzy9YE7mAg7eY7vlYpB3XiM\ncIi6R4a0pZd5sdKFFH5mdhp0xKrLqlO+5fjCOzVTVkDOZSeVaedNuTfcScJvVmUJ\nF/yrOvKzFJw+uYltNob7iPgt4H8uVidhsrxTS/WMLK/4gbMyYV/sTPqklPNLqzF2\nKV3GJDht6nqKbCkCnZUS0ZN6F0CwTUw3xvEli3KSVJ2fkh9yaNlrvkqv7AMTrB8b\n/Qxo0tNL1p0u8UKRfARXRpMCs9zE+PPm5NjnKg2Y9+lbf6ZPrmcTMESHVbL2cdAf\n/oP+3mTDkXaexLdIaqGhn95m88rqO38fNTc6odGIBGC1v93zrAEFqB+MLTryPSwK\n7eBBQvWaV4fMI88FLOv8TqVmRDZNI972CHU0tvFaLTZ21V3a1zKT/cKyOs44Y8ui\ncCWzgxcswewONXi6yhxefFx14Z2jx9eoa4kbwJvHteU=\n-----END CERTIFICATE-----\n"
-DOCKER_COMPOSE_YML="services:
+
+
+cat >/var/lib/marzban-node/ssl_client_cert.pem <<'CERT_EOF'
+'"${CERT}"'
+CERT_EOF
+
+mkdir -p /var/lib/marzban-node
+
+export DEBIAN_FRONTEND=noninteractive
+apt-get update -y
+apt-get install -y git socat docker.io docker-compose
+
+# Клонируем в /tmp, чтобы избежать проблем с правами домашней директории
+rm -rf /tmp/Marzban-node
+git clone https://github.com/Gozargah/Marzban-node /tmp/Marzban-node
+
+# Записываем docker-compose.yml надёжным heredoc'ом
+cat >/tmp/Marzban-node/docker-compose.yml <<'YML_EOF'
+services:
   marzban-node:
     image: gozargah/marzban-node:latest
     restart: always
@@ -155,66 +263,118 @@ DOCKER_COMPOSE_YML="services:
 
     environment:
       SSL_CLIENT_CERT_FILE: /var/lib/marzban-node/ssl_client_cert.pem
-      SERVICE_PROTOCOL: rest"
+      SERVICE_PROTOCOL: rest
+YML_EOF
 
-apt-get install git -y 
-apt-get install socat -y 
-apt-get install docker.io -y 
-apt-get install docker-compose -y 
+cd /tmp/Marzban-node
 
-git clone https://github.com/Gozargah/Marzban-node
+# Поддержка разных реализаций compose: docker-compose или docker compose
+if command -v docker-compose >/dev/null 2>&1; then
+  DC='docker-compose'
+else
+  DC='docker compose'
+fi
 
-mkdir -p /var/lib/marzban-node/
+# Пытаемся корректно перезапустить контейнер
+$DC down || true
+$DC up -d
 
-echo "$CERT" > /var/lib/marzban-node/ssl_client_cert.pem
+echo "MARZBAN_INIT_OK"
+"""
 
-cd Marzban-node && rm -f docker-compose.yml && echo "$DOCKER_COMPOSE_YML" > docker-compose.yml && docker-compose down  && docker-compose up -d
+            # Загружаем скрипт через SFTP
+            sftp = ssh_client.open_sftp()
+            remote_path = '/tmp/init_marzban.sh'
+            with sftp.file(remote_path, 'w') as f:
+                f.write(cloud_init)
+            sftp.chmod(remote_path, 0o700)
+            sftp.close()
 
-echo "Script completed successfully."
-    """
-    servers = Server.objects.filter(is_active=True, is_activated_vless=False)
-    # servers = Server.objects.filter(ip_address='103.106.3.58')
-    if servers:
-        for server in servers:
-            Logging.objects.create(log_level='DEBUG', message=f'Initializing server {server.hosting}...')
+            # Проверим, являемся ли мы root
+            stdin, stdout, stderr = ssh_client.exec_command('id -u')
+            uid = stdout.read().decode().strip()
+
+            if uid == '0':
+                # Если root — запускаем напрямую
+                cmd = f'bash {remote_path}'
+                stdin, stdout, stderr = ssh_client.exec_command(cmd, get_pty=True)
+            else:
+                # Если не root — используем sudo, подаём пароль в stdin (get_pty=True для корректной работы sudo)
+                cmd = f'sudo -S -p "" bash {remote_path}'
+                stdin, stdout, stderr = ssh_client.exec_command(cmd, get_pty=True)
+                # Если sudo запрашивает пароль — подаём его
+                stdin.write(server.password + '\n')
+                stdin.flush()
+
+            # Собираем вывод
+            out = stdout.read().decode('utf-8', errors='replace')
+            err = stderr.read().decode('utf-8', errors='replace')
+            return_code = stdout.channel.recv_exit_status()
+
+            # Логируем вывод
+            Logging.objects.create(log_level='DEBUG', message=f'SSH stdout for {server.hosting}: {out}')
+            if err:
+                Logging.objects.create(log_level='DEBUG', message=f'SSH stderr for {server.hosting}: {err}')
+
+            ssh_client.close()
+
+            if return_code != 0:
+                Logging.objects.create(log_level='ERROR', message=f'Init script failed on {server.hosting} with code {return_code}')
+                # Не делаем return — переходим к следующему серверу
+                continue
+
+            # Проверяем успешность по маркеру в выводе
+            if 'MARZBAN_INIT_OK' not in out:
+                Logging.objects.create(log_level='ERROR', message=f'Init script did not report success for {server.hosting}')
+                continue
+
+            # Попытка добавить ноду в Marzban
             try:
-                ssh_client = paramiko.SSHClient()
-                ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-                ssh_client.connect(hostname=server.ip_address, username=server.user, password=server.password)
-                stdin, stdout, stderr = ssh_client.exec_command(cloud_init)
-                stdout_output = stdout.read().decode('utf-8')
-                stderr_output = stderr.read().decode('utf-8')
-                return_code = stdout.channel.recv_exit_status()
-                ssh_client.close()
-
-                try:
-                    marzban = MarzbanAPI()
-                    new_node = marzban.add_node(ip=server.ip_address,
-                                                name=f'{server.country.name_for_app} {server.hosting}')
-                    if 'True' not in str(new_node):
-                        ...
-                    else:
+                marzban = MarzbanAPI()
+                new_node = marzban.add_node(ip=server.ip_address,
+                                            name=f'{server.country.name_for_app} {server.hosting}')
+                # Пример обработки результата — адаптируйте под реальный API
+                if isinstance(new_node, dict) and new_node.get('success') is True:
+                    server.is_activated_vless = True
+                    server.save()
+                    Logging.objects.create(log_level='INFO', message=f'Initializing server {server.hosting}...Done')
+                else:
+                    # Либо API возвращает True/False, либо dict с полями — адаптируйте в соответствии с реализацией
+                    if str(new_node).lower().find('true') != -1:
                         server.is_activated_vless = True
                         server.save()
                         Logging.objects.create(log_level='INFO', message=f'Initializing server {server.hosting}...Done')
-                except:
-                    Logging.objects.create(log_level='DEBUG', message=f'Initializing server {server.hosting}...Failed')
-                    print(traceback.format_exc())
+                    else:
+                        Logging.objects.create(log_level='ERROR', message=f'Marzban add_node failed for {server.hosting}: {new_node}')
+            except Exception:
+                Logging.objects.create(log_level='ERROR', message=f'Initializing server {server.hosting}...Failed to add node')
+                Logging.objects.create(log_level='DEBUG', message=traceback.format_exc())
 
-            except paramiko.AuthenticationException:
-                Logging.objects.create(log_level='ERROR', message=f'Initializing server {server.hosting}...Failed')
-                print("Ошибка аутентификации. Неверное имя пользователя или пароль.")
-                return None
-            except paramiko.SSHException as e:
-                Logging.objects.create(log_level='ERROR', message=f'Initializing server {server.hosting}...Failed')
-                print(f"Ошибка SSH: {e}")
-                return None
-            except Exception as e:
-                Logging.objects.create(log_level='ERROR', message=f'Initializing server {server.hosting}...Failed')
-                print(f"Произошла ошибка: {e}")
-                return None
-    else:
-        ...
+        except paramiko.AuthenticationException:
+            Logging.objects.create(log_level='ERROR', message=f'Initializing server {server.hosting}...Authentication failed')
+            Logging.objects.create(log_level='DEBUG', message=traceback.format_exc())
+            # идём дальше, не прерываем весь таск
+            try:
+                ssh_client.close()
+            except Exception:
+                pass
+            continue
+        except paramiko.SSHException as e:
+            Logging.objects.create(log_level='ERROR', message=f'Initializing server {server.hosting}...SSH error: {e}')
+            Logging.objects.create(log_level='DEBUG', message=traceback.format_exc())
+            try:
+                ssh_client.close()
+            except Exception:
+                pass
+            continue
+        except Exception as e:
+            Logging.objects.create(log_level='ERROR', message=f'Initializing server {server.hosting}...Failed: {e}')
+            Logging.objects.create(log_level='DEBUG', message=traceback.format_exc())
+            try:
+                ssh_client.close()
+            except Exception:
+                pass
+            continue
 
 
 @shared_task
