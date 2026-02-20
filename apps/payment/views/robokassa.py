@@ -3,7 +3,9 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 import hashlib
 from urllib.parse import urlencode
+import xml.etree.ElementTree as ET
 
+import requests
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.urls import reverse
 from django.views.generic import TemplateView
@@ -20,6 +22,51 @@ from bot.models import TelegramUser, Transaction, IncomeInfo, Logging, Prices, T
 
 def robokassa_md5(s: str) -> str:
     return hashlib.md5(s.encode('utf-8')).hexdigest().upper()
+
+
+def get_robokassa_payment_info(inv_id: str, merchant_login: str, password_2: str):
+    """
+    Получает информацию о платеже через API RoboKassa.
+    Возвращает словарь с данными, включая ID Robox (если доступен).
+    """
+    url = "https://auth.robokassa.ru/Merchant/WebService/Service.asmx/OpState"
+
+    signature = robokassa_md5(f"{merchant_login}:{inv_id}:{password_2}")
+
+    params = {
+        "MerchantLogin": merchant_login,
+        "InvoiceID": inv_id,
+        "Signature": signature,
+    }
+
+    try:
+        resp = requests.get(url, params=params, timeout=10)
+        resp.raise_for_status()
+
+        # RoboKassa возвращает XML
+        root = ET.fromstring(resp.text)
+
+        result = {}
+        for child in root:
+            result[child.tag] = child.text
+
+        # Проверяем статус
+        if result.get("State") == "5":  # 5 = оплачен
+            # ID Robox может быть в разных полях, зависит от версии API
+            # Обычно это поле "PaymentID" или "TransactionID"
+            robox_id = result.get("PaymentID") or result.get("TransactionID") or result.get("ID")
+            if robox_id:
+                result["RoboxID"] = robox_id
+
+        return result
+
+    except Exception as e:
+        Logging.objects.create(
+            log_level="WARNING",
+            message=f"[ROBO-BOT] [API] Ошибка получения информации о платеже InvId={inv_id}: {e}",
+            datetime=datetime.now(),
+        )
+        return None
 
 
 class CreateRobokassaPaymentView(LoginRequiredMixin, View):
@@ -306,15 +353,39 @@ class RobokassaBotResultView(View):
     """
 
     def post(self, request, *args, **kwargs):
+
+        # Логируем ВСЕ параметры для отладки
+        all_params = dict(request.POST.items()) if hasattr(request.POST, 'items') else {}
+        all_get_params = dict(request.GET.items()) if hasattr(request.GET, 'items') else {}
+
+        Logging.objects.create(
+            log_level="INFO",
+            message=f"[ROBO-BOT] [Webhook] Все POST параметры: {all_params}, Все GET параметры: {all_get_params}",
+            datetime=datetime.now(),
+        )
+
         out_sum = request.POST.get('OutSum') or request.GET.get('OutSum')
         inv_id = request.POST.get('InvId') or request.GET.get('InvId')
         signature = (request.POST.get('SignatureValue') or request.GET.get('SignatureValue') or '').upper()
+
+        # Возможные параметры с ID Robox (проверь документацию RoboKassa):
+        robox_id = request.POST.get('PaymentID') or request.GET.get('PaymentID') or \
+                   request.POST.get('MerchantOrderId') or request.GET.get('MerchantOrderId') or \
+                   request.POST.get('RoboxID') or request.GET.get('RoboxID') or \
+                   request.POST.get('TransactionID') or request.GET.get('TransactionID')
 
         if not out_sum or not inv_id or not signature:
             return HttpResponse('Bad request', status=400)
 
         # Подпись для ResultURL бота: MD5(OutSum:InvId:Password2Bot)
         expected = robokassa_md5(f"{out_sum}:{inv_id}:{settings.ROBOKASSA_PASSWORD_2_BOT}")
+
+        Logging.objects.create(
+            log_level="INFO",
+            message=f"[ROBO-BOT] [Webhook] OutSum={out_sum}, InvId={inv_id}, Signature={signature}, Expected={expected}",
+            datetime=datetime.now(),
+        )
+
         if signature != expected:
             return HttpResponse('bad sign', status=403)
 
@@ -358,6 +429,30 @@ class RobokassaBotResultView(View):
             transaction.paid = True
             transaction.amount = amount_value
             transaction.currency = transaction.currency or 'RUB'
+
+            # Пытаемся получить ID Robox через API RoboKassa
+            payment_info = get_robokassa_payment_info(
+                inv_id=str(inv_id),
+                merchant_login=settings.ROBOKASSA_MERCHANT_LOGIN_BOT,
+                password_2=settings.ROBOKASSA_PASSWORD_2_BOT,
+            )
+
+            if payment_info and payment_info.get("RoboxID"):
+                transaction.payment_id = str(payment_info["RoboxID"])
+                Logging.objects.create(
+                    log_level="INFO",
+                    message=f"[ROBO-BOT] [ID Robox получен через API] {payment_info['RoboxID']} для InvId={inv_id}",
+                    datetime=datetime.now(),
+                )
+            else:
+                # Fallback: сохраняем InvId (хотя это не ID Robox, но для связи транзакций сойдёт)
+                transaction.payment_id = f"ROBOX_INV_{inv_id}"  # Префикс для понимания, что это не настоящий ID Robox
+                Logging.objects.create(
+                    log_level="WARNING",
+                    message=f"[ROBO-BOT] [ID Robox не получен через API, используем InvId] {inv_id}",
+                    datetime=datetime.now(),
+                )
+
             transaction.save()
 
             # Определяем срок подписки по сумме (как в YookassaTGBOTWebhookView)
@@ -431,7 +526,7 @@ class RobokassaBotResultView(View):
 
                     if percent:
                         income = Decimal(user_to_pay.income) + (
-                            Decimal(amount_value) * Decimal(percent) / 100
+                                Decimal(amount_value) * Decimal(percent) / 100
                         )
                         user_to_pay.income = income
                         user_to_pay.save()
