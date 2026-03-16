@@ -35,6 +35,7 @@ def start():
     return markup
 
 
+
 def choose_protocol():
     markup = InlineKeyboardMarkup()
     markup.add(InlineKeyboardButton(text=f'🚀 VLESS', callback_data=f'protocol_vless'))
@@ -130,11 +131,15 @@ def my_profile(user: TelegramUser):
     btn2 = InlineKeyboardButton(text=f'💲 Купить подписку', callback_data=f'account:choose_payment')
     btn3 = InlineKeyboardButton(text=f'🤝 Реферальная программа', callback_data=f'referral')
     btn4 = InlineKeyboardButton(text=f'🛑 Отменить подписку', callback_data=f'account:cancel_subscription')
-    btn5 = InlineKeyboardButton(text=f'Договор оферты', url=f'{DOMAIN}/oferta/')
+    btn5 = InlineKeyboardButton(text=f'🔐 Доступ к сайту', callback_data='account:site_access')
+    btn6 = InlineKeyboardButton(text=f'♻️ Изменить пароль на сайте', callback_data='account:site_change_password')
+    btn7 = InlineKeyboardButton(text=f'Договор оферты', url=f'{DOMAIN}/oferta/')
     markup.row(btn2)
     markup.row(btn3)
     markup.row(btn4)
     markup.row(btn5)
+    markup.row(btn6)
+    markup.row(btn7)
     markup.row(btn_back)
     return markup
 

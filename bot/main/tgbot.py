@@ -16,15 +16,11 @@ from telebot.async_telebot import AsyncTeleBot
 from telebot.asyncio_storage import StateMemoryStorage
 from telebot.types import InlineKeyboardButton, InlineKeyboardMarkup
 
+from django.contrib.auth.models import User
+
 from bot.models import TelegramBot, Prices, TelegramMessage, Logging, ReferralSettings
-from bot.models import TelegramUser
-from bot.models import TelegramReferral
-from bot.models import VpnKey
-from bot.models import Server
-from bot.models import Country
-from bot.models import IncomeInfo
-from bot.models import WithdrawalRequest
-from bot.models import Transaction
+from bot.models import TelegramUser, UserProfile, TelegramReferral, VpnKey, Server, Country, IncomeInfo, \
+    WithdrawalRequest, Transaction
 from bot.models import Logging as lg
 
 from bot.main.utils import msg
@@ -79,6 +75,119 @@ async def send_pending_messages():
             message.save()
 
         await asyncio.sleep(15)
+
+
+def _ensure_site_user_for_telegram_user(tg_user: TelegramUser) -> User:
+    """
+    Гарантирует наличие Django-пользователя, связанного с TelegramUser через UserProfile.
+    Возвращает объект User.
+    """
+    profile = getattr(tg_user, 'user_profile', None)
+    if profile and profile.user:
+        return profile.user
+
+    base_username = tg_user.username or f"tg_{tg_user.user_id}"
+    username = base_username
+    counter = 1
+    while User.objects.filter(username=username).exists():
+        username = f"{base_username}_{counter}"
+        counter += 1
+
+    django_user = User.objects.create_user(
+        username=username,
+        email='',
+    )
+    UserProfile.objects.create(user=django_user, telegram_user=tg_user)
+    return django_user
+
+
+def _generate_and_set_site_password(django_user: User) -> str:
+    """
+    Генерирует случайный пароль, устанавливает его пользователю и возвращает в виде строки.
+    """
+    import secrets
+    import string
+
+    alphabet = string.ascii_letters + string.digits
+    password = ''.join(secrets.choice(alphabet) for _ in range(12))
+    django_user.set_password(password)
+    django_user.save()
+    return password
+
+
+@bot.message_handler(commands=['getlogin'])
+async def getlogin(message):
+    """
+    Отдаёт пользователю логин/пароль для входа на сайт через команду /getlogin.
+    Первый вызов генерирует пароль, последующие напоминают логин и предлагают смену пароля.
+    """
+    if message.chat.type != 'private':
+        await bot.reply_to(message, "Команду /getlogin можно использовать только в личных сообщениях.")
+        return
+
+    try:
+        tg_user, created = TelegramUser.objects.get_or_create(
+            user_id=message.from_user.id,
+            defaults={
+                'username': message.from_user.username,
+                'first_name': message.from_user.first_name,
+                'last_name': message.from_user.last_name,
+                'subscription_status': False,
+                'subscription_expiration': datetime.now() - timedelta(days=1),
+            }
+        )
+
+        django_user = _ensure_site_user_for_telegram_user(tg_user)
+        profile = tg_user.user_profile
+
+        site_domain = settings.DOMAIN
+        login_url = f"{site_domain}/auth/accounts/login/"
+
+        if not profile.site_password_generated:
+            password = _generate_and_set_site_password(django_user)
+            profile.site_password_generated = True
+            profile.save(update_fields=['site_password_generated'])
+
+            text = (
+                "Ваши данные для входа на сайт DomVPN:\n\n"
+                f"Логин: <code>{django_user.username}</code>\n"
+                f"Пароль: <code>{password}</code>\n\n"
+                f"Сайт: {login_url}\n\n"
+                "Рекомендуем сразу изменить пароль в личном кабинете после первого входа."
+            )
+        else:
+            text = (
+                "Ваш логин для входа на сайт DomVPN:\n\n"
+                f"Логин: <code>{django_user.username}</code>\n\n"
+                f"Сайт: {login_url}\n\n"
+                "Пароль уже был выдан ранее.\n"
+                "Если вы его забыли — используйте кнопку «Изменить пароль на сайте» в разделе Профиль."
+            )
+
+        await bot.send_message(
+            chat_id=message.chat.id,
+            text=text,
+            parse_mode='HTML'
+        )
+
+        lg.objects.create(
+            log_level='INFO',
+            message='[BOT] [Выдан логин/пароль для сайта через /getlogin]',
+            datetime=datetime.now(),
+            user=tg_user
+        )
+
+    except Exception:
+        lg.objects.create(
+            log_level='FATAL',
+            message=f'[BOT] [ОШИБКА в /getlogin]\n{traceback.format_exc()}',
+            datetime=datetime.now(),
+            user=None
+        )
+        await bot.send_message(
+            chat_id=message.chat.id,
+            text="Произошла ошибка при выдаче логина и пароля. Попробуйте позже."
+        )
 
 
 def create_cryptobot_invoice_bot(amount: Decimal, days: int, transaction_id: int) -> dict:
@@ -874,6 +983,85 @@ async def callback_query_handlers(call):
                         await bot.send_message(call.message.chat.id, text=msg.cancel_subscription_success,
                                                reply_markup=markup.start())
 
+                    elif 'site_access' in data:
+                        lg.objects.create(log_level='INFO', message=f'[BOT] [site_access 2nd]', datetime=datetime.now(),
+                                          user=user)
+
+                        try:
+
+                            tg_user = TelegramUser.objects.get(user_id=call.message.chat.id)
+                            lg.objects.create(log_level='INFO', message=f'[BOT] [{tg_user}]', datetime=datetime.now(),
+                                              user=user)
+
+                            django_user = _ensure_site_user_for_telegram_user(tg_user)
+                            lg.objects.create(log_level='INFO', message=f'[BOT] [{django_user}]',
+                                              datetime=datetime.now(), user=user)
+
+                            profile = tg_user.user_profile
+                            lg.objects.create(log_level='INFO', message=f'[BOT] [{profile}]', datetime=datetime.now(),
+                                              user=user)
+
+                            site_domain = settings.DOMAIN
+                            login_url = f"{site_domain}/auth/accounts/login/"
+
+                            if not profile.site_password_generated:
+                                password = _generate_and_set_site_password(django_user)
+                                profile.site_password_generated = True
+                                profile.save(update_fields=['site_password_generated'])
+
+                                text = (
+                                    "Ваши данные для входа на сайт DomVPN:\n\n"
+                                    f"Логин: <code>{django_user.username}</code>\n"
+                                    f"Пароль: <code>{password}</code>\n\n"
+                                    f"Сайт: {login_url}\n\n"
+                                    "Рекомендуем сразу изменить пароль в личном кабинете после первого входа."
+                                )
+                            else:
+                                text = (
+                                    "Ваш логин для входа на сайт DomVPN:\n\n"
+                                    f"Логин: <code>{django_user.username}</code>\n\n"
+                                    f"Сайт: {login_url}\n\n"
+                                    "Пароль уже был выдан ранее.\n"
+                                    "Если вы его забыли — нажмите кнопку «Изменить пароль на сайте», "
+                                    "и мы сгенерируем новый."
+                                )
+
+                            await bot.send_message(
+                                chat_id=call.message.chat.id,
+                                text=text,
+                                parse_mode='HTML'
+                            )
+                        except Exception as e:
+                            lg.objects.create(log_level='FATAL', message=f'[BOT] [{e}]', datetime=datetime.now(),
+                                              user=user)
+
+                    elif 'site_change_password' in data:
+                        tg_user = TelegramUser.objects.get(user_id=call.message.chat.id)
+                        django_user = _ensure_site_user_for_telegram_user(tg_user)
+                        profile = tg_user.user_profile
+
+                        site_domain = settings.DOMAIN
+                        login_url = f"{site_domain}/auth/accounts/login/"
+
+                        password = _generate_and_set_site_password(django_user)
+                        if profile and not profile.site_password_generated:
+                            profile.site_password_generated = True
+                            profile.save(update_fields=['site_password_generated'])
+
+                        text = (
+                            "Новый пароль для входа на сайт DomVPN:\n\n"
+                            f"Логин: <code>{django_user.username}</code>\n"
+                            f"Новый пароль: <code>{password}</code>\n\n"
+                            f"Сайт: {login_url}\n\n"
+                            "Старый пароль больше не действует."
+                        )
+
+                        await bot.send_message(
+                            chat_id=call.message.chat.id,
+                            text=text,
+                            parse_mode='HTML'
+                        )
+
                 elif 'profile' in data:
                     user_id = user.user_id
                     income = user.income
@@ -884,6 +1072,8 @@ async def callback_query_handlers(call):
                     await bot.send_message(call.message.chat.id,
                                            text=msg.profile.format(user_id, sub, active, income),
                                            reply_markup=markup.my_profile(user=user))
+
+
 
                 elif 'referral' in data:
                     bot_username = TelegramBot.objects.get(pk=1).username

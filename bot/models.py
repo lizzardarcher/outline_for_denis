@@ -61,6 +61,10 @@ class UserProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
     telegram_user = models.OneToOneField(TelegramUser, on_delete=models.SET_NULL, null=True, blank=True,
                                          related_name='user_profile')
+    site_password_generated = models.BooleanField(
+        default=False,
+        verbose_name='Пароль для сайта выдан через бота'
+    )
 
     def __str__(self):
         return self.user.username
@@ -157,6 +161,7 @@ PAYMENT_SYSTEM = (
     ('CryptoBotBot', 'Криптобот Бот'),
     ('CryptoBotSite', 'Криптобот Сайт'),
 )
+
 
 class Transaction(models.Model):
     income_info = models.ForeignKey('IncomeInfo', on_delete=models.SET_NULL, null=True, blank=True,
