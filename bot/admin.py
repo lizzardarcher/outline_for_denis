@@ -555,10 +555,13 @@ class PredefinedTransactionKeywordFilter(admin.SimpleListFilter):
 
     KEYWORDS = (
         ("[CELERY]", "[CELERY]"),
+        ("[CELERY] [SITE]", "[CELERY] [SITE]"),
+        ("[CELERY] [BOT]", "[CELERY] [BOT]"),
         ("[BOT]", "[BOT]"),
         ("[WEB]", "[WEB]"),
         ("ДЕЙСТВИЕ", "[ДЕЙСТВИЕ]"),
         ("[Закончилась подписка у пользователя]", "[Закончилась подписка у пользователя]"),
+        ("Initializing", "Initializing"),
     )
 
     def lookups(self, request, model_admin):
