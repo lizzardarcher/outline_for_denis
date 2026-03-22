@@ -11,6 +11,7 @@ ALIAS_DOMAIN = 'https://dom-vpn.su'
 # DEBUG = True
 DEBUG = False
 
+
 ALLOWED_HOSTS = os.getenv('DJANGO_ALLOWED_HOSTS').split(',')
 CSRF_TRUSTED_ORIGINS = os.getenv('CSRF_TRUSTED_ORIGINS').split(',')
 DOMAIN = CSRF_TRUSTED_ORIGINS[0]
@@ -227,7 +228,6 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
-                'outline_for_denis.context_processors.telegram_bot',
             ],
         },
     },
