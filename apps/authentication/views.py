@@ -1,10 +1,19 @@
-from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth import authenticate, login, logout, update_session_auth_hash
+from django.contrib.auth.decorators import login_required
 from django.contrib.auth.views import PasswordResetConfirmView, PasswordChangeView, LoginView
+from django.http import JsonResponse
 from django.urls import reverse
 from django.shortcuts import render, redirect
+from django.views.decorators.http import require_POST
 from django.contrib import messages
 
-from .forms import UserRegistrationForm, UserSetPasswordForm, UserPasswordChangeForm, LoginForm
+from .forms import (
+    UserRegistrationForm,
+    UserSetPasswordForm,
+    UserPasswordChangeForm,
+    LoginForm,
+    DashboardPasswordChangeForm,
+)
 
 
 def telegram_login(request):
@@ -60,3 +69,16 @@ class UserPasswordResetConfirmView(PasswordResetConfirmView):
 class UserPasswordChangeView(PasswordChangeView):
     template_name = 'account/password_change.html'
     form_class = UserPasswordChangeForm
+
+
+@login_required
+@require_POST
+def dashboard_password_change(request):
+    """JSON-ответ для смены пароля из модального окна в личном кабинете."""
+    form = DashboardPasswordChangeForm(user=request.user, data=request.POST)
+    if form.is_valid():
+        form.save()
+        update_session_auth_hash(request, form.user)
+        return JsonResponse({'ok': True, 'message': 'Пароль успешно изменён.'})
+    errors = {field: [str(e) for e in errs] for field, errs in form.errors.items()}
+    return JsonResponse({'ok': False, 'errors': errors}, status=400)

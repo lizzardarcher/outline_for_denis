@@ -11,7 +11,6 @@ from bot.models import TelegramUser, UserProfile
 
 User = get_user_model()
 
-
 class UserRegistrationForm(forms.Form):
     email = forms.EmailField(
         label='Электронная почта',
@@ -104,3 +103,41 @@ class UserPasswordChangeForm(PasswordChangeForm):
     new_password2 = forms.CharField(max_length=50, widget=forms.PasswordInput(attrs={
         'class': 'form-control', 'placeholder': 'Подтвердить новый пароль'
     }), label="Подтвердить новый пароль")
+
+
+class DashboardPasswordChangeForm(PasswordChangeForm):
+    """Смена пароля в ЛК без капчи (пользователь уже авторизован)."""
+
+    old_password = forms.CharField(
+        max_length=128,
+        widget=forms.PasswordInput(
+            attrs={
+                'class': 'form-control form-control-sm',
+                'placeholder': 'Текущий пароль',
+                'autocomplete': 'current-password',
+            }
+        ),
+        label='Текущий пароль',
+    )
+    new_password1 = forms.CharField(
+        max_length=128,
+        widget=forms.PasswordInput(
+            attrs={
+                'class': 'form-control form-control-sm',
+                'placeholder': 'Новый пароль',
+                'autocomplete': 'new-password',
+            }
+        ),
+        label='Новый пароль',
+    )
+    new_password2 = forms.CharField(
+        max_length=128,
+        widget=forms.PasswordInput(
+            attrs={
+                'class': 'form-control form-control-sm',
+                'placeholder': 'Повторите новый пароль',
+                'autocomplete': 'new-password',
+            }
+        ),
+        label='Повторите новый пароль',
+    )

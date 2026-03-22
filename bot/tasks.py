@@ -156,11 +156,11 @@ DOCKER_COMPOSE_YML="services:
     environment:
       SSL_CLIENT_CERT_FILE: /var/lib/marzban-node/ssl_client_cert.pem
       SERVICE_PROTOCOL: rest"
-
-apt-get install git -y
-apt-get install socat -y
-apt-get install docker.io -y
-apt-get install docker-compose -y
+apt update
+apt install git -y
+apt install socat -y
+apt install docker.io -y
+apt install docker-compose -y
 
 git clone https://github.com/Gozargah/Marzban-node
 
@@ -168,7 +168,7 @@ mkdir -p /var/lib/marzban-node/
 
 echo "$CERT" > /var/lib/marzban-node/ssl_client_cert.pem
 
-cd Marzban-node && rm -f docker-compose.yml && echo "$DOCKER_COMPOSE_YML" > docker-compose.yml && docker compose down  && docker compose up -d
+cd Marzban-node && rm -f docker-compose.yml && echo "$DOCKER_COMPOSE_YML" > docker-compose.yml && docker-compose down  && docker-compose up -d
 
 echo "Script completed successfully."
     """

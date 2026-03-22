@@ -13,6 +13,11 @@ urlpatterns = [
     path('accounts/logout/', views.logout_view, name='logout'),
     # path('accounts/register/', views.RegisterView.as_view(), name='register'),
     path('accounts/password-change/', views.UserPasswordChangeView.as_view(), name='password_change'),
+    path(
+        'accounts/dashboard-password-change/',
+        views.dashboard_password_change,
+        name='dashboard_password_change',
+    ),
     # path('accounts/password-reset/', views.UserPasswordResetView.as_view(), name='password_reset'),
 
     path('accounts/password_reset/', auth_views.PasswordResetView.as_view(

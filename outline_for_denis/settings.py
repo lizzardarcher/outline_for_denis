@@ -7,7 +7,7 @@ load_dotenv()
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = os.getenv('DJANGO_SECRET_KEY')
-
+ALIAS_DOMAIN = 'https://dom-vpn.su'
 # DEBUG = True
 DEBUG = False
 
@@ -227,6 +227,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'outline_for_denis.context_processors.telegram_bot',
             ],
         },
     },

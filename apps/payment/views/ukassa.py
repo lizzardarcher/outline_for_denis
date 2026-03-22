@@ -59,7 +59,7 @@ class CreatePaymentView(View):
                 },
                 "confirmation": {
                     "type": "redirect",
-                    "return_url": f'{settings.DOMAIN}/payment/payment-success/?id=&date={datetime.now()}&amount={amount}',
+                    "return_url": f'{settings.ALIAS_DOMAIN}/payment/payment-success/?id=&date={datetime.now()}&amount={amount}',
                     "enforce": False
                 },
                 "capture": True,

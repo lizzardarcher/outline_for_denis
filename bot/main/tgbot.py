@@ -140,7 +140,7 @@ async def getlogin(message):
         django_user = _ensure_site_user_for_telegram_user(tg_user)
         profile = tg_user.user_profile
 
-        site_domain = settings.DOMAIN
+        site_domain = settings.ALIAS_DOMAIN
         login_url = f"{site_domain}/auth/accounts/login/"
 
         if not profile.site_password_generated:
@@ -844,7 +844,7 @@ async def callback_query_handlers(call):
                                 payment_markup.add(
                                     InlineKeyboardButton(
                                         text='Договор оферты',
-                                        url='https://domvpn.store/oferta/'
+                                        url='https://dom-vpn.su/oferta/'
                                     )
                                 )
                                 payment_markup.add(
@@ -937,7 +937,7 @@ async def callback_query_handlers(call):
                                 payment_markup.add(
                                     InlineKeyboardButton(
                                         text='Договор оферты',
-                                        url='https://domvpn.su/oferta/',
+                                        url='https://dom-vpn.su/oferta/',
                                     )
                                 )
                                 payment_markup.add(
