@@ -93,7 +93,6 @@
                 </main>
             </div>
         </div>
-
     </div>
 
     {% block extrascript %}
@@ -152,6 +151,19 @@
                 if (window.innerWidth < 768) {
                     sidebar.style.display = 'none';
                 }
+
+                {% if open_password_change_modal %}
+                if (window.innerWidth >= 768) {
+                    showSection('user-info');
+                    var pwLink = document.querySelector('[data-target="user-info"]');
+                    if (pwLink) {
+                        setActiveLink(pwLink);
+                    }
+                }
+                if (typeof $ !== 'undefined' && $('#changePasswordModal').length) {
+                    $('#changePasswordModal').modal('show');
+                }
+                {% endif %}
             });
         </script>
     {% endblock extrascript %}

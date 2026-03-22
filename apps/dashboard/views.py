@@ -11,6 +11,7 @@ from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.generic import TemplateView
 
+from apps.authentication.forms import DashboardPasswordChangeForm
 from bot.main.MarzbanAPI import MarzbanAPI
 from bot.models import VpnKey, Server, TelegramUser, Country, Prices, UserProfile, ReferralSettings, TelegramReferral, \
     Transaction, Logging
@@ -38,6 +39,7 @@ class ProfileView(LoginRequiredMixin, SuccessMessageMixin, TemplateView):
         context['inv_4_lvl'] = TelegramReferral.objects.filter(referrer=self.request.user.profile.telegram_user, level=4).__len__()
         context['inv_5_lvl'] = TelegramReferral.objects.filter(referrer=self.request.user.profile.telegram_user, level=5).__len__()
 
+
         if self.request.user.profile.telegram_user.special_offer:
             context['per_1'] = self.request.user.profile.telegram_user.special_offer.level_1_percentage
             context['per_2'] = self.request.user.profile.telegram_user.special_offer.level_2_percentage
@@ -52,6 +54,7 @@ class ProfileView(LoginRequiredMixin, SuccessMessageMixin, TemplateView):
             context['per_5'] = ReferralSettings.objects.get(pk=1).level_5_percentage
 
         context['transactions'] = Transaction.objects.filter(user=self.request.user.profile.telegram_user).order_by('-timestamp')
+        context['dashboard_password_form'] = DashboardPasswordChangeForm(self.request.user)
         return context
 
 class CancelSubscriptionView(LoginRequiredMixin, TemplateView):

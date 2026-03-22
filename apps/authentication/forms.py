@@ -11,6 +11,7 @@ from bot.models import TelegramUser, UserProfile
 
 User = get_user_model()
 
+
 class UserRegistrationForm(forms.Form):
     email = forms.EmailField(
         label='Электронная почта',
@@ -105,39 +106,26 @@ class UserPasswordChangeForm(PasswordChangeForm):
     }), label="Подтвердить новый пароль")
 
 
-class DashboardPasswordChangeForm(PasswordChangeForm):
-    """Смена пароля в ЛК без капчи (пользователь уже авторизован)."""
+class DashboardPasswordChangeForm(SetPasswordForm):
+    """
+    Новый пароль в ЛК (без старого): пользователь уже в сессии.
+    Валидация — стандартная для SetPasswordForm (совпадение полей, AUTH_PASSWORD_VALIDATORS).
+    """
 
-    old_password = forms.CharField(
-        max_length=128,
-        widget=forms.PasswordInput(
-            attrs={
-                'class': 'form-control form-control-sm',
-                'placeholder': 'Текущий пароль',
-                'autocomplete': 'current-password',
-            }
-        ),
-        label='Текущий пароль',
-    )
-    new_password1 = forms.CharField(
-        max_length=128,
-        widget=forms.PasswordInput(
-            attrs={
-                'class': 'form-control form-control-sm',
-                'placeholder': 'Новый пароль',
-                'autocomplete': 'new-password',
-            }
-        ),
-        label='Новый пароль',
-    )
-    new_password2 = forms.CharField(
-        max_length=128,
-        widget=forms.PasswordInput(
-            attrs={
-                'class': 'form-control form-control-sm',
-                'placeholder': 'Повторите новый пароль',
-                'autocomplete': 'new-password',
-            }
-        ),
-        label='Повторите новый пароль',
-    )
+    def __init__(self, user, *args, **kwargs):
+        super().__init__(user, *args, **kwargs)
+        pwd_attrs = {
+            'class': 'form-control form-control-sm',
+            'autocomplete': 'new-password',
+        }
+        self.fields['new_password1'].widget = forms.PasswordInput(
+            attrs={**pwd_attrs, 'placeholder': 'Новый пароль'}
+        )
+        self.fields['new_password1'].label = 'Новый пароль'
+        # В модалке не показываем длинный HTML с требованиями — валидаторы всё равно сработают
+        self.fields['new_password1'].help_text = ''
+
+        self.fields['new_password2'].widget = forms.PasswordInput(
+            attrs={**pwd_attrs, 'placeholder': 'Повторите новый пароль'}
+        )
+        self.fields['new_password2'].label = 'Повторите новый пароль'

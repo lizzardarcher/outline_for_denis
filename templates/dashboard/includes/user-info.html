@@ -27,6 +27,7 @@
     <br>
 </p>
 
+
     <!-- Смена пароля (модальное окно) -->
     <div class="modal fade" id="changePasswordModal" tabindex="-1" role="dialog"
          aria-labelledby="changePasswordModalLabel" aria-hidden="true">
@@ -41,79 +42,36 @@
                 <form id="dashboardPasswordChangeForm" method="post" action="{% url 'dashboard_password_change' %}">
                     {% csrf_token %}
                     <div class="modal-body">
-                        <div id="passwordChangeFormErrors"></div>
+                        {% if dashboard_password_form.non_field_errors %}
+                            <div class="alert alert-danger small py-2 mb-2">{{ dashboard_password_form.non_field_errors }}</div>
+                        {% endif %}
                         <div class="form-group mb-2">
-                            <label class="small mb-0" for="id_modal_old_password">Текущий пароль</label>
-                            <input type="password" name="old_password" id="id_modal_old_password"
-                                   class="form-control form-control-sm" required autocomplete="current-password">
-                        </div>
-                        <div class="form-group mb-2">
-                            <label class="small mb-0" for="id_modal_new1">Новый пароль</label>
-                            <input type="password" name="new_password1" id="id_modal_new1"
-                                   class="form-control form-control-sm" required autocomplete="new-password">
+                            <label class="small mb-0" for="{{ dashboard_password_form.new_password1.id_for_label }}">
+                                {{ dashboard_password_form.new_password1.label }}
+                            </label>
+                            {{ dashboard_password_form.new_password1 }}
+                            {% if dashboard_password_form.new_password1.errors %}
+                                <div class="text-danger small">{{ dashboard_password_form.new_password1.errors }}</div>
+                            {% endif %}
                         </div>
                         <div class="form-group mb-0">
-                            <label class="small mb-0" for="id_modal_new2">Повторите новый пароль</label>
-                            <input type="password" name="new_password2" id="id_modal_new2"
-                                   class="form-control form-control-sm" required autocomplete="new-password">
+                            <label class="small mb-0" for="{{ dashboard_password_form.new_password2.id_for_label }}">
+                                {{ dashboard_password_form.new_password2.label }}
+                            </label>
+                            {{ dashboard_password_form.new_password2 }}
+                            {% if dashboard_password_form.new_password2.errors %}
+                                <div class="text-danger small">{{ dashboard_password_form.new_password2.errors }}</div>
+                            {% endif %}
                         </div>
                     </div>
                     <div class="modal-footer py-2">
                         <button type="button" class="btn btn-secondary btn-sm" data-dismiss="modal">Отмена</button>
-                        <button type="submit" class="btn btn-primary btn-sm" id="passwordChangeSubmitBtn">Сохранить</button>
+                        <button type="submit" class="btn btn-primary btn-sm">Сохранить</button>
                     </div>
                 </form>
             </div>
         </div>
     </div>
-    <script>
-    (function () {
-        var form = document.getElementById('dashboardPasswordChangeForm');
-        if (!form) return;
-        var errBox = document.getElementById('passwordChangeFormErrors');
-        var submitBtn = document.getElementById('passwordChangeSubmitBtn');
-        $('#changePasswordModal').on('hidden.bs.modal', function () {
-            errBox.innerHTML = '';
-            form.reset();
-        });
-        form.addEventListener('submit', function (e) {
-            e.preventDefault();
-            errBox.innerHTML = '';
-            submitBtn.disabled = true;
-            var fd = new FormData(form);
-            var csrf = form.querySelector('[name=csrfmiddlewaretoken]');
-            fetch(form.action, {
-                method: 'POST',
-                body: fd,
-                credentials: 'same-origin',
-                headers: {'X-CSRFToken': csrf ? csrf.value : ''}
-            }).then(function (r) {
-                return r.text().then(function (text) {
-                    var data = {};
-                    try { data = text ? JSON.parse(text) : {}; } catch (ignore) {}
-                    return {ok: r.ok, data: data};
-                });
-            }).then(function (res) {
-                if (res.ok && res.data.ok) {
-                    errBox.innerHTML = '<div class="alert alert-success py-2 mb-2 small">' + (res.data.message || 'Готово.') + '</div>';
-                    setTimeout(function () { window.location.reload(); }, 900);
-                    return;
-                }
-                var errors = (res.data && res.data.errors) || {};
-                var parts = [];
-                var labels = {old_password: 'Текущий пароль', new_password1: 'Новый пароль', new_password2: 'Повтор пароля', __all__: ''};
-                Object.keys(errors).forEach(function (key) {
-                    var msgs = errors[key];
-                    var label = labels[key] || key;
-                    msgs.forEach(function (m) { parts.push((label ? label + ': ' : '') + m); });
-                });
-                errBox.innerHTML = '<div class="alert alert-danger py-2 mb-0 small">' + (parts.join('<br>') || 'Ошибка. Проверьте поля.') + '</div>';
-            }).catch(function () {
-                errBox.innerHTML = '<div class="alert alert-danger py-2 mb-0 small">Сеть недоступна. Попробуйте позже.</div>';
-            }).finally(function () { submitBtn.disabled = false; });
-        });
-    })();
-    </script>
 <hr>
 <div>
     <p><strong>Активен с :</strong> <span class="">{{ request.user.profile.telegram_user.join_date }}</span></p>
