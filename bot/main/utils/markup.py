@@ -9,6 +9,7 @@ from bot.models import Prices, Country, TelegramUser, Server
 
 btn_back = InlineKeyboardButton(text=f'🔙 Назад', callback_data=f'back')
 DOMAIN = settings.DOMAIN
+ALIAS_DOMAIN = settings.ALIAS_DOMAIN
 
 def get_app_or_start():
     markup = InlineKeyboardMarkup()
@@ -70,8 +71,8 @@ def help_markup():
     markup.add(InlineKeyboardButton(text='Ссылки на скачивание', url='https://telegra.ph/VPN--Ssylki-na-skachivanie-10-15'))
     markup.add(InlineKeyboardButton(text='Условия использования', url='https://telegra.ph/Usloviya-polzovaniya-servisom-DOM-VPN-12-21'))
     markup.add(InlineKeyboardButton(text='Инструкция', url='https://telegra.ph/Instrukciya-DOM-VPN-12-21'))
-    markup.add(InlineKeyboardButton(text='Договор оферты', url=f'{DOMAIN}/oferta/'))
-    markup.add(InlineKeyboardButton(text='Политика конфиденциальности', url=f'{DOMAIN}/policy/'))
+    markup.add(InlineKeyboardButton(text='Договор оферты', url=f'{ALIAS_DOMAIN}/oferta/'))
+    markup.add(InlineKeyboardButton(text='Политика конфиденциальности', url=f'{ALIAS_DOMAIN}/policy/'))
     markup.add(btn_back)
     return markup
 
@@ -100,6 +101,7 @@ def get_avail_location(protocol: str):
     return markup
 
 
+
 def get_subscription():
     markup = InlineKeyboardMarkup()
     btn2 = InlineKeyboardButton(text=f'💲 Приобрести подписку', callback_data=f'account:choose_payment')
@@ -108,7 +110,6 @@ def get_subscription():
     markup.row(btn3)
     markup.row(btn_back)
     return markup
-
 
 def cancel_subscription():
     markup = InlineKeyboardMarkup()
@@ -155,20 +156,21 @@ def payment_menu(payment_type: str):
     )
     # markup.add(
     #     InlineKeyboardButton(
+    #         text='Робокасса (Банковская карта)',
+    #         callback_data=f'account:payment:robokassa:{payment_type}'
+    #     )
+    # )
+
+    # markup.add(
+    #     InlineKeyboardButton(
     #         text='Криптовалюта (USDT, TON)',
     #         callback_data=f'account:payment:cryptobot:{payment_type}'
     #     )
     # )
-    # markup.add(
-    #     InlineKeyboardButton(
-    #         text='Робокасса (карта/СБП)',
-    #         callback_data=f'account:payment:robokassa:{payment_type}'
-    #     )
-    # )
     markup.add(
         InlineKeyboardButton(
-            text='Оплачивая подписку я соглашаюсь с договором офертой',
-            url=f'{DOMAIN}/oferta/'
+            text='Договоры',
+            url=f'{ALIAS_DOMAIN}/oferta/'
         )
     )
     markup.add(btn_back)

@@ -39,7 +39,6 @@ class ProfileView(LoginRequiredMixin, SuccessMessageMixin, TemplateView):
         context['inv_4_lvl'] = TelegramReferral.objects.filter(referrer=self.request.user.profile.telegram_user, level=4).__len__()
         context['inv_5_lvl'] = TelegramReferral.objects.filter(referrer=self.request.user.profile.telegram_user, level=5).__len__()
 
-
         if self.request.user.profile.telegram_user.special_offer:
             context['per_1'] = self.request.user.profile.telegram_user.special_offer.level_1_percentage
             context['per_2'] = self.request.user.profile.telegram_user.special_offer.level_2_percentage
@@ -62,6 +61,7 @@ class CancelSubscriptionView(LoginRequiredMixin, TemplateView):
     def get(self, request, *args, **kwargs):
         user = TelegramUser.objects.filter(user_id=self.request.user.profile.telegram_user.user_id).first()
         user.payment_method_id = None
+        user.robokassa_recurring_parent_inv_id = ''
         user.permission_revoked = True
         user.save()
         Logging.objects.create(

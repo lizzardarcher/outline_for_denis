@@ -41,6 +41,7 @@ bot = AsyncTeleBot(token='8110135608:AAF66nNNRA3bsrf0gsig3bIjIRG25NvOBho', state
 bot.parse_mode = 'HTML'
 BOT_USERNAME = settings.BOT_USERNAME
 KEY_LIMIT = settings.KEY_LIMIT
+SITE_DOMAIN = ((getattr(settings, 'DOMAIN', '') or 'https://dom-vpn.su').rstrip('/'))
 
 
 def update_sub_status(user: TelegramUser):
@@ -634,7 +635,12 @@ async def callback_query_handlers(call):
                                     InlineKeyboardButton(text=f'💳 Оплатить подписку {str(days)} дн. за {str(price)}р.',
                                                          url=confirmation_url))
                                 payment_markup.add(
-                                    InlineKeyboardButton(text='Договор оферты', url='https://domvpn.store/oferta/'))
+                                    InlineKeyboardButton(text='Договор оферты', url=f'{SITE_DOMAIN}/oferta/'))
+                                payment_markup.add(
+                                    InlineKeyboardButton(text='Политика ПДн', url=f'{SITE_DOMAIN}/policy/'))
+                                payment_markup.add(
+                                    InlineKeyboardButton(text='Пользовательское соглашение',
+                                                         url=f'{SITE_DOMAIN}/user-agreement/'))
                                 payment_markup.add(InlineKeyboardButton(text=f'🔙 Назад', callback_data=f'back'))
                                 await bot.send_message(call.message.chat.id,
                                                        f"Для оплаты подписки на {days} дн. нажмите на кнопку Оплатить и следуйте инструкциям:",
@@ -671,7 +677,6 @@ async def callback_query_handlers(call):
                             try:
                                 amount_decimal = Decimal(str(price))
 
-                                # 1) Формируем ссылку RoboKassa для бота
                                 merchant_login = settings.ROBOKASSA_MERCHANT_LOGIN_BOT
                                 password_1 = settings.ROBOKASSA_PASSWORD_1_BOT
                                 base_url = getattr(
@@ -681,7 +686,6 @@ async def callback_query_handlers(call):
                                 )
                                 is_test = getattr(settings, 'ROBOKASSA_BOT_IS_TEST', False)
 
-                                # 2) Создаём pending-транзакцию для бота
                                 transaction = Transaction.objects.create(
                                     status='pending',
                                     paid=False,
@@ -692,9 +696,12 @@ async def callback_query_handlers(call):
                                     side='Приход средств',
                                     description=f'Приобретение подписки',
                                     payment_system='RoboKassaBot',
+                                    robokassa_is_recurring_parent=True,
                                 )
+                                transaction.robokassa_invoice_id = str(transaction.id)
+                                transaction.save(update_fields=['robokassa_invoice_id'])
 
-                                inv_id = transaction.id  # пойдёт в InvId для RobokassaBotResultView
+                                inv_id = transaction.id
 
                                 out_sum_str = f"{amount_decimal:.2f}"
                                 signature = robokassa_md5(
@@ -712,6 +719,7 @@ async def callback_query_handlers(call):
                                     'SignatureValue': signature,
                                     'SuccessURL': success_url,
                                     'FailURL': fail_url,
+                                    'Recurring': 'true',
                                 }
                                 if is_test:
                                     params['IsTest'] = '1'
@@ -736,7 +744,19 @@ async def callback_query_handlers(call):
                                 payment_markup.add(
                                     InlineKeyboardButton(
                                         text='Договор оферты',
-                                        url='https://domvpn.store/oferta/'
+                                        url=f'{SITE_DOMAIN}/oferta/'
+                                    )
+                                )
+                                payment_markup.add(
+                                    InlineKeyboardButton(
+                                        text='Политика ПДн',
+                                        url=f'{SITE_DOMAIN}/policy/'
+                                    )
+                                )
+                                payment_markup.add(
+                                    InlineKeyboardButton(
+                                        text='Пользовательское соглашение',
+                                        url=f'{SITE_DOMAIN}/user-agreement/'
                                     )
                                 )
                                 payment_markup.add(
@@ -829,7 +849,19 @@ async def callback_query_handlers(call):
                                 payment_markup.add(
                                     InlineKeyboardButton(
                                         text='Договор оферты',
-                                        url='https://domvpn.su/oferta/',
+                                        url=f'{SITE_DOMAIN}/oferta/',
+                                    )
+                                )
+                                payment_markup.add(
+                                    InlineKeyboardButton(
+                                        text='Политика ПДн',
+                                        url=f'{SITE_DOMAIN}/policy/',
+                                    )
+                                )
+                                payment_markup.add(
+                                    InlineKeyboardButton(
+                                        text='Пользовательское соглашение',
+                                        url=f'{SITE_DOMAIN}/user-agreement/',
                                     )
                                 )
                                 payment_markup.add(
@@ -870,6 +902,7 @@ async def callback_query_handlers(call):
                                                message=f'[BOT] [ДЕЙСТВИЕ: ОТМЕНА ПОДПИСКИ ID Платежа: {user.payment_method_id}]',
                                                datetime=datetime.now(), user=user)
                         user.payment_method_id = None
+                        user.robokassa_recurring_parent_inv_id = ''
                         user.permission_revoked = True
                         user.save()
                         await bot.send_message(call.message.chat.id, text=msg.cancel_subscription_success,

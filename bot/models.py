@@ -20,6 +20,13 @@ class TelegramUser(models.Model):
     top_up_balance_listener = models.BooleanField(default=False, verbose_name='Top up balance listener')
     withdrawal_listener = models.BooleanField(default=False, verbose_name='Withdrawal listener')
     payment_method_id = models.CharField(max_length=1000, blank=True, null=True, default='', verbose_name='Payment Method ID')
+    robokassa_recurring_parent_inv_id = models.CharField(
+        max_length=32,
+        blank=True,
+        default='',
+        verbose_name='RoboKassa InvId материнского счёта (рекуррент)',
+        help_text='Успешный платёж с Recurring=true; для автосписаний — PreviousInvoiceID.',
+    )
     permission_revoked = models.BooleanField(default=False, verbose_name='Самостоятельно отменил автоплатёж')
     next_payment_date = models.DateField(default=None, blank=True, null=True, verbose_name='Следующее списание')
     special_offer = models.ForeignKey('ReferralSpecialOffer', default=None, null=True, blank=True, db_index=True, on_delete=models.SET_NULL, related_name='special_offers', verbose_name='Специальные проценты')
@@ -174,7 +181,31 @@ class Transaction(models.Model):
     side = models.CharField(max_length=100, blank=True, null=True, choices=SIDE, verbose_name='Направление транзакции')
     description = models.CharField(max_length=255, blank=True, null=True, default=None,
                                    verbose_name='Описание платежа')
-    payment_id = models.CharField(max_length=255, blank=True, null=True, default=None, verbose_name='ID платежа')
+    payment_id = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+        default=None,
+        verbose_name='ID операции во внешней ПС',
+        help_text='ЮKassa: id платежа; RoboKassa: ID операции Robox из OpState при наличии.',
+    )
+    robokassa_invoice_id = models.CharField(
+        max_length=32,
+        blank=True,
+        null=True,
+        verbose_name='RoboKassa: номер счёта (InvId)',
+    )
+    robokassa_recurring_previous_inv_id = models.CharField(
+        max_length=32,
+        blank=True,
+        null=True,
+        verbose_name='RoboKassa: PreviousInvoiceID',
+        help_text='У дочернего рекуррентного счёта — InvId материнского платежа.',
+    )
+    robokassa_is_recurring_parent = models.BooleanField(
+        default=False,
+        verbose_name='RoboKassa: материнский рекуррент (Recurring=true)',
+    )
     paid = models.BooleanField(null=True, blank=True, default=False, verbose_name='Оплачено')
     status = models.CharField(max_length=50, choices=STATUS, default='pending', null=True, blank=True,
                               verbose_name='Статус')
@@ -372,7 +403,6 @@ LOG_LEVEL = (
     ('SUCCESS', 'SUCCESS'),
 )
 
-
 class Logging(models.Model):
     log_level = models.CharField(max_length=50, null=True, blank=True, choices=LOG_LEVEL, verbose_name='LOG LEVEL')
     message = models.TextField(max_length=4000, null=True, blank=True, verbose_name='Сообщение')
@@ -385,7 +415,6 @@ class Logging(models.Model):
     class Meta:
         verbose_name = 'Лог'
         verbose_name_plural = 'Логи'
-
 
 class Prices(models.Model):
     price_1 = models.PositiveIntegerField(null=True, blank=True, verbose_name='price for 1 month')

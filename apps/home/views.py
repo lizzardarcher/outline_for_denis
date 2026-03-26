@@ -18,7 +18,6 @@ class HomeView(TemplateView):
 class AboutView(TemplateView):
     template_name = 'home/about.html'
 
-
 class PriceView(TemplateView):
     template_name = 'home/price.html'
 
@@ -28,14 +27,24 @@ class PriceView(TemplateView):
         return context
 
 
-
-
 class OfertaView(TemplateView):
     template_name = 'home/oferta.html'
 
 
 class PolicyView(TemplateView):
     template_name = 'home/policy.html'
+
+
+class UserAgreementView(TemplateView):
+    template_name = 'home/user_agreement.html'
+
+
+class PersonalDataConsentView(TemplateView):
+    template_name = 'home/personal_data_consent.html'
+
+
+class DocumentsView(TemplateView):
+    template_name = 'home/documents.html'
 
 
 class LoginView(TemplateView):

@@ -144,6 +144,12 @@ def payment_menu(payment_type: str):
     markup = InlineKeyboardMarkup()
     markup.add(
         InlineKeyboardButton(
+            text='Робокасса (карта/СБП, рекуррент)',
+            callback_data=f'account:payment:robokassa:{payment_type}'
+        )
+    )
+    markup.add(
+        InlineKeyboardButton(
             text='Юкасса (СБП, Банковская карта)',
             callback_data=f'account:payment:ukassa:{payment_type}'
         )
@@ -154,12 +160,6 @@ def payment_menu(payment_type: str):
     #         callback_data=f'account:payment:cryptobot:{payment_type}'
     #     )
     # )
-    markup.add(
-        InlineKeyboardButton(
-            text='Робокасса (карта/СБП)',
-            callback_data=f'account:payment:robokassa:{payment_type}'
-        )
-    )
     markup.add(
         InlineKeyboardButton(
             text='Оплачивая подписку я соглашаюсь с договором офертой',

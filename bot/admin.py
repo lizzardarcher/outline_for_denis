@@ -240,7 +240,7 @@ class TelegramUserAdmin(admin.ModelAdmin):
     search_fields = ('first_name', 'last_name', 'username', 'user_id')
     fieldsets = ([
         ('Основная информация', {'fields': ['join_date','first_name','last_name','username','user_id','photo_url', ],}),
-        ('Подписка', {'fields': ['is_banned','subscription_expiration','subscription_status','payment_method_id','permission_revoked',],}),
+        ('Подписка', {'fields': ['is_banned','subscription_expiration','subscription_status','payment_method_id','robokassa_recurring_parent_inv_id','permission_revoked',],}),
         ('Реферальная программа', {'fields':['income', 'special_offer']})
     ])
     readonly_fields = ('join_date', 'first_name', 'last_name', 'username', 'user_id')
@@ -364,8 +364,15 @@ class TelegramReferralAdmin(BaseAdmin):
 
 @admin.register(Transaction)
 class TransactionAdmin(BaseAdmin):
-    list_display = ('timestamp', 'amount', 'currency', 'status', 'description', 'paid', 'payment_id', 'user', 'side', 'payment_system')
-    readonly_fields = ('income_info', 'timestamp', 'amount', 'currency', 'status', 'description', 'paid', 'payment_id', 'user', 'side', 'payment_system')
+    list_display = (
+        'timestamp', 'amount', 'currency', 'status', 'description', 'paid', 'payment_id',
+        'robokassa_invoice_id', 'robokassa_is_recurring_parent', 'user', 'side', 'payment_system',
+    )
+    readonly_fields = (
+        'income_info', 'timestamp', 'amount', 'currency', 'status', 'description', 'paid', 'payment_id',
+        'robokassa_invoice_id', 'robokassa_recurring_previous_inv_id', 'robokassa_is_recurring_parent',
+        'user', 'side', 'payment_system',
+    )
     list_display_links = ('user', 'payment_id',)
     ordering = ['-timestamp']
     search_fields = ('user__username', 'user__first_name', 'user__last_name', 'user__user_id', 'description', 'payment_id', 'payment_system')
