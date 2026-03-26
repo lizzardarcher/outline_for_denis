@@ -1,0 +1,31 @@
+{% extends 'layouts/base.html' %}
+{% load static %}
+{% block title %}Документы{% endblock title %}
+{% block content %}
+    <div class="mb-5" style="background:#00204a;">
+        {% include 'home/sections/header.html' %}
+    </div>
+    <div class="container mt-5 pt-4">
+        <h2 class="mb-4 mt-5">Документы</h2>
+        <p class="text-muted">На этой странице собраны ссылки на все действующие документы сервиса.</p>
+
+        <div class="list-group mb-5">
+            <a class="list-group-item list-group-item-action" href="{% url 'oferta' %}" target="_blank">
+                Договор оферты
+            </a>
+            <a class="list-group-item list-group-item-action" href="{% url 'policy' %}" target="_blank">
+                Политика в отношении персональных данных
+            </a>
+            <a class="list-group-item list-group-item-action" href="{% url 'user_agreement' %}" target="_blank">
+                Пользовательское соглашение
+            </a>
+            <a class="list-group-item list-group-item-action" href="{% url 'personal_data_consent' %}" target="_blank">
+                Согласие на обработку персональных данных
+            </a>
+        </div>
+    </div>
+    {% include 'home/sections/info.html' %}
+    {% include 'home/sections/footer.html' %}
+{% endblock content %}
+
+
