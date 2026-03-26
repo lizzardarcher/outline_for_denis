@@ -27,7 +27,7 @@ class UserRegistrationForm(forms.Form):
         widget=forms.PasswordInput(attrs={'placeholder': 'Подтвердите пароль'}),
         min_length=8,
     )
-    captcha = ReCaptchaField(label='Подтверждение, что вы не робот')
+    # captcha = ReCaptchaField(label='Подтверждение, что вы не робот')
 
     def clean_email(self):
         email = self.cleaned_data.get('email')
@@ -84,7 +84,7 @@ class UserPasswordResetForm(PasswordResetForm):
 
 
 class UserSetPasswordForm(SetPasswordForm):
-    confirm = ReCaptchaField()
+    # confirm = ReCaptchaField()
     new_password1 = forms.CharField(max_length=50, widget=forms.PasswordInput(attrs={
         'class': 'form-control', 'placeholder': 'Новый пароль'
     }), label="Новый пароль")
@@ -94,7 +94,7 @@ class UserSetPasswordForm(SetPasswordForm):
 
 
 class UserPasswordChangeForm(PasswordChangeForm):
-    confirm = ReCaptchaField()
+    # confirm = ReCaptchaField()
     old_password = forms.CharField(max_length=50, widget=forms.PasswordInput(attrs={
         'class': 'form-control', 'placeholder': 'Старый пароль'
     }), label='Старый пароль')
