@@ -169,8 +169,8 @@ def payment_menu(payment_type: str):
     # )
     markup.add(
         InlineKeyboardButton(
-            text='Договоры',
-            url=f'{ALIAS_DOMAIN}/oferta/'
+            text='Документы сервиса',
+            url=f'{ALIAS_DOMAIN}/documents/'
         )
     )
     markup.add(btn_back)

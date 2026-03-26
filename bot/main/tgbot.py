@@ -646,10 +646,8 @@ async def callback_query_handlers(call):
                         elif data[-1] == '3_days_trial':
                             sub = '3 Дня'
                             price = prices.price_5
-                        await bot.send_message(call.message.chat.id, text=msg.payment_menu.format(
-                            sub, price, recurrent_price
-                        ),
-                                               reply_markup=markup.payment_menu(data[-1]))
+                        await bot.send_message(call.message.chat.id, text=msg.payment_menu.format(sub, price, recurrent_price, settings.ALIAS_DOMAIN+'/documents/'),
+                            reply_markup=markup.payment_menu(data[-1]))
 
                     elif 'payment' in data:
 
