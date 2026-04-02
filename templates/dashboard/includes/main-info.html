@@ -125,15 +125,20 @@
                                     <p>Вы собираетесь оформить подписку на <b><span
                                             id="selectedSubscriptionText"></span></b>
                                         стоимостью <b><span id="selectedSubscriptionPrice"></span></b> руб.</p>
-                                    <p>Пожалуйста, подтвердите свой выбор и ознакомьтесь с условиями.</p>
+                                    <p class="mb-3">Пожалуйста, подтвердите свой выбор и ознакомьтесь с условиями.</p>
+                                    <small class="mb-3">Спустя выбранный период (в течение 1го дня) подписка будет автоматически продлена на 1 месяц за 250 ₽
+                                       Отменить подписку можно в любой момент у себя в профиле.</small>
 
-                                    <div class="form-check">
+                                    <div class="form-check mt-3">
                                         <input class="form-check-input" type="checkbox" value="" id="agreementCheckbox">
                                         <label class="form-check-label" for="agreementCheckbox">
-                                            <small>Я подтверждаю, что ознакомился и согласен с <a
-                                                    href="{% url 'oferta' %}" target="_blank">
-                                                условиями подписки</a>. Подписку можно отменить в личном кабинете в
-                                                любой момент.</small>
+                                            <small>
+
+                                                Я даю согласие на обработку персональных данных и принимаю условия
+                                                <a href="{% url 'oferta' %}" target="_blank">публичной оферты</a>.
+                                                Подписку можно отменить в личном кабинете в
+                                                любой момент.
+                                            </small>
                                         </label>
                                     </div>
                                 </div>
