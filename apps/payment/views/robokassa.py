@@ -69,41 +69,6 @@ def get_robokassa_payment_info(inv_id: str, merchant_login: str, password_2: str
         return None
 
 
-ROBOKASSA_RECURRING_URL = 'https://auth.robokassa.ru/Merchant/Recurring'
-
-
-def post_robokassa_bot_recurring_invoice(
-    *,
-    merchant_login: str,
-    password_1: str,
-    invoice_id: int,
-    previous_invoice_id: str,
-    out_sum: Decimal,
-    description: str,
-    is_test: bool,
-) -> tuple[bool, str]:
-    """
-    Дочерний рекуррентный счёт. PreviousInvoiceID не входит в SignatureValue (док. RoboKassa).
-    Подпись: MD5(MerchantLogin:OutSum:InvoiceID:Password1).
-    """
-    out_sum_str = f'{out_sum:.2f}'
-    signature = robokassa_md5(f'{merchant_login}:{out_sum_str}:{invoice_id}:{password_1}')
-    data = {
-        'MerchantLogin': merchant_login,
-        'InvoiceID': str(invoice_id),
-        'PreviousInvoiceID': str(previous_invoice_id),
-        'OutSum': out_sum_str,
-        'Description': (description or 'Подписка DomVPN')[:100],
-        'SignatureValue': signature,
-    }
-    if is_test:
-        data['IsTest'] = '1'
-    resp = requests.post(ROBOKASSA_RECURRING_URL, data=data, timeout=60)
-    text = (resp.text or '').strip()
-    ok = resp.ok and text.upper().startswith('OK')
-    return ok, text
-
-
 class CreateRobokassaPaymentView(LoginRequiredMixin, View):
     """
     Создание платежа в RoboKassa по выбранной подписке.

@@ -647,7 +647,7 @@ async def callback_query_handlers(call):
                             sub = '3 Дня'
                             price = prices.price_5
                         await bot.send_message(call.message.chat.id, text=msg.payment_menu.format(sub, price, recurrent_price),
-                            reply_markup=markup.payment_menu(data[-1]))
+                            reply_markup=markup.payment_menu(data[-1], user))
 
                     elif 'payment' in data:
 
@@ -795,6 +795,7 @@ async def callback_query_handlers(call):
                                     robokassa_is_recurring_parent=True,
                                 )
                                 transaction.robokassa_invoice_id = str(transaction.id)
+                                transaction.robokassa_recurring_previous_inv_id = str(transaction.id)
                                 transaction.save(update_fields=['robokassa_invoice_id'])
 
                                 inv_id = transaction.id  # InvId для RobokassaBotResultView

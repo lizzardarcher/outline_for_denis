@@ -565,6 +565,8 @@ class PredefinedTransactionKeywordFilter(admin.SimpleListFilter):
         ("[CELERY] [SITE]", "[CELERY] [SITE]"),
         ("[CELERY] [BOT]", "[CELERY] [BOT]"),
         ("[BOT]", "[BOT]"),
+        ("[RoboKassa рекуррент]", "[RoboKassa рекуррент]"),
+        ("[RoboKassa]", "[RoboKassa]"),
         ("[WEB]", "[WEB]"),
         ("ДЕЙСТВИЕ", "[ДЕЙСТВИЕ]"),
         ("[Закончилась подписка у пользователя]", "[Закончилась подписка у пользователя]"),

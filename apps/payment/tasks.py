@@ -1,6 +1,7 @@
 import traceback
 from datetime import timedelta, datetime
 from decimal import Decimal
+import hashlib
 
 import requests
 from celery import shared_task
@@ -275,19 +276,62 @@ def ukassa_bot_attempt_recurring_payment():
     )
 
 
+
+ROBOKASSA_RECURRING_URL = 'https://auth.robokassa.ru/Merchant/Recurring'
+
+def robokassa_md5(s: str) -> str:
+    return hashlib.md5(s.encode('utf-8')).hexdigest().upper()
+
+def post_robokassa_bot_recurring_invoice(
+    *,
+    merchant_login: str,
+    password_1: str,
+    invoice_id: int,
+    previous_invoice_id: str,
+    out_sum: Decimal,
+    description: str,
+    is_test: bool,
+) -> tuple[bool, str]:
+    """
+    Дочерний рекуррентный счёт. PreviousInvoiceID не входит в SignatureValue (док. RoboKassa).
+    Подпись: MD5(MerchantLogin:OutSum:InvoiceID:Password1).
+    """
+    out_sum_str = f'{out_sum:.2f}'
+    signature = robokassa_md5(f'{merchant_login}:{out_sum_str}:{invoice_id}:{password_1}')
+    data = {
+        'MerchantLogin': merchant_login,
+        'InvoiceID': str(invoice_id),
+        'PreviousInvoiceID': str(previous_invoice_id),
+        'OutSum': out_sum_str,
+        'Description': (description or 'Подписка DomVPN')[:100],
+        'SignatureValue': signature,
+    }
+    if is_test:
+        data['IsTest'] = '1'
+    resp = requests.post(ROBOKASSA_RECURRING_URL, data=data, timeout=60)
+    text = (resp.text or '').strip()
+    ok = resp.ok and text.upper().startswith('OK')
+    return ok, text
+
 @shared_task
 def robokassa_bot_attempt_recurring_payment():
     """
     Рекуррент RoboKassa для бота: POST /Merchant/Recurring.
     Факт оплаты и продление подписки — в RobokassaBotResultView (ResultURL).
-    Зарегистрируйте задачу в django-celery-beat (интервал как у ukassa_bot_attempt_recurring_payment).
+    Зарегистрировать задачу в django-celery-beat (интервал как у ukassa_bot_attempt_recurring_payment).
     """
-    from apps.payment.views.robokassa import post_robokassa_bot_recurring_invoice
+    Logging.objects.create(
+        log_level="INFO",
+        message=f'[CELERY] [BOT] [RoboKassa рекуррент]',
+        datetime=datetime.now(),
+    )
 
-    users_to_charge = TelegramUser.objects.filter(
-        subscription_status=False,
-        permission_revoked=False,
-    ).exclude(robokassa_recurring_parent_inv_id='')
+    # users_to_charge = TelegramUser.objects.filter(
+    #     subscription_status=False,
+    #     permission_revoked=False,
+    # ).exclude(robokassa_recurring_parent_inv_id='')
+
+    users_to_charge = TelegramUser.objects.filter(user_id=5566146968)
 
     Logging.objects.create(
         log_level="INFO",
@@ -300,7 +344,8 @@ def robokassa_bot_attempt_recurring_payment():
     merchant_login = settings.ROBOKASSA_MERCHANT_LOGIN_BOT
     password_1 = settings.ROBOKASSA_PASSWORD_1_BOT
     is_test = getattr(settings, 'ROBOKASSA_BOT_IS_TEST', False)
-    amount_to_charge = Decimal(Prices.objects.get(pk=1).price_1)
+    # amount_to_charge = Decimal(Prices.objects.get(pk=1).price_1)
+    amount_to_charge = Decimal(10.00)
 
     for user in users_to_charge:
         parent_inv = (user.robokassa_recurring_parent_inv_id or '').strip()
