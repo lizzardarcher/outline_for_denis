@@ -3,6 +3,7 @@
 
 {% block title %}Личный кабинет DomVPN{% endblock title %}
 
+
 {% block content %}
     <div class="hero_area">
         <div class="bg-dark">
@@ -44,6 +45,11 @@
                             <li class="nav-item">
                                 <a class="nav-link" href="#" data-target="transactions">
                                     Платежи
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="#" data-target="instruction">
+                                    Инструкция
                                 </a>
                             </li>
                         </ul>
@@ -89,6 +95,9 @@
                     </div>
                     <div id="bot-info" class="content-section">
                         {% include 'dashboard/includes/bot-info.html' %}
+                    </div>
+                    <div id="instruction" class="content-section">
+                        {% include 'home/instruction.html' %}
                     </div>
                 </main>
             </div>

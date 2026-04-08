@@ -170,13 +170,13 @@ def payment_menu(payment_type: str, user):
         )
     )
     # Для тестирования
-    if user.user_id == 5566146968 or user.user_id == 443210329:
-        markup.add(
-            InlineKeyboardButton(
-                text='Робокасса (Банковская карта)',
-                callback_data=f'account:payment:robokassa:{payment_type}'
-            )
+    # if user.user_id == 5566146968 or user.user_id == 443210329:
+    markup.add(
+        InlineKeyboardButton(
+            text='Робокасса (Банковская карта)',
+            callback_data=f'account:payment:robokassa:{payment_type}'
         )
+    )
 
     # markup.add(
     #     InlineKeyboardButton(

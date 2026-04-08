@@ -12,6 +12,7 @@ urlpatterns = [
     path('user-agreement/', views.UserAgreementView.as_view(), name='user_agreement'),
     path('personal-data-consent/', views.PersonalDataConsentView.as_view(), name='personal_data_consent'),
     path('documents/', views.DocumentsView.as_view(), name='documents'),
+    path('instruction/', views.InstructionView.as_view(), name='instruction'),
     path('advantages/', views.AdvantagesView.as_view(), name='advantages'),
     path('site_map/', views.SiteMapView.as_view(), name='site_map'),
     path('outline_links/', views.OutlineLinksView.as_view(), name='outline_links'),

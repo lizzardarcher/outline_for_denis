@@ -60,6 +60,61 @@ class BaseAdmin(admin.ModelAdmin):
             del actions['delete_selected']
         return actions
 
+class PredefinedLogKeywordFilter(admin.SimpleListFilter):
+    title = "Ключевые слова"
+    parameter_name = "keyword"
+
+    KEYWORDS = (
+        ("[CELERY]", "[CELERY]"),
+        ("[CELERY] [SITE]", "[CELERY] [SITE]"),
+        ("[CELERY] [BOT]", "[CELERY] [BOT]"),
+        ("[BOT]", "[BOT]"),
+        ("[RoboKassa рекуррент]", "[RoboKassa рекуррент]"),
+        ("[RoboKassa]", "[RoboKassa]"),
+        ("[WEB]", "[WEB]"),
+        ("ДЕЙСТВИЕ", "[ДЕЙСТВИЕ]"),
+        ("[Закончилась подписка у пользователя]", "[Закончилась подписка у пользователя]"),
+        ("Initializing", "Initializing"),
+        ("Юкасса Сайт", "Юкасса Сайт"),
+        ("Робокасса Бот", "Робокасса Бот"),
+        ("Юкасса Бот", "Юкасса Бот"),
+    )
+
+    def lookups(self, request, model_admin):
+        return self.KEYWORDS
+
+    def queryset(self, request, queryset):
+        value = self.value()
+        if not value:
+            return queryset
+
+        return queryset.filter(
+            Q(message__icontains=value)
+        )
+
+class PredefinedTransactionKeywordFilter(admin.SimpleListFilter):
+    title = "Ключевые слова"
+    parameter_name = "keyword"
+
+    KEYWORDS = (
+        ("YooKassaSite", "Юкасса Сайт"),
+        ("RoboKassaBot", "Робокасса Бот"),
+        ("YooKassaBot", "Юкасса Бот"),
+    )
+
+
+
+    def lookups(self, request, model_admin):
+        return self.KEYWORDS
+
+    def queryset(self, request, queryset):
+        value = self.value()
+        if not value:
+            return queryset
+
+        return queryset.filter(
+            Q(payment_system__icontains=value)
+        )
 
 class WithdrawalRequestInline(admin.TabularInline):
     model = WithdrawalRequest
@@ -376,7 +431,7 @@ class TransactionAdmin(BaseAdmin):
     list_display_links = ('user', 'payment_id',)
     ordering = ['-timestamp']
     search_fields = ('user__username', 'user__first_name', 'user__last_name', 'user__user_id', 'description', 'payment_id', 'payment_system')
-    list_filter = ['timestamp', 'description', 'paid', 'status']
+    list_filter = [PredefinedTransactionKeywordFilter, 'timestamp', 'description', 'paid', 'status']
 
     def has_change_permission(self, request, obj=None):
         return False
@@ -556,34 +611,7 @@ def make_success(modeladmin, request, queryset):
     queryset.update(log_level="SUCCESS")
 
 
-class PredefinedTransactionKeywordFilter(admin.SimpleListFilter):
-    title = "Ключевые слова"
-    parameter_name = "keyword"
 
-    KEYWORDS = (
-        ("[CELERY]", "[CELERY]"),
-        ("[CELERY] [SITE]", "[CELERY] [SITE]"),
-        ("[CELERY] [BOT]", "[CELERY] [BOT]"),
-        ("[BOT]", "[BOT]"),
-        ("[RoboKassa рекуррент]", "[RoboKassa рекуррент]"),
-        ("[RoboKassa]", "[RoboKassa]"),
-        ("[WEB]", "[WEB]"),
-        ("ДЕЙСТВИЕ", "[ДЕЙСТВИЕ]"),
-        ("[Закончилась подписка у пользователя]", "[Закончилась подписка у пользователя]"),
-        ("Initializing", "Initializing"),
-    )
-
-    def lookups(self, request, model_admin):
-        return self.KEYWORDS
-
-    def queryset(self, request, queryset):
-        value = self.value()
-        if not value:
-            return queryset
-
-        return queryset.filter(
-            Q(message__icontains=value)
-        )
 
 
 @admin.register(Logging)
@@ -627,7 +655,7 @@ class LoggingAdmin(BaseAdmin):
     ordering = ['-datetime']
     actions = [make_warning, make_debug, make_fatal, make_trace, make_success, make_info, delete_3_day_logs,
                delete_all_logs]
-    list_filter = [PredefinedTransactionKeywordFilter, 'log_level', 'datetime']
+    list_filter = [PredefinedLogKeywordFilter, 'log_level', 'datetime']
 
     def has_change_permission(self, request, obj=None):
         return False

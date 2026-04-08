@@ -47,6 +47,10 @@ class DocumentsView(TemplateView):
     template_name = 'home/documents.html'
 
 
+class InstructionView(TemplateView):
+    template_name = 'home/instruction.html'
+
+
 class LoginView(TemplateView):
     template_name = 'account/login.html'
 

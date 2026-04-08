@@ -1,0 +1,77 @@
+{% extends 'layouts/base.html' %}
+{% load static %}
+{% block title %}Инструкция{% endblock title %}
+
+{% block content %}
+<div class="mb-5" style="background:#00204a;">
+    {% include 'home/sections/header.html' %}
+</div>
+
+
+<div class="container mt-5 pt-4 mb-5">
+    <h1 class="mb-4">Инструкция по подключению</h1>
+
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <h5 class="card-title">Шаг 1. Создайте ключ</h5>
+            <p class="card-text">
+                После оплаты подписки в личном кабинете перейдите в раздел «Ключи» и нажмите кнопку «Создать».
+            </p>
+            <img class="img-fluid rounded border"
+                 src="{% static 'images/instructions/инструкция_html_ea434e64.png' %}"
+                 alt="Создание ключа">
+        </div>
+    </div>
+
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <h5 class="card-title">Шаг 2. Выберите параметры</h5>
+            <p class="card-text">
+                Выберите протокол (рекомендуем <code>vless</code>) и страну, затем нажмите «Подтвердить».
+            </p>
+            <img class="img-fluid rounded border"
+                 src="{% static 'images/instructions/инструкция_html_2fa1b004.png' %}"
+                 alt="Выбор протокола и страны">
+        </div>
+    </div>
+
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <h5 class="card-title">Шаг 3. Скопируйте ключ</h5>
+            <p class="card-text">
+                Нажмите на созданный ключ, чтобы скопировать его в буфер обмена.
+            </p>
+            <img class="img-fluid rounded border"
+                 src="{% static 'images/instructions/инструкция_html_2ba0d3ca.png' %}"
+                 alt="Копирование ключа">
+        </div>
+    </div>
+
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <h5 class="card-title">Шаг 4. Вставьте ключ в VPN-клиент</h5>
+            <p class="card-text">Вставьте скопированный ключ в приложение VPN.</p>
+        </div>
+    </div>
+
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <h5 class="card-title">Пример на ПК</h5>
+            <img class="img-fluid rounded border"
+                 src="{% static 'images/instructions/инструкция_html_7f645426.png' %}"
+                 alt="Пример на ПК">
+        </div>
+    </div>
+
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <h5 class="card-title">Пример на мобильном устройстве</h5>
+            <img class="img-fluid rounded border"
+                 src="{% static 'images/instructions/инструкция_html_53f7f014.png' %}"
+                 alt="Пример на мобильном устройстве">
+        </div>
+    </div>
+</div>
+
+{% endblock content %}
+

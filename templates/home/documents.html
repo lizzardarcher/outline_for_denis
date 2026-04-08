@@ -10,6 +10,9 @@
         <p class="text-muted">На этой странице собраны ссылки на все действующие документы сервиса.</p>
 
         <div class="list-group mb-5">
+            <a class="list-group-item list-group-item-action" href="{% url 'instruction' %}" target="_blank">
+                Инструкция по работе с сервисом
+            </a>
             <a class="list-group-item list-group-item-action" href="{% url 'oferta' %}" target="_blank">
                 Договор оферты
             </a>
@@ -27,5 +30,3 @@
     {% include 'home/sections/info.html' %}
     {% include 'home/sections/footer.html' %}
 {% endblock content %}
-
-
