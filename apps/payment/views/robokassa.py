@@ -116,9 +116,15 @@ class CreateRobokassaPaymentView(LoginRequiredMixin, View):
                 currency='RUB',
                 income_info=IncomeInfo.objects.get(pk=1),
                 side='Приход средств',
-                description=f'Приобретение подписки (RoboKassa, {days} дн.)',
+                description=f'Приобретение подписки (RoboKassa Site, {days} дн.)',
+                payment_system='RoboKassaSite',
+                robokassa_is_recurring_parent=True,
             )
 
+            transaction.robokassa_invoice_id = str(transaction.id)
+            transaction.robokassa_recurring_previous_inv_id = str(transaction.id)
+            transaction.save()
+            # transaction.save(update_fields=['robokassa_invoice_id'])
             inv_id = transaction.id  # будем использовать как InvId в RoboKassa
 
             # 2) Формируем ссылку RoboKassa
@@ -152,6 +158,7 @@ class CreateRobokassaPaymentView(LoginRequiredMixin, View):
                 'SignatureValue': signature,
                 'SuccessURL': success_url,
                 'FailURL': fail_url,
+                'Recurring': 'true',
             }
             if is_test:
                 params['IsTest'] = '1'

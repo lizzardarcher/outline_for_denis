@@ -92,6 +92,7 @@
             </li>
             <br>
 
+
             <li class="list-group-item d-flex flex-column flex-lg-row align-items-left justify-content-between">
                 <div class="mb-2 mb-lg-0">
                     <i class="fa fa-star mr-3 fa-2x" style="color: #13056e"></i>
@@ -149,7 +150,39 @@
                                     </button>
                                     <button type="button" class="btn btn-primary btn-sm" id="confirmPurchaseButton"
                                             disabled>
-                                        Подтвердить и оплатить
+                                        Подтвердить
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Modal: Выбор платежной системы -->
+                    <div class="modal fade" id="paymentSystemModal" tabindex="-1" role="dialog"
+                         aria-labelledby="paymentSystemModalLabel" aria-hidden="true">
+                        <div class="modal-dialog" role="document">
+                            <div class="modal-content">
+                                <div class="modal-header bg-primary-subtle">
+                                    <h5 class="modal-title" id="paymentSystemModalLabel">Выберите способ оплаты</h5>
+                                </div>
+                                <div class="modal-body">
+                                    <p class="mb-3">Выберите платёжную систему для оформления подписки:</p>
+                                    <div>
+                                        <button type="button"
+                                                class="btn btn-outline-primary btn-sm choose-payment-system w-100 mb-2"
+                                                data-payment-url="{% url 'ukassa_create_payment' %}">
+                                            Юкасса (СБП, Банковская карта)
+                                        </button>
+                                        {% if request.user.profile.telegram_user.username == 'megafoll' %}
+                                            <button type="button"
+                                                    class="btn btn-outline-dark btn-sm choose-payment-system w-100"
+                                                    data-payment-url="{% url 'create_payment_robokassa' %}">
+                                                Робокасса (Банковская карта)
+                                            </button>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary btn-sm" data-dismiss="modal">Отмена
                                     </button>
                                 </div>
                             </div>
@@ -183,8 +216,31 @@
                                 confirmPurchaseButton.disabled = !this.checked;
                             });
 
+                            let openPaymentSystemModal = false;
+
                             confirmPurchaseButton.addEventListener('click', function () {
-                                subscriptionForm.submit();
+                                openPaymentSystemModal = true;
+                                $('#confirmPurchaseModal').modal('hide');
+                            });
+
+                            $('#confirmPurchaseModal').on('hidden.bs.modal', function () {
+                                if (openPaymentSystemModal) {
+                                    openPaymentSystemModal = false;
+                                    // На смешанной bootstrap-инициализации иногда остаётся backdrop и блокирует кнопки
+                                    $('.modal-backdrop').remove();
+                                    $('body').removeClass('modal-open').css('padding-right', '');
+                                    $('#paymentSystemModal').modal('show');
+                                }
+                            });
+
+                            document.querySelectorAll('.choose-payment-system').forEach(function (btn) {
+                                btn.addEventListener('click', function () {
+                                    const paymentUrl = this.getAttribute('data-payment-url');
+                                    if (paymentUrl) {
+                                        subscriptionForm.setAttribute('action', paymentUrl);
+                                        subscriptionForm.submit();
+                                    }
+                                });
                             });
                         });
                     </script>
