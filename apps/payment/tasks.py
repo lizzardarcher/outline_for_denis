@@ -923,6 +923,7 @@ def robokassa_site_attempt_recurring_payment():
         permission_revoked=False,
     ).exclude(robokassa_recurring_parent_inv_id='')
 
+
     Logging.objects.create(
         log_level="INFO",
         message=f'[CELERY] [SITE] [RoboKassa рекуррент] [Начало] [пользователей: {users_to_charge.count()}]',
@@ -935,8 +936,8 @@ def robokassa_site_attempt_recurring_payment():
     merchant_login = settings.ROBOKASSA_MERCHANT_LOGIN_SITE
     password_1 = settings.ROBOKASSA_PASSWORD_1_SITE
     is_test = getattr(settings, 'ROBOKASSA_SITE_IS_TEST', False)
-    amount_to_charge = Decimal(Prices.objects.get(pk=1).price_1)
 
+    amount_to_charge = Decimal(Prices.objects.get(pk=1).price_1)
     for user in users_to_charge:
         parent_inv = (user.robokassa_recurring_parent_inv_id or '').strip()
         if not parent_inv:
