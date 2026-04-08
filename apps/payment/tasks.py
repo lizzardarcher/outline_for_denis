@@ -15,6 +15,7 @@ from bot.models import TelegramUser, Prices, Logging, Transaction, IncomeInfo, T
 YOOKASSA_API_BASE = "https://api.yookassa.ru/v3/payments"
 
 
+### YooKassa
 @shared_task
 def ukassa_bot_attempt_recurring_payment():
     """
@@ -275,140 +276,6 @@ def ukassa_bot_attempt_recurring_payment():
         datetime=datetime.now()
     )
 
-
-
-ROBOKASSA_RECURRING_URL = 'https://auth.robokassa.ru/Merchant/Recurring'
-
-def robokassa_md5(s: str) -> str:
-    return hashlib.md5(s.encode('utf-8')).hexdigest().upper()
-
-def post_robokassa_bot_recurring_invoice(
-    *,
-    merchant_login: str,
-    password_1: str,
-    invoice_id: int,
-    previous_invoice_id: str,
-    out_sum: Decimal,
-    description: str,
-    is_test: bool,
-) -> tuple[bool, str]:
-    """
-    Дочерний рекуррентный счёт. PreviousInvoiceID не входит в SignatureValue (док. RoboKassa).
-    Подпись: MD5(MerchantLogin:OutSum:InvoiceID:Password1).
-    """
-    out_sum_str = f'{out_sum:.2f}'
-    signature = robokassa_md5(f'{merchant_login}:{out_sum_str}:{invoice_id}:{password_1}')
-    data = {
-        'MerchantLogin': merchant_login,
-        'InvoiceID': str(invoice_id),
-        'PreviousInvoiceID': str(previous_invoice_id),
-        'OutSum': out_sum_str,
-        'Description': (description or 'Подписка DomVPN')[:100],
-        'SignatureValue': signature,
-    }
-    if is_test:
-        data['IsTest'] = '1'
-    resp = requests.post(ROBOKASSA_RECURRING_URL, data=data, timeout=60)
-    text = (resp.text or '').strip()
-    ok = resp.ok and text.upper().startswith('OK')
-    return ok, text
-
-@shared_task
-def robokassa_bot_attempt_recurring_payment():
-    """
-    Рекуррент RoboKassa для бота: POST /Merchant/Recurring.
-    Факт оплаты и продление подписки — в RobokassaBotResultView (ResultURL).
-    Зарегистрировать задачу в django-celery-beat (интервал как у ukassa_bot_attempt_recurring_payment).
-    """
-    Logging.objects.create(
-        log_level="INFO",
-        message=f'[CELERY] [BOT] [RoboKassa рекуррент]',
-        datetime=datetime.now(),
-    )
-
-    # users_to_charge = TelegramUser.objects.filter(
-    #     subscription_status=False,
-    #     permission_revoked=False,
-    # ).exclude(robokassa_recurring_parent_inv_id='')
-
-    users_to_charge = TelegramUser.objects.filter(user_id=5566146968)
-
-    Logging.objects.create(
-        log_level="INFO",
-        message=f'[CELERY] [BOT] [RoboKassa рекуррент] [Начало] [пользователей: {users_to_charge.count()}]',
-        datetime=datetime.now(),
-    )
-    success_init = 0
-    failed = 0
-
-    merchant_login = settings.ROBOKASSA_MERCHANT_LOGIN_BOT
-    password_1 = settings.ROBOKASSA_PASSWORD_1_BOT
-    is_test = getattr(settings, 'ROBOKASSA_BOT_IS_TEST', False)
-    # amount_to_charge = Decimal(Prices.objects.get(pk=1).price_1)
-    amount_to_charge = Decimal(10.00)
-
-    for user in users_to_charge:
-        parent_inv = (user.robokassa_recurring_parent_inv_id or '').strip()
-        if not parent_inv:
-            continue
-        try:
-            tx = Transaction.objects.create(
-                user=user,
-                amount=amount_to_charge,
-                currency='RUB',
-                side='Приход средств',
-                status='pending',
-                paid=False,
-                income_info=IncomeInfo.objects.get(pk=1),
-                description='Рекуррентный платёж (RoboKassa BOT)',
-                payment_system='RoboKassaBot',
-                robokassa_is_recurring_parent=False,
-                robokassa_recurring_previous_inv_id=parent_inv,
-            )
-            tx.robokassa_invoice_id = str(tx.id)
-            tx.save(update_fields=['robokassa_invoice_id'])
-
-            ok, body = post_robokassa_bot_recurring_invoice(
-                merchant_login=merchant_login,
-                password_1=password_1,
-                invoice_id=tx.id,
-                previous_invoice_id=parent_inv,
-                out_sum=amount_to_charge,
-                description=f'Подписка DomVPN рекуррент user={user.user_id}',
-                is_test=is_test,
-            )
-            if ok:
-                success_init += 1
-                Logging.objects.create(
-                    log_level="INFO",
-                    message=f'[CELERY] [BOT] [RoboKassa] Инициировано списание InvId={tx.id} ответ={body[:200]}',
-                    datetime=datetime.now(),
-                    user=user
-                )
-            else:
-                failed += 1
-                tx.status = 'failed'
-                tx.save(update_fields=['status'])
-                Logging.objects.create(
-                    log_level="WARNING",
-                    message=f'[CELERY] [BOT] [RoboKassa] Не OK user={user.user_id} InvId={tx.id}: {body[:500]}',
-                    datetime=datetime.now(),
-                    user=user,
-                )
-        except Exception as e:
-            failed += 1
-            Logging.objects.create(
-                log_level="FATAL",
-                message=f'[CELERY] [BOT] [RoboKassa] Исключение user={user.user_id}: {e}\n{traceback.format_exc()}',
-                datetime=datetime.now(),
-                user=user,
-            )
-
-    Logging.objects.create(
-        log_level="INFO",
-        message=f'[CELERY] [BOT] [RoboKassa рекуррент] [Конец] инициировано: {success_init}, ошибок: {failed}',
-        datetime=datetime.now(),
-    )
 
 @shared_task
 def ukassa_site_attempt_recurring_payment():
@@ -908,3 +775,241 @@ def ukassa_check_pending_site(self):
             Logging.objects.create(log_level="DANGER",
                                    message=f'[WEB] [Ошибка при опросе платежа {str(traceback.format_exc())}] [payment_id={getattr(transaction, "payment_id", None)}]',
                                    datetime=timezone.now())
+
+
+### RoboKassa
+
+ROBOKASSA_RECURRING_URL = 'https://auth.robokassa.ru/Merchant/Recurring'
+
+
+def robokassa_md5(s: str) -> str:
+    return hashlib.md5(s.encode('utf-8')).hexdigest().upper()
+
+
+def post_robokassa_bot_recurring_invoice(*, merchant_login: str, password_1: str, invoice_id: int,
+                                         previous_invoice_id: str, out_sum: Decimal, description: str,
+                                         is_test: bool, ) -> tuple[bool, str]:
+    """
+    Дочерний рекуррентный счёт. PreviousInvoiceID не входит в SignatureValue (док. RoboKassa).
+    Подпись: MD5(MerchantLogin:OutSum:InvoiceID:Password1).
+    """
+    out_sum_str = f'{out_sum:.2f}'
+    signature = robokassa_md5(f'{merchant_login}:{out_sum_str}:{invoice_id}:{password_1}')
+    data = {
+        'MerchantLogin': merchant_login,
+        'InvoiceID': str(invoice_id),
+        'PreviousInvoiceID': str(previous_invoice_id),
+        'OutSum': out_sum_str,
+        'Description': (description or 'Подписка DomVPN')[:100],
+        'SignatureValue': signature,
+    }
+    if is_test:
+        data['IsTest'] = '1'
+    resp = requests.post(ROBOKASSA_RECURRING_URL, data=data, timeout=60)
+    text = (resp.text or '').strip()
+    ok = resp.ok and text.upper().startswith('OK')
+    return ok, text
+
+
+@shared_task
+def robokassa_bot_attempt_recurring_payment():
+    """
+    Рекуррент RoboKassa для бота: POST /Merchant/Recurring.
+    Факт оплаты и продление подписки — в RobokassaBotResultView (ResultURL).
+    Зарегистрировать задачу в django-celery-beat (интервал как у ukassa_bot_attempt_recurring_payment).
+    """
+    Logging.objects.create(
+        log_level="INFO",
+        message=f'[CELERY] [BOT] [RoboKassa рекуррент]',
+        datetime=datetime.now(),
+    )
+
+    users_to_charge = TelegramUser.objects.filter(
+        subscription_status=False,
+        permission_revoked=False,
+    ).exclude(robokassa_recurring_parent_inv_id='')
+
+    Logging.objects.create(
+        log_level="INFO",
+        message=f'[CELERY] [BOT] [RoboKassa рекуррент] [Начало] [пользователей: {users_to_charge.count()}]',
+        datetime=datetime.now(),
+    )
+    success_init = 0
+    failed = 0
+
+    merchant_login = settings.ROBOKASSA_MERCHANT_LOGIN_BOT
+    password_1 = settings.ROBOKASSA_PASSWORD_1_BOT
+    is_test = getattr(settings, 'ROBOKASSA_BOT_IS_TEST', False)
+    amount_to_charge = Decimal(Prices.objects.get(pk=1).price_1)
+
+    for user in users_to_charge:
+        parent_inv = (user.robokassa_recurring_parent_inv_id or '').strip()
+        if not parent_inv:
+            continue
+        try:
+            tx = Transaction.objects.create(
+                user=user,
+                amount=amount_to_charge,
+                currency='RUB',
+                side='Приход средств',
+                status='pending',
+                paid=False,
+                income_info=IncomeInfo.objects.get(pk=1),
+                description='Рекуррентный платёж (RoboKassa BOT)',
+                payment_system='RoboKassaBot',
+                robokassa_is_recurring_parent=False,
+                robokassa_recurring_previous_inv_id=parent_inv,
+            )
+            tx.robokassa_invoice_id = str(tx.id)
+            tx.save(update_fields=['robokassa_invoice_id'])
+
+            ok, body = post_robokassa_bot_recurring_invoice(
+                merchant_login=merchant_login,
+                password_1=password_1,
+                invoice_id=tx.id,
+                previous_invoice_id=parent_inv,
+                out_sum=amount_to_charge,
+                description=f'Подписка DomVPN рекуррент user={user.user_id}',
+                is_test=is_test,
+            )
+            if ok:
+                success_init += 1
+                Logging.objects.create(
+                    log_level="INFO",
+                    message=f'[CELERY] [BOT] [RoboKassa] Инициировано списание InvId={tx.id} ответ={body[:200]}',
+                    datetime=datetime.now(),
+                    user=user
+                )
+            else:
+                failed += 1
+                tx.status = 'failed'
+                tx.save(update_fields=['status'])
+                Logging.objects.create(
+                    log_level="WARNING",
+                    message=f'[CELERY] [BOT] [RoboKassa] Не OK user={user.user_id} InvId={tx.id}: {body[:500]}',
+                    datetime=datetime.now(),
+                    user=user,
+                )
+        except Exception as e:
+            failed += 1
+            Logging.objects.create(
+                log_level="FATAL",
+                message=f'[CELERY] [BOT] [RoboKassa] Исключение user={user.user_id}: {e}\n{traceback.format_exc()}',
+                datetime=datetime.now(),
+                user=user,
+            )
+
+    Logging.objects.create(
+        log_level="INFO",
+        message=f'[CELERY] [BOT] [RoboKassa рекуррент] [Конец] инициировано: {success_init}, ошибок: {failed}',
+        datetime=datetime.now(),
+    )
+
+
+@shared_task
+def robokassa_site_attempt_recurring_payment():
+    """
+    Рекуррент RoboKassa для сайта: POST /Merchant/Recurring.
+    Факт оплаты и продление подписки — в RobokassaSiteResultView (ResultURL).
+    """
+    Logging.objects.create(
+        log_level="INFO",
+        message='[CELERY] [SITE] [RoboKassa рекуррент]',
+        datetime=datetime.now(),
+    )
+
+    users_to_charge = TelegramUser.objects.filter(
+        subscription_status=False,
+        permission_revoked=False,
+    ).exclude(robokassa_recurring_parent_inv_id='')
+
+    Logging.objects.create(
+        log_level="INFO",
+        message=f'[CELERY] [SITE] [RoboKassa рекуррент] [Начало] [пользователей: {users_to_charge.count()}]',
+        datetime=datetime.now(),
+    )
+    success_init = 0
+    skipped = 0
+    failed = 0
+
+    merchant_login = settings.ROBOKASSA_MERCHANT_LOGIN_SITE
+    password_1 = settings.ROBOKASSA_PASSWORD_1_SITE
+    is_test = getattr(settings, 'ROBOKASSA_SITE_IS_TEST', False)
+    amount_to_charge = Decimal(Prices.objects.get(pk=1).price_1)
+
+    for user in users_to_charge:
+        parent_inv = (user.robokassa_recurring_parent_inv_id or '').strip()
+        if not parent_inv:
+            skipped += 1
+            continue
+
+        # Для сайта берем только цепочки, где parent счёт был оплачен через RoboKassaSite.
+        parent_tx = Transaction.objects.filter(
+            user=user,
+            robokassa_invoice_id=parent_inv,
+            payment_system='RoboKassaSite',
+            status='succeeded',
+            paid=True,
+        ).first()
+        if not parent_tx:
+            skipped += 1
+            continue
+
+        try:
+            tx = Transaction.objects.create(
+                user=user,
+                amount=amount_to_charge,
+                currency='RUB',
+                side='Приход средств',
+                status='pending',
+                paid=False,
+                income_info=IncomeInfo.objects.get(pk=1),
+                description='Рекуррентный платёж (RoboKassa SITE)',
+                payment_system='RoboKassaSite',
+                robokassa_is_recurring_parent=False,
+                robokassa_recurring_previous_inv_id=parent_inv,
+            )
+            tx.robokassa_invoice_id = str(tx.id)
+            tx.save(update_fields=['robokassa_invoice_id'])
+
+            ok, body = post_robokassa_bot_recurring_invoice(
+                merchant_login=merchant_login,
+                password_1=password_1,
+                invoice_id=tx.id,
+                previous_invoice_id=parent_inv,
+                out_sum=amount_to_charge,
+                description=f'Подписка DomVPN рекуррент SITE user={user.user_id}',
+                is_test=is_test,
+            )
+            if ok:
+                success_init += 1
+                Logging.objects.create(
+                    log_level="INFO",
+                    message=f'[CELERY] [SITE] [RoboKassa] Инициировано списание InvId={tx.id} ответ={body[:200]}',
+                    datetime=datetime.now(),
+                    user=user,
+                )
+            else:
+                failed += 1
+                tx.status = 'failed'
+                tx.save(update_fields=['status'])
+                Logging.objects.create(
+                    log_level="WARNING",
+                    message=f'[CELERY] [SITE] [RoboKassa] Не OK user={user.user_id} InvId={tx.id}: {body[:500]}',
+                    datetime=datetime.now(),
+                    user=user,
+                )
+        except Exception as e:
+            failed += 1
+            Logging.objects.create(
+                log_level="FATAL",
+                message=f'[CELERY] [SITE] [RoboKassa] Исключение user={user.user_id}: {e}\n{traceback.format_exc()}',
+                datetime=datetime.now(),
+                user=user,
+            )
+
+    Logging.objects.create(
+        log_level="INFO",
+        message=f'[CELERY] [SITE] [RoboKassa рекуррент] [Конец] инициировано: {success_init}, пропущено: {skipped}, ошибок: {failed}',
+        datetime=datetime.now(),
+    )

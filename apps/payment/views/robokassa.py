@@ -24,6 +24,7 @@ def robokassa_md5(s: str) -> str:
     return hashlib.md5(s.encode('utf-8')).hexdigest().upper()
 
 
+
 def get_robokassa_payment_info(inv_id: str, merchant_login: str, password_2: str):
     """
     Получает информацию о платеже через API RoboKassa.
@@ -193,6 +194,15 @@ class RobokassaSiteResultView(View):
     """
 
     def post(self, request, *args, **kwargs):
+        # Логируем входящие параметры для отладки
+        all_params = dict(request.POST.items()) if hasattr(request.POST, 'items') else {}
+        all_get_params = dict(request.GET.items()) if hasattr(request.GET, 'items') else {}
+        Logging.objects.create(
+            log_level="INFO",
+            message=f"[ROBO-SITE] [Webhook] Все POST параметры: {all_params}, Все GET параметры: {all_get_params}",
+            datetime=datetime.now(),
+        )
+
         out_sum = request.POST.get('OutSum') or request.GET.get('OutSum')
         inv_id = request.POST.get('InvId') or request.GET.get('InvId')
         signature = (request.POST.get('SignatureValue') or request.GET.get('SignatureValue') or '').upper()
@@ -200,8 +210,13 @@ class RobokassaSiteResultView(View):
         if not out_sum or not inv_id or not signature:
             return HttpResponse('Bad request', status=400)
 
-        # Подпись для ResultURL: MD5(OutSum:InvId:Password2)
+        # Подпись для ResultURL: MD5(OutSum:InvId:Password2Site)
         expected = robokassa_md5(f"{out_sum}:{inv_id}:{settings.ROBOKASSA_PASSWORD_2_SITE}")
+        Logging.objects.create(
+            log_level="INFO",
+            message=f"[ROBO-SITE] [Webhook] OutSum={out_sum}, InvId={inv_id}, Signature={signature}, Expected={expected}",
+            datetime=datetime.now(),
+        )
         if signature != expected:
             return HttpResponse('bad sign', status=403)
 
@@ -210,27 +225,23 @@ class RobokassaSiteResultView(View):
         except ValueError:
             return HttpResponse('Bad InvId', status=400)
 
-        # Предполагаем, что при создании счёта в RoboKassa вы передаёте InvId = Transaction.id
         transaction = Transaction.objects.select_related('user').filter(id=inv_id_int).first()
-
         if not transaction:
-            # Транзакцию не нашли, но для RoboKassa всё равно нужно вернуть OK, иначе будут ретраи
             Logging.objects.create(
                 log_level="WARNING",
-                message=f"[ROBO] [Result] Транзакция с id={inv_id_int} не найдена",
+                message=f"[ROBO-SITE] [Result] Транзакция с id={inv_id_int} не найдена",
                 datetime=datetime.now(),
             )
             return HttpResponse(f"OK{inv_id}", content_type='text/plain')
 
-        # Если уже обработали ранее — просто возвращаем OK (идемпотентность)
         if transaction.status == 'succeeded':
             return HttpResponse(f"OK{inv_id}", content_type='text/plain')
 
-        telegram_user = transaction.user  # ForeignKey на TelegramUser
+        telegram_user = transaction.user
         if not telegram_user:
             Logging.objects.create(
                 log_level="WARNING",
-                message=f"[ROBO] [Result] У транзакции id={inv_id_int} нет привязанного TelegramUser",
+                message=f"[ROBO-SITE] [Result] У транзакции id={inv_id_int} нет привязанного TelegramUser",
                 datetime=datetime.now(),
             )
             return HttpResponse(f"OK{inv_id}", content_type='text/plain')
@@ -238,17 +249,39 @@ class RobokassaSiteResultView(View):
         try:
             amount_value = Decimal(out_sum)
         except Exception:
-            amount_value = transaction.amount  # fallback
+            amount_value = transaction.amount
 
         try:
-            # Обновляем транзакцию
             transaction.status = 'succeeded'
             transaction.paid = True
             transaction.amount = amount_value
             transaction.currency = transaction.currency or 'RUB'
+
+            # Пытаемся получить ID Robox через API RoboKassa
+            payment_info = get_robokassa_payment_info(
+                inv_id=str(inv_id),
+                merchant_login=settings.ROBOKASSA_MERCHANT_LOGIN_SITE,
+                password_2=settings.ROBOKASSA_PASSWORD_2_SITE,
+            )
+            if payment_info and payment_info.get("RoboxID"):
+                transaction.payment_id = str(payment_info["RoboxID"])
+                Logging.objects.create(
+                    log_level="INFO",
+                    message=f"[ROBO-SITE] [ID Robox получен через API] {payment_info['RoboxID']} для InvId={inv_id}",
+                    datetime=datetime.now(),
+                )
+            else:
+                transaction.payment_id = f"ROBOX_INV_{inv_id}"
+                Logging.objects.create(
+                    log_level="WARNING",
+                    message=f"[ROBO-SITE] [ID Robox не получен через API, используем InvId] {inv_id}",
+                    datetime=datetime.now(),
+                )
+
+            transaction.payment_system = transaction.payment_system or 'RoboKassaSite'
+            transaction.robokassa_invoice_id = transaction.robokassa_invoice_id or str(inv_id)
             transaction.save()
 
-            # Определяем срок подписки по сумме (как в YookassaSiteWebhookView)
             prices = Prices.objects.get(pk=1)
             days = 0
             if int(amount_value) == prices.price_1:
@@ -262,25 +295,25 @@ class RobokassaSiteResultView(View):
             elif int(amount_value) == prices.price_5:
                 days = 3
 
-            # Обновляем подписку (без сохранения payment_method_id — RoboKassa не даёт токен)
             if telegram_user.subscription_status:
                 telegram_user.subscription_expiration = telegram_user.subscription_expiration + timedelta(days=days)
                 telegram_user.permission_revoked = False
-                telegram_user.save()
             else:
                 telegram_user.subscription_status = True
                 telegram_user.subscription_expiration = datetime.now() + timedelta(days=days)
                 telegram_user.permission_revoked = False
-                telegram_user.save()
+            if transaction.robokassa_is_recurring_parent:
+                if not (telegram_user.robokassa_recurring_parent_inv_id or '').strip():
+                    telegram_user.robokassa_recurring_parent_inv_id = str(inv_id)
+            telegram_user.save()
 
             Logging.objects.create(
                 log_level="INFO",
-                message=f"[ROBO] [Обработка платежа] [Сумма: {amount_value}] [Дни: {days}]",
+                message=f"[ROBO-SITE] [Обработка платежа] [Сумма: {amount_value}] [Дни: {days}]",
                 datetime=datetime.now(),
                 user=telegram_user,
             )
 
-            # Реферальные начисления (копия логики из Yookassa*WebhookView)
             referral_percentages = {
                 1: ReferralSettings.objects.get(pk=1).level_1_percentage,
                 2: ReferralSettings.objects.get(pk=1).level_2_percentage,
@@ -306,7 +339,6 @@ class RobokassaSiteResultView(View):
                         continue
 
                     percent = referral_percentages.get(level)
-
                     if user_to_pay.special_offer:
                         referral_percentages_2 = {
                             1: user_to_pay.special_offer.level_1_percentage,
@@ -331,7 +363,7 @@ class RobokassaSiteResultView(View):
 
             Logging.objects.create(
                 log_level="SUCCESS",
-                message=f"[ROBO] [Платёж на сумму {amount_value} р. прошёл] [InvId={inv_id}]",
+                message=f"[ROBO-SITE] [Платёж на сумму {amount_value} р. прошёл] [InvId={inv_id}]",
                 datetime=datetime.now(),
                 user=telegram_user,
             )
@@ -339,12 +371,11 @@ class RobokassaSiteResultView(View):
         except Exception:
             Logging.objects.create(
                 log_level="DANGER",
-                message=f"[ROBO] [Ошибка при обработке ResultURL]\n{traceback.format_exc()}",
+                message=f"[ROBO-SITE] [Ошибка при обработке ResultURL]\n{traceback.format_exc()}",
                 datetime=datetime.now(),
                 user=telegram_user,
             )
 
-        # Обязательный ответ RoboKassa
         return HttpResponse(f"OK{inv_id}", content_type='text/plain')
 
 
