@@ -104,7 +104,6 @@ class CreateRobokassaPaymentView(LoginRequiredMixin, View):
                 days = 3
 
             amount_decimal = Decimal(str(amount))
-            amount_decimal = Decimal(1)
 
             # Пользователь из связанного Telegram-профиля
             telegram_user = request.user.profile.telegram_user

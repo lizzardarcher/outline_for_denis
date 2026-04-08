@@ -156,15 +156,13 @@
                                                 disabled>
                                             Юкасса (СБП, Банковская карта)
                                         </button>
-                                        {% if request.user.profile.telegram_user.username == 'megafoll' %}
-                                            <button type="button"
-                                                    class="btn btn-primary btn-md choose-payment-system"
-                                                    id="payRobokassaButton"
-                                                    data-payment-url="{% url 'create_payment_robokassa' %}"
-                                                    disabled>
-                                                Робокасса (Банковская карта)
-                                            </button>
-                                        {% endif %}
+                                        <button type="button"
+                                                class="btn btn-primary btn-md choose-payment-system"
+                                                id="payRobokassaButton"
+                                                data-payment-url="{% url 'create_payment_robokassa' %}"
+                                                disabled>
+                                            Робокасса (Банковская карта)
+                                        </button>
                                     </div>
                                 </div>
                             </div>
