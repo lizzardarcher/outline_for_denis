@@ -4,7 +4,7 @@ from .views import ukassa, robokassa, cryptobot, report
 urlpatterns = [
 
     # YOOKASSA
-    path('create-payment/', ukassa.CreatePaymentView.as_view(), name='create_payment'),
+    path('create-payment/', ukassa.CreatePaymentView.as_view(), name='ukassa_create_payment'),
     path('payment-success/', ukassa.PaymentSuccessView.as_view(), name='payment_success'),
     path('payment-failure/', ukassa.PaymentFailureView.as_view(), name='payment_failure'),
     path('bot/yookassa-webhook/', ukassa.YookassaTGBOTWebhookView.as_view(), name='yookassa_tgbot_webhook'),    # Webhook bot
