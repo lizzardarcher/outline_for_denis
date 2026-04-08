@@ -70,7 +70,7 @@ def download_app():
     markup.add(InlineKeyboardButton(text=f'💻 Windows (Vless)',
                                     url=f'https://github.com/InvisibleManVPN/InvisibleMan-XRayClient/releases'))
     markup.add(InlineKeyboardButton(text=f'💻 MacOS (Vless)',
-                                    url=f'https://apps.apple.com/ru/app/happ-proxy-utility-plus/id6746188973'))
+                                    url=f'https://disk.yandex.ru/d/lbLtZZ_7KMsbmw'))
     markup.add(InlineKeyboardButton(text=f'💻 Linux (Vless)', url=f'https://snapcraft.io/v4freedom'))
     # markup.add( InlineKeyboardButton(text=f'📱 iPhone/iPad (Vless)',  url=f'https://apps.apple.com/ru/app/v2box-v2ray-client/id6446814690'))
     # markup.add(InlineKeyboardButton(text=f'💻 MacOS (Vless)',         url=f'https://apps.apple.com/pl/app/v2raytun/id6476628951'))

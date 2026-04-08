@@ -42,13 +42,16 @@ class UserAgreementView(TemplateView):
 class PersonalDataConsentView(TemplateView):
     template_name = 'home/personal_data_consent.html'
 
-
 class DocumentsView(TemplateView):
     template_name = 'home/documents.html'
 
 
 class InstructionView(TemplateView):
     template_name = 'home/instruction.html'
+
+
+class FaqView(TemplateView):
+    template_name = 'home/faq.html'
 
 
 class LoginView(TemplateView):
