@@ -77,6 +77,7 @@ class PredefinedLogKeywordFilter(admin.SimpleListFilter):
         ("Initializing", "Initializing"),
         ("Юкасса Сайт", "Юкасса Сайт"),
         ("Робокасса Бот", "Робокасса Бот"),
+        ("Робокасса Сайт", "Робокасса Сайт"),
         ("Юкасса Бот", "Юкасса Бот"),
     )
 
