@@ -42,10 +42,13 @@ def ukassa_bot_attempt_recurring_payment():
         if (getattr(user, 'robokassa_recurring_parent_inv_id', '') or '').strip():
             continue
         if user.payment_method_id.__len__() > 10 and '000' in user.payment_method_id:
-            # payment_system = Transaction.objects.filter(payment_id=user.payment_method_id).last().payment_system
+            try:
+                payment_system = Transaction.objects.filter(payment_id=user.payment_method_id).last().payment_system
+            except Transaction.DoesNotExist:
+                payment_system = None
 
-            # if payment_system != 'YooKassaBot':
-            #     continue
+            if payment_system == 'YooKassaSite' or payment_system == 'RoboKassaBot' or payment_system == 'RoboKassaSite':
+                continue
 
             try:
                 # Сумма списания
