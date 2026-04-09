@@ -72,6 +72,7 @@ class PredefinedLogKeywordFilter(admin.SimpleListFilter):
         ("[RoboKassa рекуррент]", "[RoboKassa рекуррент]"),
         ("[RoboKassa]", "[RoboKassa]"),
         ("[WEB]", "[WEB]"),
+        ("Новый ключ создан", "Новый ключ создан"),
         ("ДЕЙСТВИЕ", "[ДЕЙСТВИЕ]"),
         ("[Закончилась подписка у пользователя]", "[Закончилась подписка у пользователя]"),
         ("Initializing", "Initializing"),
@@ -568,7 +569,7 @@ class ServerAdmin(BaseAdmin):
 
     list_display = (
         'hosting', 'ip_address', 'user', 'password', 'rental_price', 'max_keys', 'get_key_generated', 'is_active',
-        'country', 'created_at')
+        'country', 'created_at', 'is_activated_vless')
     list_display_links = ('hosting',)
     fields = ( 'hosting', 'ip_address', 'user', 'password', 'rental_price', 'max_keys', 'is_active', 'country', 'created_at')
     readonly_fields = ('max_keys', 'created_at',)

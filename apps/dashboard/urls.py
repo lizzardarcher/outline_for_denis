@@ -10,5 +10,5 @@ urlpatterns = [
          name='update_subscription'),
     path('cancel_subscription/<int:telegram_user_id>', views.CancelSubscriptionView.as_view(),
          name='cancel_subscription'),
-    path('analytics/', views.daily_transaction_analytics, name='daily_analytics'),
+    # path('analytics/', views.daily_transaction_analytics, name='daily_analytics'),
 ]

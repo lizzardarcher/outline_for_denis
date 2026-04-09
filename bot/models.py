@@ -270,7 +270,7 @@ class Server(models.Model):
     is_activated = models.BooleanField(editable=False, default=False,
                                        verbose_name='Сервер Активирован для Outline (не трогать)')
     is_activated_vless = models.BooleanField(editable=False, default=False,
-                                             verbose_name='Сервер Активирован для VLESS (не трогать)')
+                                             verbose_name='MB')
 
     def __str__(self):
         return f"{self.hosting} ({self.created_at}) {self.country.name}"

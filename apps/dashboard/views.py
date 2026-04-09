@@ -114,7 +114,10 @@ class CreateNewKeyView(LoginRequiredMixin, TemplateView):
                                         port=1040, method='ss', access_url=key, protocol='outline')
 
             messages.success(request, f'Новый ключ создан!')
-            Logging.objects.create(log_level=" INFO", message=f'[WEB] [Новый ключ создан]', datetime=datetime.now(), user=self.request.user.profile.telegram_user)
+            Logging.objects.create(log_level=" INFO",
+                                   message=f'[WEB] [Новый ключ создан] [outline] [{server.hosting}] [{server.country.name_for_app}]',
+                                   datetime=datetime.now(), user=self.request.user.profile.telegram_user)
+
 
         elif protocol == 'vless':
 
@@ -142,7 +145,7 @@ class CreateNewKeyView(LoginRequiredMixin, TemplateView):
                                         port=1040, method='vless', access_url=key, protocol='vless')
 
             messages.success(request, f'Новый ключ создан!')
-            Logging.objects.create(log_level=" INFO", message=f'[WEB] [Новый ключ создан]', datetime=datetime.now(), user=self.request.user.profile.telegram_user)
+            Logging.objects.create(log_level=" INFO", message=f'[WEB] [Новый ключ создан] [vless] [{server.hosting}] [{server.country.name_for_app}]', datetime=datetime.now(), user=self.request.user.profile.telegram_user)
         return redirect('profile')
 
 class UpdateSubscriptionView(LoginRequiredMixin, TemplateView):

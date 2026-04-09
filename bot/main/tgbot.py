@@ -613,6 +613,10 @@ async def callback_query_handlers(call):
                                                             name=str(user.user_id), password=str(user.user_id),
                                                             port=1040, method=protocol, access_url=key,
                                                             protocol=protocol)
+                                Logging.objects.create(log_level=" INFO",
+                                                       message=f'[BOT] [Новый ключ создан] [{protocol}] [{server.hosting}] [{server.country.name_for_app}]',
+                                                       datetime=datetime.now(),
+                                                       user=user)
 
                                 await bot.send_message(call.message.chat.id,
                                                        text=f'{msg.key_avail}\n<code>{key.access_url}</code>',
