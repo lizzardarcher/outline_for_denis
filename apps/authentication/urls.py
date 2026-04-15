@@ -18,14 +18,7 @@ urlpatterns = [
         views.dashboard_password_change,
         name='dashboard_password_change',
     ),
-    # path('accounts/password-reset/', views.UserPasswordResetView.as_view(), name='password_reset'),
-
-    path('accounts/password_reset/', auth_views.PasswordResetView.as_view(
-            template_name='account/password_reset.html',
-            email_template_name='account/password_reset_email.html',
-            subject_template_name='account/password_reset_subject.txt',
-            success_url='/auth/accounts/password-reset-done/'
-        ), name='password_reset'),
+    path('accounts/password_reset/', views.UserPasswordResetView.as_view(), name='password_reset'),
 
 
     path('accounts/password-reset-confirm/<uidb64>/<token>/', views.UserPasswordResetConfirmView.as_view(), name='password_reset_confirm'),
