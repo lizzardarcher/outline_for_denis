@@ -1,0 +1,197 @@
+{% extends "admindashboardx/admipanelbase.html" %}
+
+{% block title %} · Главная{% endblock %}
+
+{% block content %}
+    <div class="row g-3 mb-4">
+        <div class="col-12 col-md-6 col-xl-3">
+            <div class="card admx-card h-100">
+                <div class="card-body">
+                    <div class="admx-kpi-title">Всего пользователей</div>
+                    <div class="admx-kpi-value">{{ kpi_users_total }}</div>
+                    <div class="admx-kpi-foot">Активных: {{ kpi_users_active }}</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-md-6 col-xl-3">
+            <div class="card admx-card h-100">
+                <div class="card-body">
+                    <div class="admx-kpi-title">Новые пользователи</div>
+                    <div class="admx-kpi-value">{{ kpi_users_new }}</div>
+                    <div class="admx-kpi-foot">За {{ period_days }} дней</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-md-6 col-xl-3">
+            <div class="card admx-card h-100">
+                <div class="card-body">
+                    <div class="admx-kpi-title">Успешные транзакции</div>
+                    <div class="admx-kpi-value">{{ kpi_success_tx_count }}</div>
+                    <div class="admx-kpi-foot">Сумма: {{ kpi_success_tx_sum }} RUB</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12 col-md-6 col-xl-3">
+            <div class="card admx-card h-100">
+                <div class="card-body">
+                    <div class="admx-kpi-title">Ошибка/предупреждения</div>
+                    <div class="admx-kpi-value">{{ kpi_error_logs }}</div>
+                    <div class="admx-kpi-foot">Log levels: WARNING, FATAL</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-12 col-xl-8">
+            <div class="card admx-card">
+                <div class="card-header">Динамика платежей</div>
+                <div class="card-body">
+                    <canvas id="txDynamicsChart" height="96"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-xl-4">
+            <div class="card admx-card">
+                <div class="card-header">Распределение по платёжным системам</div>
+                <div class="card-body">
+                    <canvas id="paymentDistributionChart" height="210"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3">
+        <div class="col-12 col-xl-6">
+            <div class="card admx-card">
+                <div class="card-header">Последние ошибки</div>
+                <div class="table-responsive">
+                    <table class="table table-dark table-hover align-middle mb-0 admx-table">
+                        <thead>
+                        <tr>
+                            <th>Время</th>
+                            <th>Уровень</th>
+                            <th>Пользователь</th>
+                            <th>Сообщение</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {% for row in recent_error_logs %}
+                            <tr>
+                                <td>{{ row.datetime|date:"d.m.Y H:i" }}</td>
+                                <td>{{ row.log_level }}</td>
+                                <td>{% if row.user %}{{ row.user.user_id }}{% else %}—{% endif %}</td>
+                                <td class="admx-message-cell">{{ row.message }}</td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="4" class="text-center text-secondary">Нет данных</td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-xl-6">
+            <div class="card admx-card">
+                <div class="card-header">Последние failed/canceled транзакции</div>
+                <div class="table-responsive">
+                    <table class="table table-dark table-hover align-middle mb-0 admx-table">
+                        <thead>
+                        <tr>
+                            <th>Время</th>
+                            <th>Пользователь</th>
+                            <th>Сумма</th>
+                            <th>ПС</th>
+                            <th>Статус</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {% for tx in recent_failed_tx %}
+                            <tr>
+                                <td>{{ tx.timestamp|date:"d.m.Y H:i" }}</td>
+                                <td>{% if tx.user %}{{ tx.user.user_id }}{% else %}—{% endif %}</td>
+                                <td>{{ tx.amount }} {{ tx.currency|default:"RUB" }}</td>
+                                <td>{{ tx.payment_system|default:"—" }}</td>
+                                <td>{{ tx.status }}</td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="5" class="text-center text-secondary">Нет данных</td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block extrascript %}
+    <script>
+        const txLabels = {{ tx_labels_json|safe }};
+        const txAmounts = {{ tx_amount_series_json|safe }};
+        const txCounts = {{ tx_count_series_json|safe }};
+        const paymentLabels = {{ payment_labels_json|safe }};
+        const paymentSeries = {{ payment_series_json|safe }};
+
+        const txDynamicsCtx = document.getElementById('txDynamicsChart');
+        if (txDynamicsCtx) {
+            new Chart(txDynamicsCtx, {
+                type: 'line',
+                data: {
+                    labels: txLabels,
+                    datasets: [
+                        {
+                            label: 'Сумма, RUB',
+                            data: txAmounts,
+                            borderColor: '#7c9cff',
+                            backgroundColor: 'rgba(124, 156, 255, 0.18)',
+                            yAxisID: 'y',
+                            fill: true,
+                            tension: 0.25
+                        },
+                        {
+                            label: 'Кол-во платежей',
+                            data: txCounts,
+                            borderColor: '#6fd3a9',
+                            backgroundColor: 'rgba(111, 211, 169, 0.18)',
+                            yAxisID: 'y1',
+                            fill: false,
+                            tension: 0.25
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {position: 'left', beginAtZero: true},
+                        y1: {position: 'right', beginAtZero: true, grid: {drawOnChartArea: false}}
+                    }
+                }
+            });
+        }
+
+        const paymentDistributionCtx = document.getElementById('paymentDistributionChart');
+        if (paymentDistributionCtx) {
+            new Chart(paymentDistributionCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: paymentLabels,
+                    datasets: [{
+                        data: paymentSeries,
+                        backgroundColor: ['#7c9cff', '#6fd3a9', '#f5b971', '#f58f9b', '#9f8cff', '#5dc9f5']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false
+                }
+            });
+        }
+    </script>
+{% endblock %}

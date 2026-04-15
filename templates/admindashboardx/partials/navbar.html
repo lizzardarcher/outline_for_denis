@@ -1,0 +1,14 @@
+<header class="admx-navbar px-4 py-3 d-flex align-items-center justify-content-between">
+    <div>
+        <h1 class="h5 mb-1">{{ page_title|default:"AdminDashboardX" }}</h1>
+        <div class="small text-secondary-emphasis">Период: последние {{ period_days|default:30 }} дней</div>
+    </div>
+    <div class="d-flex align-items-center gap-2">
+        {% if request.user.is_authenticated %}
+            <span class="badge text-bg-secondary">{{ request.user.username }}</span>
+        {% else %}
+            <span class="badge text-bg-warning">URL only mode</span>
+        {% endif %}
+    </div>
+
+</header>

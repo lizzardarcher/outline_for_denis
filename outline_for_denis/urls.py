@@ -20,6 +20,7 @@ from django.contrib import admin
 from django.urls import path, re_path, include
 from django.views.static import serve
 
+
 urlpatterns = [
     re_path(r'^media/(?P<path>.*)$', serve, {'document_root': settings.MEDIA_ROOT}),
     re_path(r'^static/(?P<path>.*)$', serve, {'document_root': settings.STATIC_ROOT}),
@@ -28,6 +29,7 @@ urlpatterns = [
     path('', include('bot.urls')),
     path('dashboard/', include('apps.dashboard.urls')),
     path('payment/', include('apps.payment.urls')),
+    path('admindashboardx/', include('apps.admindashboardx.urls')),
     path('admindomvpnx/', admin.site.urls),
 
 ]
