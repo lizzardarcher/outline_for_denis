@@ -1,0 +1,71 @@
+{% extends "admindashboardx/admipanelbase.html" %}
+
+{% block title %} · Логи{% endblock %}
+
+
+{% block content %}
+    <div class="card admx-card mb-3">
+        <div class="card-body">
+            <form method="get" class="row g-2 align-items-end">
+                <div class="col-12 col-md-6 col-lg-5">
+                    <label class="form-label">Поиск</label>
+                    <input type="text" name="q" class="form-control" value="{{ q }}"
+                           placeholder="message или user_id">
+                </div>
+                <div class="col-12 col-md-3 col-lg-3">
+                    <label class="form-label">Уровень</label>
+                    <select name="level" class="form-select">
+                        <option value="">Все</option>
+                        {% for l in level_choices %}
+                            <option value="{{ l }}" {% if level == l %}selected{% endif %}>{{ l }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-12 col-md-3 col-lg-2">
+                    <button class="btn btn-primary w-100" type="submit">Применить</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="card admx-card">
+        <div class="table-responsive">
+            <table class="table table-dark table-hover align-middle mb-0 admx-table">
+                <thead>
+                <tr>
+                    <th>Время</th>
+                    <th>Уровень</th>
+                    <th>User</th>
+                    <th>Сообщение</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for row in logs_page %}
+                    <tr>
+                        <td>{{ row.datetime|date:"d.m.Y H:i:s" }}</td>
+                        <td>{{ row.log_level }}</td>
+                        <td>{% if row.user %}{{ row.user.user_id }}{% else %}—{% endif %}</td>
+                        <td class="admx-message-cell">{{ row.message }}</td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="4" class="text-center text-secondary">Нет данных</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div class="card-footer d-flex justify-content-between align-items-center">
+            <small class="text-secondary">Всего на странице: {{ logs_page|length }}</small>
+            <div class="btn-group">
+                {% if logs_page.has_previous %}
+                    <a class="btn btn-sm btn-outline-light"
+                       href="?q={{ q }}&level={{ level }}&page={{ logs_page.previous_page_number }}">Назад</a>
+                {% endif %}
+                <button class="btn btn-sm btn-outline-light disabled">{{ logs_page.number }} / {{ logs_page.paginator.num_pages }}</button>
+                {% if logs_page.has_next %}
+                    <a class="btn btn-sm btn-outline-light"
+                       href="?q={{ q }}&level={{ level }}&page={{ logs_page.next_page_number }}">Вперед</a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+{% endblock %}

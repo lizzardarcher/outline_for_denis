@@ -3,20 +3,21 @@
         <div class="small text-secondary-emphasis">DomVPN</div>
         <div class="fw-semibold">AdminDashboardX</div>
     </div>
+
     <nav class="admx-nav px-2 pb-3">
-        <a class="admx-nav-link active" href="{% url 'admindashboardx:index' %}">
+        <a class="admx-nav-link {% if page_key == 'index' %}active{% endif %}" href="{% url 'admindashboardx:index' %}">
             <i class="bi bi-grid-1x2-fill me-2"></i>
             Главная
         </a>
-        <a class="admx-nav-link disabled" href="#">
+        <a class="admx-nav-link {% if page_key == 'users' %}active{% endif %}" href="{% url 'admindashboardx:users' %}">
             <i class="bi bi-people-fill me-2"></i>
             Пользователи
         </a>
-        <a class="admx-nav-link disabled" href="#">
+        <a class="admx-nav-link {% if page_key == 'transactions' %}active{% endif %}" href="{% url 'admindashboardx:transactions' %}">
             <i class="bi bi-credit-card-2-front-fill me-2"></i>
             Платежи
         </a>
-        <a class="admx-nav-link disabled" href="#">
+        <a class="admx-nav-link {% if page_key == 'logs' %}active{% endif %}" href="{% url 'admindashboardx:logs' %}">
             <i class="bi bi-journal-text me-2"></i>
             Логи
         </a>

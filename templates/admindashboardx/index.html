@@ -2,6 +2,7 @@
 
 {% block title %} · Главная{% endblock %}
 
+
 {% block content %}
     <div class="row g-3 mb-4">
         <div class="col-12 col-md-6 col-xl-3">
@@ -44,19 +45,13 @@
     </div>
 
     <div class="row g-3 mb-4">
-        <div class="col-12 col-xl-8">
+        <div class="col-12">
             <div class="card admx-card">
-                <div class="card-header">Динамика платежей</div>
-                <div class="card-body">
-                    <canvas id="txDynamicsChart" height="96"></canvas>
-                </div>
-            </div>
-        </div>
-        <div class="col-12 col-xl-4">
-            <div class="card admx-card">
-                <div class="card-header">Распределение по платёжным системам</div>
-                <div class="card-body">
-                    <canvas id="paymentDistributionChart" height="210"></canvas>
+                <div class="card-header">Быстрые переходы</div>
+                <div class="card-body d-flex flex-wrap gap-2">
+                    <a class="btn btn-outline-light btn-sm" href="{% url 'admindashboardx:users' %}">Пользователи</a>
+                    <a class="btn btn-outline-light btn-sm" href="{% url 'admindashboardx:transactions' %}">Платежи</a>
+                    <a class="btn btn-outline-light btn-sm" href="{% url 'admindashboardx:logs' %}">Логи</a>
                 </div>
             </div>
         </div>
@@ -130,68 +125,3 @@
     </div>
 {% endblock %}
 
-{% block extrascript %}
-    <script>
-        const txLabels = {{ tx_labels_json|safe }};
-        const txAmounts = {{ tx_amount_series_json|safe }};
-        const txCounts = {{ tx_count_series_json|safe }};
-        const paymentLabels = {{ payment_labels_json|safe }};
-        const paymentSeries = {{ payment_series_json|safe }};
-
-        const txDynamicsCtx = document.getElementById('txDynamicsChart');
-        if (txDynamicsCtx) {
-            new Chart(txDynamicsCtx, {
-                type: 'line',
-                data: {
-                    labels: txLabels,
-                    datasets: [
-                        {
-                            label: 'Сумма, RUB',
-                            data: txAmounts,
-                            borderColor: '#7c9cff',
-                            backgroundColor: 'rgba(124, 156, 255, 0.18)',
-                            yAxisID: 'y',
-                            fill: true,
-                            tension: 0.25
-                        },
-                        {
-                            label: 'Кол-во платежей',
-                            data: txCounts,
-                            borderColor: '#6fd3a9',
-                            backgroundColor: 'rgba(111, 211, 169, 0.18)',
-                            yAxisID: 'y1',
-                            fill: false,
-                            tension: 0.25
-                        }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: {
-                        y: {position: 'left', beginAtZero: true},
-                        y1: {position: 'right', beginAtZero: true, grid: {drawOnChartArea: false}}
-                    }
-                }
-            });
-        }
-
-        const paymentDistributionCtx = document.getElementById('paymentDistributionChart');
-        if (paymentDistributionCtx) {
-            new Chart(paymentDistributionCtx, {
-                type: 'doughnut',
-                data: {
-                    labels: paymentLabels,
-                    datasets: [{
-                        data: paymentSeries,
-                        backgroundColor: ['#7c9cff', '#6fd3a9', '#f5b971', '#f58f9b', '#9f8cff', '#5dc9f5']
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false
-                }
-            });
-        }
-    </script>
-{% endblock %}
