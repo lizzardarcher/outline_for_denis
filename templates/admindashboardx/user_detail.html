@@ -2,6 +2,7 @@
 
 {% block title %} · Пользователь {{ user_obj.user_id }}{% endblock %}
 
+
 {% block content %}
     <div class="card admx-card mb-3">
         {% include "admindashboardx/partials/detail_header.html" with header_title="Пользователь" current_label=user_obj.user_id section_url=section_url section_label=section_label back_url=back_url %}
@@ -15,80 +16,303 @@
                             data-copy-text="{{ user_obj.user_id }}" title="Скопировать user_id">Скопировать user_id</button>
                 {% endif %}
             </div>
-            <div class="row g-3">
-                <div class="col-md-4"><strong>Username:</strong> {{ user_obj.username|default:"—" }}</div>
-                <div class="col-md-4"><strong>Имя:</strong> {{ user_obj.first_name }} {{ user_obj.last_name|default:"" }}</div>
-                <div class="col-md-4"><strong>Дата регистрации:</strong> {{ user_obj.join_date|date:"d.m.Y" }}</div>
-                <div class="col-md-4"><strong>Подписка:</strong> {% if user_obj.subscription_status %}✅{% else %}—{% endif %}</div>
-                <div class="col-md-4"><strong>Истекает:</strong> {{ user_obj.subscription_expiration|date:"d.m.Y"|default:"—" }}</div>
-                <div class="col-md-4"><strong>Permission revoked:</strong> {% if user_obj.permission_revoked %}✅{% else %}—{% endif %}</div>
-                <div class="col-md-4"><strong>Balance:</strong> {{ user_obj.balance }}</div>
-                <div class="col-md-4"><strong>Income:</strong> {{ user_obj.income }}</div>
-                <div class="col-md-4"><strong>Payment Method ID:</strong> {% if user_obj.payment_method_id %}✅{% else %}—{% endif %}</div>
+            <div class="small text-secondary">
+                Подробные данные ниже сгруппированы по вкладкам и раскрываются по клику.
             </div>
         </div>
     </div>
 
-    <div class="row g-3">
-        <div class="col-12 col-xl-6">
-            <div class="card admx-card">
-                <div class="card-header">Последние транзакции</div>
-                <div class="table-responsive">
-                    <table class="table table-dark table-hover align-middle mb-0 admx-table">
-                        <thead><tr><th>Время</th><th>Сумма</th><th>ПС</th><th>Статус</th></tr></thead>
-                        <tbody>
-                        {% for tx in recent_tx %}
-                            <tr>
-                                <td><a class="link-light link-underline-opacity-0" href="{% url 'admindashboardx:transaction_detail' tx_id=tx.id %}?return_to={{ request.get_full_path|urlencode }}">{{ tx.timestamp|date:"d.m.Y H:i" }}</a></td>
-                                <td>{{ tx.amount }} {{ tx.currency|default:"RUB" }}</td>
-                                <td>{{ tx.payment_system|default:"—" }}</td>
-                                <td>{{ tx.status|default:"—" }}</td>
-                            </tr>
-                        {% empty %}
-                            <tr><td colspan="4" class="text-center text-secondary">Нет данных</td></tr>
-                        {% endfor %}
-                        </tbody>
-                    </table>
+    <div class="accordion" id="userDetailsAccordion">
+        <div class="accordion-item admx-accordion-item">
+            <h2 class="accordion-header">
+                <button class="accordion-button admx-accordion-button" type="button" data-bs-toggle="collapse"
+                        data-bs-target="#collapseProfile" aria-expanded="true">
+                    1) Профиль и базовые данные
+                </button>
+            </h2>
+            <div id="collapseProfile" class="accordion-collapse collapse show" data-bs-parent="#userDetailsAccordion">
+                <div class="accordion-body">
+                    <div class="row g-3">
+                        <div class="col-md-3"><strong>Telegram user_id:</strong> {{ user_obj.user_id }}</div>
+                        <div class="col-md-3"><strong>Username:</strong> {{ user_obj.username|default:"—" }}</div>
+                        <div class="col-md-3"><strong>Имя:</strong> {{ user_obj.first_name }} {{ user_obj.last_name|default:"" }}</div>
+                        <div class="col-md-3"><strong>Дата регистрации:</strong> {{ user_obj.join_date|date:"d.m.Y" }}</div>
+                        <div class="col-md-6"><strong>Photo URL:</strong> {{ user_obj.photo_url|default:"—" }}</div>
+                        <div class="col-md-2"><strong>Бан:</strong> {% if user_obj.is_banned %}✅{% else %}—{% endif %}</div>
+                        <div class="col-md-2"><strong>Data limit:</strong> {{ user_obj.data_limit|default:"—" }}</div>
+                        <div class="col-md-2"><strong>Top-up listener:</strong> {% if user_obj.top_up_balance_listener %}✅{% else %}—{% endif %}</div>
+                        <div class="col-md-2"><strong>Withdrawal listener:</strong> {% if user_obj.withdrawal_listener %}✅{% else %}—{% endif %}</div>
+                    </div>
+                    <hr>
+                    <div class="row g-3">
+                        <div class="col-md-3"><strong>Профиль сайта:</strong> {% if user_profile %}✅{% else %}—{% endif %}</div>
+                        <div class="col-md-3"><strong>Django user:</strong> {% if django_user %}{{ django_user.username }}{% else %}—{% endif %}</div>
+                        <div class="col-md-3"><strong>Email:</strong> {% if django_user %}{{ django_user.email|default:"—" }}{% else %}—{% endif %}</div>
+                        <div class="col-md-3"><strong>Пароль сайта выдан ботом:</strong> {% if user_profile and user_profile.site_password_generated %}✅{% else %}—{% endif %}</div>
+                        <div class="col-md-3"><strong>Django active:</strong> {% if django_user and django_user.is_active %}✅{% else %}—{% endif %}</div>
+                        <div class="col-md-3"><strong>Django staff:</strong> {% if django_user and django_user.is_staff %}✅{% else %}—{% endif %}</div>
+                        <div class="col-md-3"><strong>Django superuser:</strong> {% if django_user and django_user.is_superuser %}✅{% else %}—{% endif %}</div>
+                        <div class="col-md-3"><strong>Last login:</strong> {% if django_user and django_user.last_login %}{{ django_user.last_login|date:"d.m.Y H:i" }}{% else %}—{% endif %}</div>
+                    </div>
                 </div>
             </div>
         </div>
-        <div class="col-12 col-xl-6">
-            <div class="card admx-card mb-3">
-                <div class="card-header">Последние ключи</div>
-                <div class="table-responsive">
-                    <table class="table table-dark table-hover align-middle mb-0 admx-table">
-                        <thead><tr><th>Дата</th><th>Протокол</th><th>Сервер</th></tr></thead>
-                        <tbody>
-                        {% for k in recent_keys %}
-                            <tr>
-                                <td>{{ k.created_at|date:"d.m.Y" }}</td>
-                                <td>{{ k.protocol|default:"—" }}</td>
-                                <td>{% if k.server %}{{ k.server.hosting|default:k.server.ip_address }}{% else %}—{% endif %}</td>
-                            </tr>
-                        {% empty %}
-                            <tr><td colspan="3" class="text-center text-secondary">Нет данных</td></tr>
-                        {% endfor %}
-                        </tbody>
-                    </table>
+
+        <div class="accordion-item admx-accordion-item">
+            <h2 class="accordion-header">
+                <button class="accordion-button collapsed admx-accordion-button" type="button" data-bs-toggle="collapse"
+                        data-bs-target="#collapseBilling" aria-expanded="false">
+                    2) Подписка и платежные данные
+                </button>
+            </h2>
+            <div id="collapseBilling" class="accordion-collapse collapse" data-bs-parent="#userDetailsAccordion">
+                <div class="accordion-body">
+                    <div class="row g-3">
+                        <div class="col-md-3"><strong>Подписка:</strong> {% if user_obj.subscription_status %}✅{% else %}—{% endif %}</div>
+                        <div class="col-md-3"><strong>Истекает:</strong> {{ user_obj.subscription_expiration|date:"d.m.Y"|default:"—" }}</div>
+                        <div class="col-md-3"><strong>Следующий платеж:</strong> {{ user_obj.next_payment_date|date:"d.m.Y"|default:"—" }}</div>
+                        <div class="col-md-3"><strong>Permission revoked:</strong> {% if user_obj.permission_revoked %}✅{% else %}—{% endif %}</div>
+                        <div class="col-md-3"><strong>Баланс:</strong> {{ user_obj.balance }}</div>
+                        <div class="col-md-3"><strong>Доход:</strong> {{ user_obj.income }}</div>
+                        <div class="col-md-3"><strong>Payment method id:</strong> {{ user_obj.payment_method_id|default:"—" }}</div>
+                        <div class="col-md-3"><strong>Robo parent InvId:</strong> {{ user_obj.robokassa_recurring_parent_inv_id|default:"—" }}</div>
+                        <div class="col-md-12"><strong>Special offer:</strong>
+                            {% if user_obj.special_offer %}
+                                L1={{ user_obj.special_offer.level_1_percentage }}%, L2={{ user_obj.special_offer.level_2_percentage }}%, L3={{ user_obj.special_offer.level_3_percentage }}%, L4={{ user_obj.special_offer.level_4_percentage }}%, L5={{ user_obj.special_offer.level_5_percentage }}%
+                            {% else %}
+                                —
+                            {% endif %}
+                        </div>
+                    </div>
                 </div>
             </div>
-            <div class="card admx-card">
-                <div class="card-header">Последние логи</div>
-                <div class="table-responsive">
-                    <table class="table table-dark table-hover align-middle mb-0 admx-table">
-                        <thead><tr><th>Время</th><th>Уровень</th><th>Сообщение</th></tr></thead>
-                        <tbody>
-                        {% for row in recent_logs %}
-                            <tr>
-                                <td>{{ row.datetime|date:"d.m.Y H:i" }}</td>
-                                <td>{{ row.log_level }}</td>
-                                <td class="admx-message-cell">{{ row.message }}</td>
-                            </tr>
-                        {% empty %}
-                            <tr><td colspan="3" class="text-center text-secondary">Нет данных</td></tr>
-                        {% endfor %}
-                        </tbody>
-                    </table>
+        </div>
+
+        <div class="accordion-item admx-accordion-item">
+            <h2 class="accordion-header">
+                <button class="accordion-button collapsed admx-accordion-button" type="button" data-bs-toggle="collapse"
+                        data-bs-target="#collapseTransactions" aria-expanded="false">
+                    3) Все транзакции ({{ all_tx|length }})
+                </button>
+            </h2>
+            <div id="collapseTransactions" class="accordion-collapse collapse" data-bs-parent="#userDetailsAccordion">
+                <div class="accordion-body">
+                    <div class="table-responsive">
+                        <table class="table table-dark table-hover align-middle mb-0 admx-table">
+                            <thead><tr><th>ID</th><th>Время</th><th>Сумма</th><th>ПС</th><th>Status</th><th>Paid</th><th>Payment ID</th><th>Description</th></tr></thead>
+                            <tbody>
+                            {% for tx in all_tx %}
+                                <tr>
+                                    <td><a class="link-light link-underline-opacity-0" href="{% url 'admindashboardx:transaction_detail' tx_id=tx.id %}?return_to={{ request.get_full_path|urlencode }}">{{ tx.id }}</a></td>
+                                    <td>{{ tx.timestamp|date:"d.m.Y H:i" }}</td>
+                                    <td>{{ tx.amount }} {{ tx.currency|default:"RUB" }}</td>
+                                    <td>{{ tx.payment_system|default:"—" }}</td>
+                                    <td>{{ tx.status|default:"—" }}</td>
+                                    <td>{% if tx.paid %}✅{% else %}—{% endif %}</td>
+                                    <td class="admx-message-cell">{{ tx.payment_id|default:"—" }}</td>
+                                    <td class="admx-message-cell">{{ tx.description|default:"—" }}</td>
+                                </tr>
+                            {% empty %}
+                                <tr><td colspan="8" class="text-center text-secondary">Нет данных</td></tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="accordion-item admx-accordion-item">
+            <h2 class="accordion-header">
+                <button class="accordion-button collapsed admx-accordion-button" type="button" data-bs-toggle="collapse"
+                        data-bs-target="#collapseKeys" aria-expanded="false">
+                    4) Все VPN ключи ({{ all_keys|length }})
+                </button>
+            </h2>
+            <div id="collapseKeys" class="accordion-collapse collapse" data-bs-parent="#userDetailsAccordion">
+                <div class="accordion-body">
+                    <div class="table-responsive">
+                        <table class="table table-dark table-hover align-middle mb-0 admx-table">
+                            <thead><tr><th>Дата</th><th>Key ID</th><th>Протокол</th><th>Method</th><th>Port</th><th>Сервер</th><th>URL</th><th>Used/Data limit</th></tr></thead>
+                            <tbody>
+                            {% for k in all_keys %}
+                                <tr>
+                                    <td>{{ k.created_at|date:"d.m.Y" }}</td>
+                                    <td>{{ k.key_id }}</td>
+                                    <td>{{ k.protocol|default:"—" }}</td>
+                                    <td>{{ k.method|default:"—" }}</td>
+                                    <td>{{ k.port|default:"—" }}</td>
+                                    <td>{% if k.server %}<a class="link-light link-underline-opacity-0" href="{% url 'admindashboardx:server_detail' server_id=k.server.id %}?return_to={{ request.get_full_path|urlencode }}">{{ k.server.hosting|default:k.server.ip_address }}</a>{% else %}—{% endif %}</td>
+                                    <td class="admx-message-cell">{{ k.access_url|default:"—" }}</td>
+                                    <td>{{ k.used_bytes|default:"—" }} / {{ k.data_limit|default:"—" }}</td>
+                                </tr>
+                            {% empty %}
+                                <tr><td colspan="8" class="text-center text-secondary">Нет данных</td></tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="accordion-item admx-accordion-item">
+            <h2 class="accordion-header">
+                <button class="accordion-button collapsed admx-accordion-button" type="button" data-bs-toggle="collapse"
+                        data-bs-target="#collapseLogs" aria-expanded="false">
+                    5) Все логи пользователя ({{ all_logs|length }})
+                </button>
+            </h2>
+            <div id="collapseLogs" class="accordion-collapse collapse" data-bs-parent="#userDetailsAccordion">
+                <div class="accordion-body">
+                    <div class="table-responsive">
+                        <table class="table table-dark table-hover align-middle mb-0 admx-table">
+                            <thead><tr><th>Время</th><th>Уровень</th><th>Сообщение</th></tr></thead>
+                            <tbody>
+                            {% for row in all_logs %}
+                                <tr>
+                                    <td>{{ row.datetime|date:"d.m.Y H:i:s" }}</td>
+                                    <td>{{ row.log_level }}</td>
+                                    <td class="admx-message-cell">{{ row.message }}</td>
+                                </tr>
+                            {% empty %}
+                                <tr><td colspan="3" class="text-center text-secondary">Нет данных</td></tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="accordion-item admx-accordion-item">
+            <h2 class="accordion-header">
+                <button class="accordion-button collapsed admx-accordion-button" type="button" data-bs-toggle="collapse"
+                        data-bs-target="#collapseReferrals" aria-expanded="false">
+                    6) Реферальные связи (выдано: {{ given_referrals|length }}, получено: {{ received_referrals|length }})
+                </button>
+            </h2>
+            <div id="collapseReferrals" class="accordion-collapse collapse" data-bs-parent="#userDetailsAccordion">
+                <div class="accordion-body">
+                    <h6>Этот пользователь пригласил:</h6>
+                    <div class="table-responsive mb-4">
+                        <table class="table table-dark table-hover align-middle mb-0 admx-table">
+                            <thead><tr><th>Level</th><th>referred user_id</th><th>Username</th><th>Имя</th></tr></thead>
+                            <tbody>
+                            {% for ref in given_referrals %}
+                                <tr>
+                                    <td>{{ ref.level }}</td>
+                                    <td><a class="link-light link-underline-opacity-0" href="{% url 'admindashboardx:user_detail' telegram_user_id=ref.referred.user_id %}?return_to={{ request.get_full_path|urlencode }}">{{ ref.referred.user_id }}</a></td>
+                                    <td>{{ ref.referred.username|default:"—" }}</td>
+                                    <td>{{ ref.referred.first_name }} {{ ref.referred.last_name|default:"" }}</td>
+                                </tr>
+                            {% empty %}
+                                <tr><td colspan="4" class="text-center text-secondary">Нет данных</td></tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <h6>Этот пользователь был приглашен:</h6>
+                    <div class="table-responsive">
+                        <table class="table table-dark table-hover align-middle mb-0 admx-table">
+                            <thead><tr><th>Level</th><th>referrer user_id</th><th>Username</th><th>Имя</th></tr></thead>
+                            <tbody>
+                            {% for ref in received_referrals %}
+                                <tr>
+                                    <td>{{ ref.level }}</td>
+                                    <td><a class="link-light link-underline-opacity-0" href="{% url 'admindashboardx:user_detail' telegram_user_id=ref.referrer.user_id %}?return_to={{ request.get_full_path|urlencode }}">{{ ref.referrer.user_id }}</a></td>
+                                    <td>{{ ref.referrer.username|default:"—" }}</td>
+                                    <td>{{ ref.referrer.first_name }} {{ ref.referrer.last_name|default:"" }}</td>
+                                </tr>
+                            {% empty %}
+                                <tr><td colspan="4" class="text-center text-secondary">Нет данных</td></tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="accordion-item admx-accordion-item">
+            <h2 class="accordion-header">
+                <button class="accordion-button collapsed admx-accordion-button" type="button" data-bs-toggle="collapse"
+                        data-bs-target="#collapseReferralMoney" aria-expanded="false">
+                    7) Реферальные начисления (как referrer: {{ referral_earnings_as_referrer|length }}, как referred: {{ referral_earnings_as_referred|length }})
+                </button>
+            </h2>
+            <div id="collapseReferralMoney" class="accordion-collapse collapse" data-bs-parent="#userDetailsAccordion">
+                <div class="accordion-body">
+                    <h6>Начисления, где пользователь — referrer</h6>
+                    <div class="table-responsive mb-4">
+                        <table class="table table-dark table-hover align-middle mb-0 admx-table">
+                            <thead><tr><th>Время</th><th>Сумма</th><th>Level</th><th>Referred</th><th>Tx ID</th></tr></thead>
+                            <tbody>
+                            {% for rt in referral_earnings_as_referrer %}
+                                <tr>
+                                    <td>{{ rt.timestamp|date:"d.m.Y H:i" }}</td>
+                                    <td>{{ rt.amount }}</td>
+                                    <td>{% if rt.referral %}{{ rt.referral.level }}{% else %}—{% endif %}</td>
+                                    <td>{% if rt.referral and rt.referral.referred %}<a class="link-light link-underline-opacity-0" href="{% url 'admindashboardx:user_detail' telegram_user_id=rt.referral.referred.user_id %}?return_to={{ request.get_full_path|urlencode }}">{{ rt.referral.referred.user_id }}</a>{% else %}—{% endif %}</td>
+                                    <td>{% if rt.transaction %}<a class="link-light link-underline-opacity-0" href="{% url 'admindashboardx:transaction_detail' tx_id=rt.transaction.id %}?return_to={{ request.get_full_path|urlencode }}">{{ rt.transaction.id }}</a>{% else %}—{% endif %}</td>
+                                </tr>
+                            {% empty %}
+                                <tr><td colspan="5" class="text-center text-secondary">Нет данных</td></tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <h6>Начисления, где пользователь — referred</h6>
+                    <div class="table-responsive">
+                        <table class="table table-dark table-hover align-middle mb-0 admx-table">
+                            <thead><tr><th>Время</th><th>Сумма</th><th>Level</th><th>Referrer</th><th>Tx ID</th></tr></thead>
+                            <tbody>
+                            {% for rt in referral_earnings_as_referred %}
+                                <tr>
+                                    <td>{{ rt.timestamp|date:"d.m.Y H:i" }}</td>
+                                    <td>{{ rt.amount }}</td>
+                                    <td>{% if rt.referral %}{{ rt.referral.level }}{% else %}—{% endif %}</td>
+                                    <td>{% if rt.referral and rt.referral.referrer %}<a class="link-light link-underline-opacity-0" href="{% url 'admindashboardx:user_detail' telegram_user_id=rt.referral.referrer.user_id %}?return_to={{ request.get_full_path|urlencode }}">{{ rt.referral.referrer.user_id }}</a>{% else %}—{% endif %}</td>
+                                    <td>{% if rt.transaction %}<a class="link-light link-underline-opacity-0" href="{% url 'admindashboardx:transaction_detail' tx_id=rt.transaction.id %}?return_to={{ request.get_full_path|urlencode }}">{{ rt.transaction.id }}</a>{% else %}—{% endif %}</td>
+                                </tr>
+                            {% empty %}
+                                <tr><td colspan="5" class="text-center text-secondary">Нет данных</td></tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="accordion-item admx-accordion-item">
+            <h2 class="accordion-header">
+                <button class="accordion-button collapsed admx-accordion-button" type="button" data-bs-toggle="collapse"
+                        data-bs-target="#collapseWithdrawals" aria-expanded="false">
+                    8) Заявки на вывод ({{ withdrawals|length }})
+                </button>
+            </h2>
+            <div id="collapseWithdrawals" class="accordion-collapse collapse" data-bs-parent="#userDetailsAccordion">
+                <div class="accordion-body">
+                    <div class="table-responsive">
+                        <table class="table table-dark table-hover align-middle mb-0 admx-table">
+                            <thead><tr><th>Время</th><th>Amount</th><th>Currency</th><th>Status</th></tr></thead>
+                            <tbody>
+                            {% for w in withdrawals %}
+                                <tr>
+                                    <td>{{ w.timestamp|date:"d.m.Y H:i"|default:"—" }}</td>
+                                    <td>{{ w.amount|default:"—" }}</td>
+                                    <td>{{ w.currency|default:"—" }}</td>
+                                    <td>{% if w.status %}✅{% else %}—{% endif %}</td>
+                                </tr>
+                            {% empty %}
+                                <tr><td colspan="4" class="text-center text-secondary">Нет данных</td></tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>

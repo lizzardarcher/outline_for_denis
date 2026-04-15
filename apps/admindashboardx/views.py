@@ -10,7 +10,17 @@ from django.urls import reverse
 from django.utils import timezone
 from django.views.generic import TemplateView
 
-from bot.models import Logging, Server, TelegramUser, Transaction, VpnKey
+from bot.models import (
+    Logging,
+    ReferralTransaction,
+    Server,
+    TelegramReferral,
+    TelegramUser,
+    Transaction,
+    UserProfile,
+    VpnKey,
+    WithdrawalRequest,
+)
 
 
 class DashboardBaseView(LoginRequiredMixin, TemplateView):
@@ -28,6 +38,7 @@ class DashboardBaseView(LoginRequiredMixin, TemplateView):
             "page_key": self.page_key,
             "is_support": is_support,
         }
+
 
     def _is_support(self):
         support_account = getattr(settings, "SUPPORT_ACCOUNT", "")
@@ -371,54 +382,139 @@ class UserDetailView(DashboardBaseView):
         context = super().get_context_data(**kwargs)
         telegram_user_id = kwargs.get("telegram_user_id")
         user_obj = get_object_or_404(
-            TelegramUser.objects.only(
+            TelegramUser.objects.select_related("special_offer").only(
                 "id",
                 "join_date",
                 "user_id",
                 "username",
                 "first_name",
                 "last_name",
+                "photo_url",
+                "is_banned",
                 "subscription_status",
                 "subscription_expiration",
                 "permission_revoked",
                 "balance",
                 "income",
+                "data_limit",
+                "top_up_balance_listener",
+                "withdrawal_listener",
+                "next_payment_date",
                 "payment_method_id",
+                "robokassa_recurring_parent_inv_id",
+                "special_offer__level_1_percentage",
+                "special_offer__level_2_percentage",
+                "special_offer__level_3_percentage",
+                "special_offer__level_4_percentage",
+                "special_offer__level_5_percentage",
             ),
             user_id=telegram_user_id,
         )
         back_url = self._safe_return_to(reverse("admindashboardx:users"))
 
-        recent_tx = Transaction.objects.only(
+        user_profile = UserProfile.objects.select_related("user").filter(telegram_user=user_obj).first()
+        django_user = user_profile.user if user_profile else None
+
+        all_tx = Transaction.objects.only(
             "id",
             "timestamp",
             "amount",
             "currency",
             "payment_system",
             "status",
+            "paid",
+            "description",
+            "payment_id",
+            "robokassa_invoice_id",
+            "robokassa_recurring_previous_inv_id",
+            "robokassa_is_recurring_parent",
             "user_id",
-        ).filter(user=user_obj).order_by("-timestamp")[:30]
-        recent_keys = VpnKey.objects.select_related("server").only(
+        ).filter(user=user_obj).order_by("-timestamp")
+        all_keys = VpnKey.objects.select_related("server").only(
             "key_id",
             "created_at",
             "protocol",
+            "method",
+            "port",
+            "access_url",
+            "used_bytes",
+            "data_limit",
+            "server__id",
             "server__hosting",
             "server__ip_address",
-        ).filter(user=user_obj).order_by("-created_at")[:20]
-        recent_logs = Logging.objects.only(
+            "server__country__name_for_app",
+        ).filter(user=user_obj).order_by("-created_at")
+        all_logs = Logging.objects.only(
             "id",
             "datetime",
             "log_level",
             "message",
-        ).filter(user=user_obj).order_by("-datetime")[:20]
+        ).filter(user=user_obj).order_by("-datetime")
+
+        withdrawals = WithdrawalRequest.objects.only(
+            "id",
+            "amount",
+            "status",
+            "currency",
+            "timestamp",
+        ).filter(user=user_obj).order_by("-timestamp", "-id")
+
+        given_referrals = TelegramReferral.objects.select_related("referred").only(
+            "id",
+            "level",
+            "referred__user_id",
+            "referred__username",
+            "referred__first_name",
+            "referred__last_name",
+        ).filter(referrer=user_obj).order_by("level", "-id")
+
+        received_referrals = TelegramReferral.objects.select_related("referrer").only(
+            "id",
+            "level",
+            "referrer__user_id",
+            "referrer__username",
+            "referrer__first_name",
+            "referrer__last_name",
+        ).filter(referred=user_obj).order_by("level", "-id")
+
+        referral_earnings_as_referrer = ReferralTransaction.objects.select_related(
+            "referral", "referral__referrer", "referral__referred", "transaction"
+        ).only(
+            "id",
+            "amount",
+            "timestamp",
+            "referral__level",
+            "referral__referrer__user_id",
+            "referral__referred__user_id",
+            "transaction__id",
+        ).filter(referral__referrer=user_obj).order_by("-timestamp", "-id")
+
+        referral_earnings_as_referred = ReferralTransaction.objects.select_related(
+            "referral", "referral__referrer", "referral__referred", "transaction"
+        ).only(
+            "id",
+            "amount",
+            "timestamp",
+            "referral__level",
+            "referral__referrer__user_id",
+            "referral__referred__user_id",
+            "transaction__id",
+        ).filter(referral__referred=user_obj).order_by("-timestamp", "-id")
 
         context.update(
             {
                 **self._base_context(),
                 "user_obj": user_obj,
-                "recent_tx": recent_tx,
-                "recent_keys": recent_keys,
-                "recent_logs": recent_logs,
+                "user_profile": user_profile,
+                "django_user": django_user,
+                "all_tx": all_tx,
+                "all_keys": all_keys,
+                "all_logs": all_logs,
+                "withdrawals": withdrawals,
+                "given_referrals": given_referrals,
+                "received_referrals": received_referrals,
+                "referral_earnings_as_referrer": referral_earnings_as_referrer,
+                "referral_earnings_as_referred": referral_earnings_as_referred,
                 "back_url": back_url,
                 "section_url": reverse("admindashboardx:users"),
                 "section_label": "Пользователи",

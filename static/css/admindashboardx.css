@@ -15,6 +15,7 @@ body.admx-body {
     min-height: 100vh;
 }
 
+
 .admx-shell {
     display: flex;
     min-height: 100vh;
@@ -184,6 +185,32 @@ body.admx-body {
     color: #fff;
     border-radius: 0.2rem;
     padding: 0 0.2rem;
+}
+
+.admx-accordion-item {
+    background: var(--admx-panel);
+    border: 1px solid var(--admx-border);
+    color: var(--admx-text);
+}
+
+.admx-accordion-button {
+    background: rgba(255, 255, 255, 0.02);
+    color: var(--admx-text);
+}
+
+.admx-accordion-button:not(.collapsed) {
+    background: rgba(124, 156, 255, 0.18);
+    color: #fff;
+    box-shadow: inset 0 -1px 0 var(--admx-border);
+}
+
+.admx-accordion-button:focus {
+    box-shadow: 0 0 0 0.2rem rgba(124, 156, 255, 0.15);
+    border-color: var(--admx-accent);
+}
+
+.admx-accordion-button::after {
+    filter: invert(95%) sepia(8%) saturate(350%) hue-rotate(190deg) brightness(100%) contrast(95%);
 }
 
 @media (max-width: 991.98px) {
