@@ -122,7 +122,8 @@ def message_sender():
 
 @shared_task
 def reload_servers():
-    servers = Server.objects.filter(hosting__contains='IS Hosting')
+    # servers = Server.objects.filter(hosting__contains='IS Hosting')
+    servers = Server.objects.filter(is_activated_vless=True)
     for server in servers:
         try:
             Logging.objects.create(log_level='DEBUG', message=f'[CELERY] Reloading server {server.hosting}...')
