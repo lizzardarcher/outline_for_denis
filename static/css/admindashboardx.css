@@ -1,0 +1,213 @@
+:root {
+    --admx-bg: #212733;
+    --admx-panel: #2a3140;
+    --admx-surface: #323a4c;
+    --admx-border: #404a5f;
+    --admx-text: #e8edf7;
+    --admx-muted: #abb5c7;
+    --admx-accent: #7c9cff;
+}
+
+
+body.admx-body {
+    background: var(--admx-bg);
+    color: var(--admx-text);
+    min-height: 100vh;
+}
+
+.admx-shell {
+    display: flex;
+    min-height: 100vh;
+}
+
+.admx-sidebar {
+    width: 270px;
+    background: var(--admx-panel);
+    border-right: 1px solid var(--admx-border);
+    display: flex;
+    flex-direction: column;
+}
+
+.admx-main {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.admx-navbar {
+    background: var(--admx-panel);
+    border-bottom: 1px solid var(--admx-border);
+}
+
+.admx-content {
+    flex: 1;
+}
+
+.admx-footer {
+    background: var(--admx-panel);
+    border-top: 1px solid var(--admx-border);
+}
+
+.admx-brand {
+    border-bottom: 1px solid var(--admx-border);
+}
+
+.admx-nav-link {
+    display: block;
+    color: var(--admx-text);
+    text-decoration: none;
+    border-radius: 0.55rem;
+    padding: 0.65rem 0.75rem;
+    margin-bottom: 0.35rem;
+}
+
+.admx-nav-link:hover {
+    background: var(--admx-surface);
+    color: #fff;
+}
+
+.admx-nav-link.active {
+    background: rgba(124, 156, 255, 0.22);
+    color: #fff;
+}
+
+.admx-nav-link.disabled {
+    opacity: 0.55;
+    pointer-events: none;
+}
+
+.admx-sidebar-bottom {
+    margin-top: auto;
+    border-top: 1px solid var(--admx-border);
+}
+
+.admx-card {
+    background: var(--admx-panel);
+    border: 1px solid var(--admx-border);
+    color: var(--admx-text);
+}
+
+.admx-card .card-header {
+    background: rgba(255, 255, 255, 0.02);
+    border-bottom: 1px solid var(--admx-border);
+    color: var(--admx-text);
+}
+
+.admx-card .form-control,
+.admx-card .form-select {
+    background-color: #242b39;
+    border-color: var(--admx-border);
+    color: var(--admx-text);
+}
+
+.admx-card .form-control::placeholder {
+    color: var(--admx-muted);
+}
+
+.admx-card .form-control:focus,
+.admx-card .form-select:focus {
+    border-color: var(--admx-accent);
+    box-shadow: 0 0 0 0.2rem rgba(124, 156, 255, 0.15);
+}
+
+.admx-kpi-title {
+    color: var(--admx-muted);
+    font-size: 0.9rem;
+}
+
+.admx-kpi-value {
+    font-size: 1.8rem;
+    font-weight: 700;
+    margin: 0.25rem 0;
+}
+
+.admx-kpi-foot {
+    color: var(--admx-muted);
+    font-size: 0.85rem;
+}
+
+.admx-table {
+    --bs-table-bg: transparent;
+    --bs-table-color: var(--admx-text);
+    --bs-table-border-color: var(--admx-border);
+    --bs-table-striped-bg: rgba(255, 255, 255, 0.02);
+    --bs-table-hover-bg: rgba(255, 255, 255, 0.04);
+}
+
+.admx-message-cell {
+    max-width: 480px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.admx-copy-btn {
+    margin-left: 0.35rem;
+    padding: 0.1rem 0.35rem;
+    font-size: 0.75rem;
+    line-height: 1.1;
+}
+
+.admx-copy-ok {
+    border-color: #6fd3a9 !important;
+    color: #6fd3a9 !important;
+}
+
+.admx-sticky-filters {
+    position: sticky;
+    top: 0.65rem;
+    z-index: 10;
+}
+
+.admx-detail-header {
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.admx-breadcrumb {
+    --bs-breadcrumb-divider-color: var(--admx-muted);
+    --bs-breadcrumb-item-active-color: var(--admx-text);
+    font-size: 0.85rem;
+}
+
+.admx-breadcrumb a {
+    color: var(--admx-muted);
+    text-decoration: none;
+}
+
+.admx-breadcrumb a:hover {
+    color: var(--admx-text);
+}
+
+.admx-message-cell mark {
+    background: rgba(124, 156, 255, 0.3);
+    color: #fff;
+    border-radius: 0.2rem;
+    padding: 0 0.2rem;
+}
+
+@media (max-width: 991.98px) {
+    .admx-shell {
+        flex-direction: column;
+    }
+
+    .admx-sidebar {
+        width: 100%;
+    }
+
+    .admx-table th,
+    .admx-table td {
+        font-size: 0.82rem;
+        white-space: nowrap;
+    }
+
+    .admx-copy-btn {
+        margin-left: 0.2rem;
+        padding: 0.08rem 0.28rem;
+        font-size: 0.68rem;
+    }
+
+    .admx-card .card-header {
+        font-size: 0.92rem;
+    }
+}

@@ -4,12 +4,12 @@
 {% block title %} · Пользователи{% endblock %}
 
 {% block content %}
-    <div class="card admx-card mb-3">
+    <div class="card admx-card mb-3 admx-sticky-filters">
         <div class="card-body">
             <form method="get" class="row g-2 align-items-end">
                 <div class="col-12 col-md-6 col-lg-5">
                     <label class="form-label">Поиск</label>
-                    <input type="text" name="q" class="form-control" value="{{ q }}"
+                    <input type="text" name="q" class="form-control admx-search-input" value="{{ q }}" autofocus
                            placeholder="user_id, username, имя, фамилия">
                 </div>
                 <div class="col-12 col-md-3 col-lg-3">
@@ -20,9 +20,7 @@
                         <option value="false" {% if subscription_status == "false" %}selected{% endif %}>Неактивна</option>
                     </select>
                 </div>
-                <div class="col-12 col-md-3 col-lg-2">
-                    <button class="btn btn-primary w-100" type="submit">Применить</button>
-                </div>
+                {% include "admindashboardx/partials/filter_actions.html" with reset_url=reset_url %}
             </form>
         </div>
     </div>
@@ -34,18 +32,25 @@
                 <tr>
                     <th>Дата</th>
                     <th>user_id</th>
-                    <th>Username</th>
+                    <th>Логин</th>
                     <th>Имя</th>
                     <th>Подписка</th>
                     <th>Истекает</th>
-                    <th>PM ID</th>
+                    <th>Payment Method</th>
                 </tr>
                 </thead>
                 <tbody>
                 {% for u in users_page %}
                     <tr>
                         <td>{{ u.join_date|date:"d.m.Y" }}</td>
-                        <td>{{ u.user_id }}</td>
+                        <td>
+                            <a class="link-light link-underline-opacity-0"
+                               href="{% url 'admindashboardx:user_detail' telegram_user_id=u.user_id %}?return_to={{ request.get_full_path|urlencode }}">
+                                {{ u.user_id }}
+                            </a>
+                            <button type="button" class="btn btn-sm btn-outline-light admx-copy-btn"
+                                    data-copy-text="{{ u.user_id }}" title="Скопировать user_id">⧉</button>
+                        </td>
                         <td>{{ u.username|default:"—" }}</td>
                         <td>{{ u.first_name }} {{ u.last_name|default:"" }}</td>
                         <td>{% if u.subscription_status %}✅{% else %}—{% endif %}</td>
@@ -58,19 +63,6 @@
                 </tbody>
             </table>
         </div>
-        <div class="card-footer d-flex justify-content-between align-items-center">
-            <small class="text-secondary">Всего на странице: {{ users_page|length }}</small>
-            <div class="btn-group">
-                {% if users_page.has_previous %}
-                    <a class="btn btn-sm btn-outline-light"
-                       href="?q={{ q }}&subscription_status={{ subscription_status }}&page={{ users_page.previous_page_number }}">Назад</a>
-                {% endif %}
-                <button class="btn btn-sm btn-outline-light disabled">{{ users_page.number }} / {{ users_page.paginator.num_pages }}</button>
-                {% if users_page.has_next %}
-                    <a class="btn btn-sm btn-outline-light"
-                       href="?q={{ q }}&subscription_status={{ subscription_status }}&page={{ users_page.next_page_number }}">Вперед</a>
-                {% endif %}
-            </div>
-        </div>
+        {% include "admindashboardx/partials/pagination.html" with page_obj=users_page page_qs=page_qs %}
     </div>
 {% endblock %}

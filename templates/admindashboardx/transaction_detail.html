@@ -1,0 +1,40 @@
+{% extends "admindashboardx/admipanelbase.html" %}
+
+{% block title %} · Транзакция {{ tx.id }}{% endblock %}
+
+{% block content %}
+    <div class="card admx-card">
+        {% include "admindashboardx/partials/detail_header.html" with header_title="Транзакция" current_label=tx.id section_url=section_url section_label=section_label back_url=back_url %}
+        <div class="card-body">
+            <div class="mb-3 d-flex flex-wrap gap-2">
+                {% if tx.user %}
+                    <a class="btn btn-sm btn-outline-light" href="{% url 'admindashboardx:user_detail' telegram_user_id=tx.user.user_id %}?return_to={{ request.get_full_path|urlencode }}">Карточка пользователя</a>
+                    <a class="btn btn-sm btn-outline-light" href="{% url 'admindashboardx:transactions' %}?q={{ tx.user.user_id }}">Транзакции пользователя</a>
+                {% endif %}
+                {% if tx.payment_id %}
+                    <a class="btn btn-sm btn-outline-light" href="{% url 'admindashboardx:transactions' %}?q={{ tx.payment_id }}">Поиск по payment_id</a>
+                    {% if not is_support %}
+                        <button type="button" class="btn btn-sm btn-outline-light admx-copy-btn"
+                                data-copy-text="{{ tx.payment_id }}" title="Скопировать payment_id">Скопировать payment_id</button>
+                    {% endif %}
+                {% endif %}
+            </div>
+            <div class="row g-3">
+                <div class="col-md-4"><strong>Время:</strong> {{ tx.timestamp|date:"d.m.Y H:i:s" }}</div>
+                <div class="col-md-4"><strong>Статус:</strong> {{ tx.status|default:"—" }}</div>
+                <div class="col-md-4"><strong>Оплачено:</strong> {% if tx.paid %}✅{% else %}—{% endif %}</div>
+
+                <div class="col-md-4"><strong>User:</strong> {% if tx.user %}<a class="link-light link-underline-opacity-0" href="{% url 'admindashboardx:user_detail' telegram_user_id=tx.user.user_id %}">{{ tx.user.user_id }}</a>{% else %}—{% endif %}</div>
+                <div class="col-md-4"><strong>Сумма:</strong> {{ tx.amount }} {{ tx.currency|default:"RUB" }}</div>
+                <div class="col-md-4"><strong>Платежная система:</strong> {{ tx.payment_system|default:"—" }}</div>
+
+                <div class="col-md-6"><strong>ID операции во внешней ПС:</strong> {{ tx.payment_id|default:"—" }}</div>
+                <div class="col-md-6"><strong>Описание:</strong> {{ tx.description|default:"—" }}</div>
+
+                <div class="col-md-4"><strong>RoboKassa invoice:</strong> {{ tx.robokassa_invoice_id|default:"—" }}</div>
+                <div class="col-md-4"><strong>RoboKassa previous invoice:</strong> {{ tx.robokassa_recurring_previous_inv_id|default:"—" }}</div>
+                <div class="col-md-4"><strong>RoboKassa parent:</strong> {% if tx.robokassa_is_recurring_parent %}✅{% else %}—{% endif %}</div>
+            </div>
+        </div>
+    </div>
+{% endblock %}

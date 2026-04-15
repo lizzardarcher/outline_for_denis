@@ -1,0 +1,48 @@
+{% extends "admindashboardx/admipanelbase.html" %}
+
+{% block title %} · Сервер {{ server.id }}{% endblock %}
+
+{% block content %}
+    <div class="card admx-card mb-3">
+        {% include "admindashboardx/partials/detail_header.html" with header_title="Сервер" current_label=server.hosting|default:server.ip_address section_url=section_url section_label=section_label back_url=back_url %}
+        <div class="card-body">
+            <div class="mb-3 d-flex flex-wrap gap-2">
+                <a class="btn btn-sm btn-outline-light" href="{% url 'admindashboardx:keys' %}?q={{ server.hosting|default:server.ip_address }}">Ключи по серверу</a>
+                <a class="btn btn-sm btn-outline-light" href="{% url 'admindashboardx:servers' %}?q={{ server.ip_address }}">Поиск этого сервера</a>
+                {% if server.ip_address and not is_support %}
+                    <button type="button" class="btn btn-sm btn-outline-light admx-copy-btn"
+                            data-copy-text="{{ server.ip_address }}" title="Скопировать IP">Скопировать IP</button>
+                {% endif %}
+            </div>
+            <div class="row g-3">
+                <div class="col-md-4"><strong>IP:</strong> {{ server.ip_address|default:"—" }}</div>
+                <div class="col-md-4"><strong>Страна:</strong> {% if server.country %}{{ server.country.name_for_app|default:server.country.name }}{% else %}—{% endif %}</div>
+                <div class="col-md-4"><strong>Создан:</strong> {{ server.created_at|date:"d.m.Y" }}</div>
+                <div class="col-md-4"><strong>Активен:</strong> {% if server.is_active %}✅{% else %}—{% endif %}</div>
+                <div class="col-md-4"><strong>VLESS MB:</strong> {% if server.is_activated_vless %}✅{% else %}—{% endif %}</div>
+                <div class="col-md-4"><strong>Ключей:</strong> {{ server.keys_generated|default:0 }} / {{ server.max_keys|default:"—" }}</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card admx-card">
+        <div class="card-header">Последние ключи на сервере</div>
+        <div class="table-responsive">
+            <table class="table table-dark table-hover align-middle mb-0 admx-table">
+                <thead><tr><th>Дата</th><th>User</th><th>Протокол</th><th>URL</th></tr></thead>
+                <tbody>
+                {% for k in server_keys %}
+                    <tr>
+                        <td>{{ k.created_at|date:"d.m.Y" }}</td>
+                        <td>{% if k.user %}<a class="link-light link-underline-opacity-0" href="{% url 'admindashboardx:user_detail' telegram_user_id=k.user.user_id %}?return_to={{ request.get_full_path|urlencode }}">{{ k.user.user_id }}</a>{% else %}—{% endif %}</td>
+                        <td>{{ k.protocol|default:"—" }}</td>
+                        <td class="admx-message-cell">{{ k.access_url|default:"—" }}</td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="4" class="text-center text-secondary">Нет данных</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+{% endblock %}

@@ -1,0 +1,23 @@
+<div class="card-header admx-detail-header d-flex justify-content-between align-items-start gap-3">
+    <div>
+        <nav aria-label="breadcrumb" class="mb-2">
+            <ol class="breadcrumb admx-breadcrumb mb-0">
+                <li class="breadcrumb-item"><a href="{% url 'admindashboardx:index' %}">Главная</a></li>
+                {% if section_url and section_label %}
+                    <li class="breadcrumb-item"><a href="{{ section_url }}">{{ section_label }}</a></li>
+                {% endif %}
+                <li class="breadcrumb-item active" aria-current="page">{{ current_label }}</li>
+            </ol>
+        </nav>
+        <div class="fw-semibold">{{ header_title }}</div>
+        {% if is_support %}
+            <div class="small text-warning mt-1">Support mode: read-only</div>
+        {% endif %}
+    </div>
+    <div class="btn-group">
+        <a class="btn btn-sm btn-outline-light" href="{{ back_url }}">Назад</a>
+        {% if section_url and section_label %}
+            <a class="btn btn-sm btn-outline-light" href="{{ section_url }}">К списку</a>
+        {% endif %}
+    </div>
+</div>

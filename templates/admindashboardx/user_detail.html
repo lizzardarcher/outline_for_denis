@@ -1,0 +1,96 @@
+{% extends "admindashboardx/admipanelbase.html" %}
+
+{% block title %} · Пользователь {{ user_obj.user_id }}{% endblock %}
+
+{% block content %}
+    <div class="card admx-card mb-3">
+        {% include "admindashboardx/partials/detail_header.html" with header_title="Пользователь" current_label=user_obj.user_id section_url=section_url section_label=section_label back_url=back_url %}
+        <div class="card-body">
+            <div class="mb-3 d-flex flex-wrap gap-2">
+                <a class="btn btn-sm btn-outline-light" href="{% url 'admindashboardx:transactions' %}?q={{ user_obj.user_id }}">Все транзакции пользователя</a>
+                <a class="btn btn-sm btn-outline-light" href="{% url 'admindashboardx:keys' %}?q={{ user_obj.user_id }}">Все ключи пользователя</a>
+                <a class="btn btn-sm btn-outline-light" href="{% url 'admindashboardx:logs' %}?q={{ user_obj.user_id }}">Логи пользователя</a>
+                {% if not is_support %}
+                    <button type="button" class="btn btn-sm btn-outline-light admx-copy-btn"
+                            data-copy-text="{{ user_obj.user_id }}" title="Скопировать user_id">Скопировать user_id</button>
+                {% endif %}
+            </div>
+            <div class="row g-3">
+                <div class="col-md-4"><strong>Username:</strong> {{ user_obj.username|default:"—" }}</div>
+                <div class="col-md-4"><strong>Имя:</strong> {{ user_obj.first_name }} {{ user_obj.last_name|default:"" }}</div>
+                <div class="col-md-4"><strong>Дата регистрации:</strong> {{ user_obj.join_date|date:"d.m.Y" }}</div>
+                <div class="col-md-4"><strong>Подписка:</strong> {% if user_obj.subscription_status %}✅{% else %}—{% endif %}</div>
+                <div class="col-md-4"><strong>Истекает:</strong> {{ user_obj.subscription_expiration|date:"d.m.Y"|default:"—" }}</div>
+                <div class="col-md-4"><strong>Permission revoked:</strong> {% if user_obj.permission_revoked %}✅{% else %}—{% endif %}</div>
+                <div class="col-md-4"><strong>Balance:</strong> {{ user_obj.balance }}</div>
+                <div class="col-md-4"><strong>Income:</strong> {{ user_obj.income }}</div>
+                <div class="col-md-4"><strong>Payment Method ID:</strong> {% if user_obj.payment_method_id %}✅{% else %}—{% endif %}</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3">
+        <div class="col-12 col-xl-6">
+            <div class="card admx-card">
+                <div class="card-header">Последние транзакции</div>
+                <div class="table-responsive">
+                    <table class="table table-dark table-hover align-middle mb-0 admx-table">
+                        <thead><tr><th>Время</th><th>Сумма</th><th>ПС</th><th>Статус</th></tr></thead>
+                        <tbody>
+                        {% for tx in recent_tx %}
+                            <tr>
+                                <td><a class="link-light link-underline-opacity-0" href="{% url 'admindashboardx:transaction_detail' tx_id=tx.id %}?return_to={{ request.get_full_path|urlencode }}">{{ tx.timestamp|date:"d.m.Y H:i" }}</a></td>
+                                <td>{{ tx.amount }} {{ tx.currency|default:"RUB" }}</td>
+                                <td>{{ tx.payment_system|default:"—" }}</td>
+                                <td>{{ tx.status|default:"—" }}</td>
+                            </tr>
+                        {% empty %}
+                            <tr><td colspan="4" class="text-center text-secondary">Нет данных</td></tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-xl-6">
+            <div class="card admx-card mb-3">
+                <div class="card-header">Последние ключи</div>
+                <div class="table-responsive">
+                    <table class="table table-dark table-hover align-middle mb-0 admx-table">
+                        <thead><tr><th>Дата</th><th>Протокол</th><th>Сервер</th></tr></thead>
+                        <tbody>
+                        {% for k in recent_keys %}
+                            <tr>
+                                <td>{{ k.created_at|date:"d.m.Y" }}</td>
+                                <td>{{ k.protocol|default:"—" }}</td>
+                                <td>{% if k.server %}{{ k.server.hosting|default:k.server.ip_address }}{% else %}—{% endif %}</td>
+                            </tr>
+                        {% empty %}
+                            <tr><td colspan="3" class="text-center text-secondary">Нет данных</td></tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="card admx-card">
+                <div class="card-header">Последние логи</div>
+                <div class="table-responsive">
+                    <table class="table table-dark table-hover align-middle mb-0 admx-table">
+                        <thead><tr><th>Время</th><th>Уровень</th><th>Сообщение</th></tr></thead>
+                        <tbody>
+                        {% for row in recent_logs %}
+                            <tr>
+                                <td>{{ row.datetime|date:"d.m.Y H:i" }}</td>
+                                <td>{{ row.log_level }}</td>
+                                <td class="admx-message-cell">{{ row.message }}</td>
+                            </tr>
+                        {% empty %}
+                            <tr><td colspan="3" class="text-center text-secondary">Нет данных</td></tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}

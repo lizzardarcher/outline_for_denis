@@ -1,0 +1,14 @@
+<div class="card-footer d-flex justify-content-between align-items-center">
+    <small class="text-secondary">Всего на странице: {{ page_obj|length }}</small>
+    <div class="btn-group">
+        {% if page_obj.has_previous %}
+            <a class="btn btn-sm btn-outline-light"
+               href="?{{ page_qs }}{% if page_qs %}&{% endif %}page={{ page_obj.previous_page_number }}">Назад</a>
+        {% endif %}
+        <button class="btn btn-sm btn-outline-light disabled">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</button>
+        {% if page_obj.has_next %}
+            <a class="btn btn-sm btn-outline-light"
+               href="?{{ page_qs }}{% if page_qs %}&{% endif %}page={{ page_obj.next_page_number }}">Вперед</a>
+        {% endif %}
+    </div>
+</div>

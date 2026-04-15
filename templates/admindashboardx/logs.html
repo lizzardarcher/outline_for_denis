@@ -1,15 +1,49 @@
 {% extends "admindashboardx/admipanelbase.html" %}
+{% load admx_extras %}
 
 {% block title %} · Логи{% endblock %}
 
 
 {% block content %}
-    <div class="card admx-card mb-3">
+    {% if not is_support %}
+        <div class="card admx-card mb-3">
+            <div class="card-body">
+                <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+                    <div>
+                        <div class="fw-semibold">Обслуживание логов</div>
+                        <div class="small text-secondary">Безопасная очистка старых логов по периоду.</div>
+                    </div>
+                    <form method="post" class="d-flex align-items-center gap-2"
+                          onsubmit="return confirm('Удалить логи старше выбранного периода?')">
+                        {% csrf_token %}
+                        <select name="delete_days" class="form-select form-select-sm">
+                            <option value="3">Старше 3 дней</option>
+                            <option value="7">Старше 7 дней</option>
+                            <option value="30">Старше 30 дней</option>
+                        </select>
+                        <button type="submit" class="btn btn-sm btn-outline-warning">Очистить</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    {% endif %}
+
+    {% if ops == "deleted" %}
+        <div class="alert alert-success py-2">
+            Удалено записей: <strong>{{ deleted_count|default:"0" }}</strong> (старше {{ deleted_days }} дней).
+        </div>
+    {% elif ops == "invalid" %}
+        <div class="alert alert-warning py-2">
+            Неверные параметры операции очистки.
+        </div>
+    {% endif %}
+
+    <div class="card admx-card mb-3 admx-sticky-filters">
         <div class="card-body">
             <form method="get" class="row g-2 align-items-end">
                 <div class="col-12 col-md-6 col-lg-5">
                     <label class="form-label">Поиск</label>
-                    <input type="text" name="q" class="form-control" value="{{ q }}"
+                    <input type="text" name="q" class="form-control admx-search-input" value="{{ q }}" autofocus
                            placeholder="message или user_id">
                 </div>
                 <div class="col-12 col-md-3 col-lg-3">
@@ -21,9 +55,7 @@
                         {% endfor %}
                     </select>
                 </div>
-                <div class="col-12 col-md-3 col-lg-2">
-                    <button class="btn btn-primary w-100" type="submit">Применить</button>
-                </div>
+                {% include "admindashboardx/partials/filter_actions.html" with reset_url=reset_url %}
             </form>
         </div>
     </div>
@@ -35,7 +67,7 @@
                 <tr>
                     <th>Время</th>
                     <th>Уровень</th>
-                    <th>User</th>
+                    <th>Пользователь</th>
                     <th>Сообщение</th>
                 </tr>
                 </thead>
@@ -44,8 +76,16 @@
                     <tr>
                         <td>{{ row.datetime|date:"d.m.Y H:i:s" }}</td>
                         <td>{{ row.log_level }}</td>
-                        <td>{% if row.user %}{{ row.user.user_id }}{% else %}—{% endif %}</td>
-                        <td class="admx-message-cell">{{ row.message }}</td>
+                        <td>
+                            {% if row.user %}
+                                <a class="link-light link-underline-opacity-0" href="{% url 'admindashboardx:user_detail' telegram_user_id=row.user.user_id %}?return_to={{ request.get_full_path|urlencode }}">{{ row.user.user_id }}</a>
+                                <button type="button" class="btn btn-sm btn-outline-light admx-copy-btn"
+                                        data-copy-text="{{ row.user.user_id }}" title="Скопировать user_id">⧉</button>
+                            {% else %}
+                                —
+                            {% endif %}
+                        </td>
+                        <td class="admx-message-cell">{{ row.message|highlight:q }}</td>
                     </tr>
                 {% empty %}
                     <tr><td colspan="4" class="text-center text-secondary">Нет данных</td></tr>
@@ -53,19 +93,6 @@
                 </tbody>
             </table>
         </div>
-        <div class="card-footer d-flex justify-content-between align-items-center">
-            <small class="text-secondary">Всего на странице: {{ logs_page|length }}</small>
-            <div class="btn-group">
-                {% if logs_page.has_previous %}
-                    <a class="btn btn-sm btn-outline-light"
-                       href="?q={{ q }}&level={{ level }}&page={{ logs_page.previous_page_number }}">Назад</a>
-                {% endif %}
-                <button class="btn btn-sm btn-outline-light disabled">{{ logs_page.number }} / {{ logs_page.paginator.num_pages }}</button>
-                {% if logs_page.has_next %}
-                    <a class="btn btn-sm btn-outline-light"
-                       href="?q={{ q }}&level={{ level }}&page={{ logs_page.next_page_number }}">Вперед</a>
-                {% endif %}
-            </div>
-        </div>
+        {% include "admindashboardx/partials/pagination.html" with page_obj=logs_page page_qs=page_qs %}
     </div>
 {% endblock %}

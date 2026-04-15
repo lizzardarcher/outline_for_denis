@@ -1,0 +1,66 @@
+{% extends "admindashboardx/admipanelbase.html" %}
+
+{% block title %} · Серверы{% endblock %}
+
+{% block content %}
+    <div class="card admx-card mb-3 admx-sticky-filters">
+        <div class="card-body">
+            <form method="get" class="row g-2 align-items-end">
+                <div class="col-12 col-md-6 col-lg-5">
+                    <label class="form-label">Поиск</label>
+                    <input type="text" name="q" class="form-control admx-search-input" value="{{ q }}" autofocus
+                           placeholder="hosting, ip, country">
+                </div>
+                <div class="col-12 col-md-3 col-lg-3">
+                    <label class="form-label">Активность</label>
+                    <select name="is_active" class="form-select">
+                        <option value="">Все</option>
+                        <option value="true" {% if is_active == "true" %}selected{% endif %}>Активен</option>
+                        <option value="false" {% if is_active == "false" %}selected{% endif %}>Неактивен</option>
+                    </select>
+                </div>
+                {% include "admindashboardx/partials/filter_actions.html" with reset_url=reset_url %}
+            </form>
+        </div>
+    </div>
+
+    <div class="card admx-card">
+        <div class="table-responsive">
+            <table class="table table-dark table-hover align-middle mb-0 admx-table">
+                <thead>
+                <tr>
+                    <th>Хостинг</th>
+                    <th>IP</th>
+                    <th>Страна</th>
+                    <th>Активен</th>
+                    <th>VLESS MB</th>
+                    <th>Ключей</th>
+                    <th>Создан</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for s in servers_page %}
+                    <tr>
+                        <td><a class="link-light link-underline-opacity-0" href="{% url 'admindashboardx:server_detail' server_id=s.id %}?return_to={{ request.get_full_path|urlencode }}">{{ s.hosting|default:"—" }}</a></td>
+                        <td>
+                            {{ s.ip_address|default:"—" }}
+                            {% if s.ip_address %}
+                                <button type="button" class="btn btn-sm btn-outline-light admx-copy-btn"
+                                        data-copy-text="{{ s.ip_address }}" title="Скопировать IP">⧉</button>
+                            {% endif %}
+                        </td>
+                        <td>{% if s.country %}{{ s.country.name_for_app|default:s.country.name }}{% else %}—{% endif %}</td>
+                        <td>{% if s.is_active %}✅{% else %}—{% endif %}</td>
+                        <td>{% if s.is_activated_vless %}✅{% else %}—{% endif %}</td>
+                        <td>{{ s.keys_generated|default:0 }} / {{ s.max_keys|default:"—" }}</td>
+                        <td>{{ s.created_at|date:"d.m.Y" }}</td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="7" class="text-center text-secondary">Нет данных</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% include "admindashboardx/partials/pagination.html" with page_obj=servers_page page_qs=page_qs %}
+    </div>
+{% endblock %}

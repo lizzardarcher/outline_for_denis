@@ -4,12 +4,12 @@
 
 
 {% block content %}
-    <div class="card admx-card mb-3">
+    <div class="card admx-card mb-3 admx-sticky-filters">
         <div class="card-body">
             <form method="get" class="row g-2 align-items-end">
                 <div class="col-12 col-md-6 col-lg-5">
                     <label class="form-label">Поиск</label>
-                    <input type="text" name="q" class="form-control" value="{{ q }}"
+                    <input type="text" name="q" class="form-control admx-search-input" value="{{ q }}" autofocus
                            placeholder="payment_id, описание, username, user_id">
                 </div>
                 <div class="col-12 col-md-3 col-lg-3">
@@ -21,9 +21,7 @@
                         {% endfor %}
                     </select>
                 </div>
-                <div class="col-12 col-md-3 col-lg-2">
-                    <button class="btn btn-primary w-100" type="submit">Применить</button>
-                </div>
+                {% include "admindashboardx/partials/filter_actions.html" with reset_url=reset_url %}
             </form>
         </div>
     </div>
@@ -34,9 +32,9 @@
                 <thead>
                 <tr>
                     <th>Время</th>
-                    <th>User</th>
+                    <th>Пользователь</th>
                     <th>Сумма</th>
-                    <th>ПС</th>
+                    <th>Платежная система</th>
                     <th>Внешний ID</th>
                     <th>Статус</th>
                 </tr>
@@ -44,11 +42,17 @@
                 <tbody>
                 {% for tx in tx_page %}
                     <tr>
-                        <td>{{ tx.timestamp|date:"d.m.Y H:i" }}</td>
-                        <td>{% if tx.user %}{{ tx.user.user_id }}{% else %}—{% endif %}</td>
+                        <td><a class="link-light link-underline-opacity-0" href="{% url 'admindashboardx:transaction_detail' tx_id=tx.id %}?return_to={{ request.get_full_path|urlencode }}">{{ tx.timestamp|date:"d.m.Y H:i" }}</a></td>
+                        <td>{% if tx.user %}<a class="link-light link-underline-opacity-0" href="{% url 'admindashboardx:user_detail' telegram_user_id=tx.user.user_id %}?return_to={{ request.get_full_path|urlencode }}">{{ tx.user.user_id }}</a>{% else %}—{% endif %}</td>
                         <td>{{ tx.amount }} {{ tx.currency|default:"RUB" }}</td>
                         <td>{{ tx.payment_system|default:"—" }}</td>
-                        <td>{{ tx.payment_id|default:"—" }}</td>
+                        <td>
+                            <a class="link-light link-underline-opacity-0" href="{% url 'admindashboardx:transaction_detail' tx_id=tx.id %}?return_to={{ request.get_full_path|urlencode }}">{{ tx.payment_id|default:"—" }}</a>
+                            {% if tx.payment_id %}
+                                <button type="button" class="btn btn-sm btn-outline-light admx-copy-btn"
+                                        data-copy-text="{{ tx.payment_id }}" title="Скопировать payment_id">⧉</button>
+                            {% endif %}
+                        </td>
                         <td>{{ tx.status|default:"—" }}</td>
                     </tr>
                 {% empty %}
@@ -57,19 +61,6 @@
                 </tbody>
             </table>
         </div>
-        <div class="card-footer d-flex justify-content-between align-items-center">
-            <small class="text-secondary">Всего на странице: {{ tx_page|length }}</small>
-            <div class="btn-group">
-                {% if tx_page.has_previous %}
-                    <a class="btn btn-sm btn-outline-light"
-                       href="?q={{ q }}&status={{ status }}&page={{ tx_page.previous_page_number }}">Назад</a>
-                {% endif %}
-                <button class="btn btn-sm btn-outline-light disabled">{{ tx_page.number }} / {{ tx_page.paginator.num_pages }}</button>
-                {% if tx_page.has_next %}
-                    <a class="btn btn-sm btn-outline-light"
-                       href="?q={{ q }}&status={{ status }}&page={{ tx_page.next_page_number }}">Вперед</a>
-                {% endif %}
-            </div>
-        </div>
+        {% include "admindashboardx/partials/pagination.html" with page_obj=tx_page page_qs=page_qs %}
     </div>
 {% endblock %}

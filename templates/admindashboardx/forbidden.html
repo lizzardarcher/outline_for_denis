@@ -1,0 +1,14 @@
+{% extends "admindashboardx/admipanelbase.html" %}
+
+{% block title %} · Доступ ограничен{% endblock %}
+
+{% block content %}
+    <div class="card admx-card">
+        <div class="card-body py-5 text-center">
+            <div class="display-6 mb-2">403</div>
+            <h2 class="h4 mb-3">Доступ ограничен</h2>
+            <p class="text-secondary mb-4">{{ forbidden_message|default:"У вас недостаточно прав для просмотра этой страницы." }}</p>
+            <a href="{% url 'admindashboardx:index' %}" class="btn btn-outline-light">На главную панель</a>
+        </div>
+    </div>
+{% endblock %}
