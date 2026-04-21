@@ -5,27 +5,51 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.messages.views import SuccessMessageMixin
-from django.db.models import Sum
+from django.db.models import Q, Sum
 from django.db.models.functions import TruncDate
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.utils import timezone
+from django.views import View
 from django.views.generic import TemplateView
 
 from apps.authentication.forms import DashboardPasswordChangeForm
 from bot.main.MarzbanAPI import MarzbanAPI
 from bot.models import VpnKey, Server, TelegramUser, Country, Prices, UserProfile, ReferralSettings, TelegramReferral, \
-    Transaction, Logging
+    Transaction, Logging, SiteNotification, SiteNotificationState
 
 KEY_LIMIT = settings.KEY_LIMIT
 class ProfileView(LoginRequiredMixin, SuccessMessageMixin, TemplateView):
     template_name = 'dashboard/index.html'
 
+    @staticmethod
+    def _active_notifications_qs():
+        now = timezone.now()
+        return SiteNotification.objects.filter(
+            is_active=True
+        ).filter(
+            Q(starts_at__isnull=True) | Q(starts_at__lte=now)
+        ).filter(
+            Q(expires_at__isnull=True) | Q(expires_at__gte=now)
+        ).order_by('-id')
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        tg_user = self.request.user.profile.telegram_user
+        notif_state, _ = SiteNotificationState.objects.get_or_create(user=tg_user)
+        notifications_qs = self._active_notifications_qs()
+        notifications = list(notifications_qs[:100])
+        last_seen_id = int(notif_state.last_seen_notification_id or 0)
+        unread_notifications = [n for n in notifications if n.id > last_seen_id]
+        notifications_with_state = [
+            {"obj": n, "is_unread": n.id > last_seen_id}
+            for n in notifications
+        ]
+
         context['servers'] = Server.objects.filter(is_active=True).values_list('country__name_for_app',
                                                                                flat=True).distinct()
         try:
-            context['vpn_key'] = VpnKey.objects.select_related('user').get(user=self.request.user.profile.telegram_user)
+            context['vpn_key'] = VpnKey.objects.select_related('user').get(user=tg_user)
         except VpnKey.DoesNotExist:
             ...
         context['total_users'] = TelegramUser.objects.count()
@@ -33,18 +57,18 @@ class ProfileView(LoginRequiredMixin, SuccessMessageMixin, TemplateView):
         context['subscription'] = Prices.objects.get(id=1)
         context['referral'] = ReferralSettings.objects.get(pk=1)
 
-        context['inv_1_lvl'] = TelegramReferral.objects.filter(referrer=self.request.user.profile.telegram_user, level=1).__len__()
-        context['inv_2_lvl'] = TelegramReferral.objects.filter(referrer=self.request.user.profile.telegram_user, level=2).__len__()
-        context['inv_3_lvl'] = TelegramReferral.objects.filter(referrer=self.request.user.profile.telegram_user, level=3).__len__()
-        context['inv_4_lvl'] = TelegramReferral.objects.filter(referrer=self.request.user.profile.telegram_user, level=4).__len__()
-        context['inv_5_lvl'] = TelegramReferral.objects.filter(referrer=self.request.user.profile.telegram_user, level=5).__len__()
+        context['inv_1_lvl'] = TelegramReferral.objects.filter(referrer=tg_user, level=1).__len__()
+        context['inv_2_lvl'] = TelegramReferral.objects.filter(referrer=tg_user, level=2).__len__()
+        context['inv_3_lvl'] = TelegramReferral.objects.filter(referrer=tg_user, level=3).__len__()
+        context['inv_4_lvl'] = TelegramReferral.objects.filter(referrer=tg_user, level=4).__len__()
+        context['inv_5_lvl'] = TelegramReferral.objects.filter(referrer=tg_user, level=5).__len__()
 
-        if self.request.user.profile.telegram_user.special_offer:
-            context['per_1'] = self.request.user.profile.telegram_user.special_offer.level_1_percentage
-            context['per_2'] = self.request.user.profile.telegram_user.special_offer.level_2_percentage
-            context['per_3'] = self.request.user.profile.telegram_user.special_offer.level_3_percentage
-            context['per_4'] = self.request.user.profile.telegram_user.special_offer.level_4_percentage
-            context['per_5'] = self.request.user.profile.telegram_user.special_offer.level_5_percentage
+        if tg_user.special_offer:
+            context['per_1'] = tg_user.special_offer.level_1_percentage
+            context['per_2'] = tg_user.special_offer.level_2_percentage
+            context['per_3'] = tg_user.special_offer.level_3_percentage
+            context['per_4'] = tg_user.special_offer.level_4_percentage
+            context['per_5'] = tg_user.special_offer.level_5_percentage
         else:
             context['per_1'] = ReferralSettings.objects.get(pk=1).level_1_percentage
             context['per_2'] = ReferralSettings.objects.get(pk=1).level_2_percentage
@@ -52,9 +76,37 @@ class ProfileView(LoginRequiredMixin, SuccessMessageMixin, TemplateView):
             context['per_4'] = ReferralSettings.objects.get(pk=1).level_4_percentage
             context['per_5'] = ReferralSettings.objects.get(pk=1).level_5_percentage
 
-        context['transactions'] = Transaction.objects.filter(user=self.request.user.profile.telegram_user).order_by('-timestamp')
+        context['transactions'] = Transaction.objects.filter(user=tg_user).order_by('-timestamp')
         context['dashboard_password_form'] = DashboardPasswordChangeForm(self.request.user)
+        context['notifications'] = notifications_with_state
+        context['last_seen_notification_id'] = last_seen_id
+        context['unread_notifications_count'] = len(unread_notifications)
+        context['latest_unread_notification'] = unread_notifications[0] if unread_notifications else None
+        context['open_section'] = (self.request.GET.get('section') or '').strip()
         return context
+
+class MarkNotificationReadView(LoginRequiredMixin, View):
+    def post(self, request, *args, **kwargs):
+        tg_user = request.user.profile.telegram_user
+        notification_id = int(kwargs.get('notification_id'))
+        now = timezone.now()
+        notification_exists = SiteNotification.objects.filter(
+            id=notification_id,
+            is_active=True
+        ).filter(
+            Q(starts_at__isnull=True) | Q(starts_at__lte=now)
+        ).filter(
+            Q(expires_at__isnull=True) | Q(expires_at__gte=now)
+        ).exists()
+        if not notification_exists:
+            return redirect('profile')
+
+        state, _ = SiteNotificationState.objects.get_or_create(user=tg_user)
+        if notification_id > state.last_seen_notification_id:
+            state.last_seen_notification_id = notification_id
+            state.save(update_fields=['last_seen_notification_id', 'updated_at'])
+
+        return redirect('/dashboard/profile/?section=notifications')
 
 class CancelSubscriptionView(LoginRequiredMixin, TemplateView):
 

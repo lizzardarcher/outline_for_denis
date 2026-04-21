@@ -250,6 +250,7 @@ class VpnKey(models.Model):
         verbose_name_plural = 'VPN Ключи'
 
 
+
 class Server(models.Model):
     hosting = models.CharField(max_length=1000, blank=True, null=True, verbose_name='Хостинг')
     ip_address = models.CharField(max_length=1000, blank=True, null=True, verbose_name='IP Address')
@@ -454,3 +455,42 @@ class TelegramMessage(models.Model):
         verbose_name = 'Сообщение Telegram'
         verbose_name_plural = 'Сообщения Telegram'
         ordering = ['-created_at']
+
+
+class SiteNotification(models.Model):
+    title = models.CharField(max_length=255, verbose_name='Заголовок')
+    message = models.TextField(verbose_name='Текст уведомления')
+    is_active = models.BooleanField(default=True, verbose_name='Активно')
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True, verbose_name='Создано')
+    starts_at = models.DateTimeField(blank=True, null=True, db_index=True, verbose_name='Показывать с')
+    expires_at = models.DateTimeField(blank=True, null=True, db_index=True, verbose_name='Показывать до')
+
+    class Meta:
+        verbose_name = 'Уведомление сайта'
+        verbose_name_plural = 'Уведомления сайта'
+        ordering = ['-id']
+
+    def __str__(self):
+        return f'#{self.id} {self.title}'
+
+
+class SiteNotificationState(models.Model):
+    user = models.OneToOneField(
+        TelegramUser,
+        on_delete=models.CASCADE,
+        related_name='site_notification_state',
+        verbose_name='Пользователь',
+    )
+    last_seen_notification_id = models.PositiveBigIntegerField(
+        default=0,
+        db_index=True,
+        verbose_name='ID последнего прочитанного уведомления',
+    )
+    updated_at = models.DateTimeField(auto_now=True, verbose_name='Обновлено')
+
+    class Meta:
+        verbose_name = 'Состояние уведомлений пользователя'
+        verbose_name_plural = 'Состояния уведомлений пользователей'
+
+    def __str__(self):
+        return f'{self.user} -> seen: {self.last_seen_notification_id}'

@@ -1,0 +1,46 @@
+<h4 class="mb-3">Уведомления</h4>
+
+
+{% if notifications %}
+    <div class="table-responsive">
+        <table class="table table-striped table-sm">
+            <thead>
+            <tr>
+                <th>Дата</th>
+                <th>Заголовок</th>
+                <th>Текст</th>
+                <th>Статус</th>
+                <th></th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for row in notifications %}
+                    <tr class="{% if row.is_unread %}table-danger-subtle{% endif %}">
+                        <td>{{ row.obj.created_at|date:"d.m.Y H:i" }}</td>
+                        <td>{{ row.obj.title }}</td>
+                        <td style="max-width: 560px;">{{ row.obj.message|linebreaksbr }}</td>
+                        <td>
+                            {% if row.is_unread %}
+                                <span class="badge text-bg-danger">Непрочитано</span>
+                            {% else %}
+                                <span class="badge text-bg-secondary">Прочитано</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-end">
+                            {% if row.is_unread %}
+                                <form method="post" action="{% url 'mark_notification_read' notification_id=row.obj.id %}">
+                                    {% csrf_token %}
+                                    <button class="btn btn-sm btn-outline-danger" type="submit">Прочитано</button>
+                                </form>
+                            {% endif %}
+                        </td>
+                    </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+{% else %}
+    <div class="alert alert-light border mb-0">
+        Уведомлений пока нет.
+    </div>
+{% endif %}

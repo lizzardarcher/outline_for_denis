@@ -3,6 +3,7 @@ import os
 from django.contrib import admin
 from django.contrib.auth.models import Group
 from django.db.models import Q, Sum
+from django.utils import timezone
 from django.utils.html import format_html
 from django_celery_beat.models import *
 from django_admin_inline_paginator.admin import TabularInlinePaginated
@@ -44,6 +45,7 @@ class BaseAdmin(admin.ModelAdmin):
 
     def has_change_permission(self, request, obj=None):
         return self.has_permission(request)
+
 
     def has_view_permission(self, request, obj=None):
         return self.has_permission(request)
@@ -733,6 +735,76 @@ class TelegramMessageAdmin(BaseAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False
+
+
+@admin.register(SiteNotification)
+class SiteNotificationAdmin(BaseAdmin):
+    list_display = ('id', 'title', 'is_active', 'created_at', 'starts_at', 'expires_at', 'unread_count', 'read_count')
+    list_display_links = ('id', 'title')
+    list_filter = ('is_active', 'created_at', 'starts_at', 'expires_at')
+    search_fields = ('title', 'message')
+    readonly_fields = ('created_at', 'read_users_preview', 'unread_users_preview')
+    fields = ('title', 'message', 'is_active', 'starts_at', 'expires_at', 'created_at', 'read_users_preview', 'unread_users_preview')
+
+    @admin.display(description='Не прочитали')
+    def unread_count(self, obj):
+        return TelegramUser.objects.filter(
+            Q(site_notification_state__last_seen_notification_id__lt=obj.id) |
+            Q(site_notification_state__isnull=True)
+        ).count()
+
+    @admin.display(description='Прочитали')
+    def read_count(self, obj):
+        return TelegramUser.objects.filter(site_notification_state__last_seen_notification_id__gte=obj.id).count()
+
+    @admin.display(description='Пользователи, прочитавшие (первые 100)')
+    def read_users_preview(self, obj):
+        users = TelegramUser.objects.filter(
+            site_notification_state__last_seen_notification_id__gte=obj.id
+        ).order_by('-site_notification_state__updated_at')[:100]
+        if not users:
+            return 'Нет данных'
+        items = ''.join(
+            f'<li>{u.user_id} @{u.username or ""} {u.first_name or ""} {u.last_name or ""}</li>'
+            for u in users
+        )
+        return format_html(f'<ul>{items}</ul>')
+
+    @admin.display(description='Пользователи, не прочитавшие (первые 100)')
+    def unread_users_preview(self, obj):
+        users = TelegramUser.objects.filter(
+            Q(site_notification_state__last_seen_notification_id__lt=obj.id) |
+            Q(site_notification_state__isnull=True)
+        ).order_by('-join_date')[:100]
+        if not users:
+            return 'Нет данных'
+        items = ''.join(
+            f'<li>{u.user_id} @{u.username or ""} {u.first_name or ""} {u.last_name or ""}</li>'
+            for u in users
+        )
+        return format_html(f'<ul>{items}</ul>')
+
+
+@admin.register(SiteNotificationState)
+class SiteNotificationStateAdmin(BaseAdmin):
+    list_display = ('user', 'last_seen_notification_id', 'updated_at', 'current_unread_count')
+    list_display_links = ('user',)
+    search_fields = ('user__user_id', 'user__username', 'user__first_name', 'user__last_name')
+    readonly_fields = ('updated_at',)
+    list_select_related = ('user',)
+
+    @admin.display(description='Текущих непрочитанных')
+    def current_unread_count(self, obj):
+        now = timezone.now()
+        return SiteNotification.objects.filter(
+            is_active=True
+        ).filter(
+            Q(starts_at__isnull=True) | Q(starts_at__lte=now)
+        ).filter(
+            Q(expires_at__isnull=True) | Q(expires_at__gte=now)
+        ).filter(
+            id__gt=obj.last_seen_notification_id
+        ).count()
 
 
 @admin.register(PeriodicTask)
