@@ -7,13 +7,14 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.messages.views import SuccessMessageMixin
 from django.db.models import Q, Sum
 from django.db.models.functions import TruncDate
-from django.http import JsonResponse
+from django.http import HttpResponseForbidden, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views import View
 from django.views.generic import TemplateView
 
 from apps.authentication.forms import DashboardPasswordChangeForm
+from apps.mtproxy.services import can_use_mtproxy, get_active_key, issue_or_get_key, reissue_key, revoke_all_user_keys
 from bot.main.MarzbanAPI import MarzbanAPI
 from bot.models import VpnKey, Server, TelegramUser, Country, Prices, UserProfile, ReferralSettings, TelegramReferral, \
     Transaction, Logging, SiteNotification, SiteNotificationState
@@ -83,7 +84,11 @@ class ProfileView(LoginRequiredMixin, SuccessMessageMixin, TemplateView):
         context['unread_notifications_count'] = len(unread_notifications)
         context['latest_unread_notification'] = unread_notifications[0] if unread_notifications else None
         context['open_section'] = (self.request.GET.get('section') or '').strip()
+        context['show_mtproxy'] = can_use_mtproxy(tg_user)
+        if context['show_mtproxy']:
+            context['mtproxy_key'] = get_active_key(tg_user)
         return context
+
 
 class MarkNotificationReadView(LoginRequiredMixin, View):
     def post(self, request, *args, **kwargs):
@@ -108,6 +113,31 @@ class MarkNotificationReadView(LoginRequiredMixin, View):
 
         return redirect('/dashboard/profile/?section=notifications')
 
+
+class ManageMtProxyView(LoginRequiredMixin, View):
+    def post(self, request, *args, **kwargs):
+        tg_user = request.user.profile.telegram_user
+        if not can_use_mtproxy(tg_user):
+            return HttpResponseForbidden("Недостаточно прав для MTProto Proxy.")
+
+        action = (request.POST.get("action") or "").strip()
+        if action == "reissue":
+            key = reissue_key(tg_user)
+            if key:
+                messages.success(request, "Новый MTProto ключ успешно создан.")
+            else:
+                messages.error(request, "Не удалось перевыдать ключ: нет доступных прокси-нод.")
+        else:
+            key, created = issue_or_get_key(tg_user)
+            if key and created:
+                messages.success(request, "MTProto ключ успешно создан.")
+            elif key:
+                messages.info(request, "У вас уже есть активный MTProto ключ.")
+            else:
+                messages.error(request, "Сейчас нет доступных прокси-нод.")
+
+        return redirect("/dashboard/profile/?section=tg-proxy")
+
 class CancelSubscriptionView(LoginRequiredMixin, TemplateView):
 
     def get(self, request, *args, **kwargs):
@@ -116,6 +146,7 @@ class CancelSubscriptionView(LoginRequiredMixin, TemplateView):
         user.robokassa_recurring_parent_inv_id = ''
         user.permission_revoked = True
         user.save()
+        revoke_all_user_keys(user, reason="manual_cancel_site")
         Logging.objects.create(
             log_level=" INFO",
             message=f'[WEB] [Отмена подписки]',

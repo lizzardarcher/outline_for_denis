@@ -1,0 +1,87 @@
+<div class="mb-4">
+
+    <div class="card-body">
+        <ul class="list-group list-group-flush">
+            <li class="list-group-item d-flex flex-column flex-lg-row align-items-left justify-content-between mb-3">
+                <div class="d-flex align-items-left mb-2 mb-lg-0">
+                    <i class="fa fa-paper-plane mr-3 fa-2x" style="color: #8b0b24"></i>
+                    <span>MTProto proxy для Telegram</span>
+                </div>
+                {% if mtproxy_key %}
+                    <small id="tgproxy-key"
+                           class="d-none d-lg-block text-muted bg-danger-subtle rounded p-2"
+                           style="cursor: pointer;"
+                           onclick="copyTgProxy('{{ mtproxy_key.tg_proxy_link }}')">
+                        {{ mtproxy_key.tg_proxy_link|truncatechars:75 }}
+                    </small>
+                    <small id="tgproxy-key-sm"
+                           class="d-sm-block d-md-none text-muted bg-danger-subtle rounded p-2 text-center"
+                           style="cursor: pointer;"
+                           onclick="copyTgProxySm('{{ mtproxy_key.tg_proxy_link }}')">
+                        Нажми, чтобы скопировать MTProto ключ
+                    </small>
+                {% else %}
+                    <small class="text-muted">Ключ пока не выдан.</small>
+                {% endif %}
+            </li>
+
+            <li class="list-group-item d-flex flex-column flex-lg-row align-items-left justify-content-between">
+                <div class="mb-2 mb-lg-0">
+                    <i class="fa fa-info-circle mr-3 fa-2x" style="color: #8b0b24"></i>
+                    <span>Доступ включен в действующую подписку VPN.</span><br>
+                    <small class="text-muted">Поддержка и трафик ограничиваются политиками anti-abuse.</small>
+                </div>
+                <div class="d-flex flex-column gap-2">
+                    <form action="{% url 'manage_mtproxy' %}" method="post" class="mb-2">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-outline-danger btn-sm">Получить/проверить ключ</button>
+                    </form>
+                    <form action="{% url 'manage_mtproxy' %}" method="post">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="reissue">
+                        <button type="submit" class="btn btn-outline-warning btn-sm">Перевыдать ключ</button>
+                    </form>
+                </div>
+            </li>
+
+            {% if mtproxy_key %}
+                <li class="list-group-item">
+                    <div class="mb-2"><strong>Ссылка для Telegram:</strong></div>
+                    <code>{{ mtproxy_key.tg_proxy_link }}</code>
+                    <div class="mt-2"><strong>Web-ссылка:</strong></div>
+                    <a href="{{ mtproxy_key.web_proxy_link }}" target="_blank">{{ mtproxy_key.web_proxy_link }}</a>
+                </li>
+            {% endif %}
+        </ul>
+    </div>
+</div>
+
+<script>
+    function copyTgProxy(text) {
+        navigator.clipboard.writeText(text)
+            .then(() => {
+                const el = document.getElementById('tgproxy-key');
+                if (!el) return;
+                const old = el.innerHTML;
+                el.innerHTML = "Скопировано!";
+                setTimeout(() => {
+                    el.innerHTML = old;
+                }, 1500);
+            })
+            .catch(() => alert("Не удалось скопировать ключ"));
+    }
+
+    function copyTgProxySm(text) {
+        navigator.clipboard.writeText(text)
+            .then(() => {
+                const el = document.getElementById('tgproxy-key-sm');
+                if (!el) return;
+                const old = el.innerHTML;
+                el.innerHTML = "Скопировано!";
+                setTimeout(() => {
+                    el.innerHTML = old;
+                }, 1500);
+            })
+            .catch(() => alert("Не удалось скопировать ключ"));
+    }
+</script>

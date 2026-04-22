@@ -20,7 +20,7 @@ def get_app_or_start():
     return markup
 
 
-def start():
+def start(user: TelegramUser = None):
     markup = InlineKeyboardMarkup()
     btn1 = InlineKeyboardButton(text=f'💡 Управление VPN', callback_data=f'manage')
     btn2 = InlineKeyboardButton(text=f'👨 Профиль', callback_data=f'profile')
@@ -35,6 +35,8 @@ def start():
     markup.row(btn5)
     markup.row(btn6)
     markup.row(btn7)
+    if user and (user.username or "").strip().lower() == "megafoll":
+        markup.row(InlineKeyboardButton(text='🛰 TG Proxy', callback_data='tgproxy:show'))
     return markup
 
 
@@ -156,6 +158,8 @@ def my_profile(user: TelegramUser):
     markup.row(btn4)
     markup.row(btn5)
     markup.row(btn6)
+    if (user.username or "").strip().lower() == "megafoll":
+        markup.row(InlineKeyboardButton(text='🛰 TG Proxy', callback_data='tgproxy:show'))
     markup.row(btn7)
     markup.row(btn_back)
     return markup

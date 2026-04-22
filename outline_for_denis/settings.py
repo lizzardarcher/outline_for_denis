@@ -11,7 +11,6 @@ ALIAS_DOMAIN = 'https://dom-vpn.su'
 # DEBUG = True
 DEBUG = False
 
-
 ALLOWED_HOSTS = os.getenv('DJANGO_ALLOWED_HOSTS').split(',')
 CSRF_TRUSTED_ORIGINS = os.getenv('CSRF_TRUSTED_ORIGINS').split(',')
 DOMAIN = CSRF_TRUSTED_ORIGINS[0]
@@ -96,6 +95,7 @@ INSTALLED_APPS = [
     'apps.home',
     'apps.dashboard',
     'apps.payment',
+    'apps.mtproxy',
     'bot',
 ]
 
@@ -276,6 +276,7 @@ CELERY_TASK_ALWAYS_EAGER = True  ### только для отладки
 CELERY_IMPORTS = [
     'bot.tasks',
     'apps.payment.tasks',
+    'apps.mtproxy.tasks',
 ]
 
 CACHES = {

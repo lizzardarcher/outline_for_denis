@@ -8,6 +8,7 @@ from django.contrib.admin.models import LogEntry
 from telebot import TeleBot
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 
+from apps.mtproxy.tasks import revoke_mtproxy_keys_for_user_task
 from bot.main.utils import msg
 from bot.main.MarzbanAPI import MarzbanAPI
 from bot.models import Logging, Transaction, IncomeInfo, TelegramUser, TelegramBot, VpnKey, TelegramMessage
@@ -66,6 +67,7 @@ def update_user_subscription_status():
         try:
             user.subscription_status = False
             user.save()
+            revoke_mtproxy_keys_for_user_task.delay(user.user_id, reason="subscription_expired")
             try:
                 bot.send_message(chat_id=user.user_id, text=msg.subscription_expired)
             except:
@@ -87,6 +89,7 @@ def update_user_subscription_status():
             Logging.objects.create(log_level='FATAL',
                                    message=f'[BOT] [Ошибка при удалении ключа:\n{traceback.format_exc()}]',
                                    datetime=timezone.now())
+
 
 
 @shared_task

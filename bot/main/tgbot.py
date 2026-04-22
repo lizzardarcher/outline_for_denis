@@ -27,6 +27,7 @@ from bot.main.utils import msg
 from bot.main.utils import markup
 
 from bot.main.MarzbanAPI import MarzbanAPI
+from apps.mtproxy.services import can_use_mtproxy, issue_or_get_key, reissue_key, revoke_all_user_keys
 
 from bot.main.utils.utils import return_matches, robokassa_md5
 
@@ -434,6 +435,7 @@ async def menu(message):
         'price_6_month': Prices.objects.get(pk=1).price_3,
         'price_1_year': Prices.objects.get(pk=1).price_4,
     }
+    tg_user = TelegramUser.objects.filter(user_id=message.chat.id).first()
     await bot.send_message(chat_id=message.chat.id,
                            text=msg.start_message.format(message.from_user.first_name,
                            prices['price_3_days'],
@@ -441,7 +443,7 @@ async def menu(message):
                            prices['price_3_month'],
                            prices['price_6_month'],
                            prices['price_1_year'],),
-                           reply_markup=markup.start())
+                           reply_markup=markup.start(user=tg_user))
 
 
 @bot.message_handler(content_types=['text'])
@@ -507,7 +509,7 @@ async def callback_query_handlers(call):
 
                 elif 'app_installed' in data:
                     await bot.send_message(chat_id=call.message.chat.id, text=msg.app_installed,
-                                           reply_markup=markup.start())
+                                           reply_markup=markup.start(user=user))
                     # if user.subscription_status and not VpnKey.objects.filter(user=user):
                     #     server = random.choice(Server.objects.filter(is_active=True, keys_generated__lte=KEY_LIMIT))
                     #     key = await create_new_key(server, user)
@@ -1008,7 +1010,8 @@ async def callback_query_handlers(call):
                                                    reply_markup=markup.cancel_subscription())
                         else:
                             await bot.send_message(call.message.chat.id, text=msg.cancel_subscription_error,
-                                                   reply_markup=markup.start())
+                                                   reply_markup=markup.start(user=user))
+
 
                     elif 'cancelled_sbs' in data:
                         # Подтверждение отмены подписки
@@ -1019,8 +1022,9 @@ async def callback_query_handlers(call):
                         user.robokassa_recurring_parent_inv_id = ''
                         user.permission_revoked = True
                         user.save()
+                        revoke_all_user_keys(user, reason="manual_cancel_bot")
                         await bot.send_message(call.message.chat.id, text=msg.cancel_subscription_success,
-                                               reply_markup=markup.start())
+                                               reply_markup=markup.start(user=user))
 
                     elif 'site_access' in data:
                         lg.objects.create(log_level='INFO', message=f'[BOT] [site_access 2nd]', datetime=datetime.now(),
@@ -1112,6 +1116,49 @@ async def callback_query_handlers(call):
                                            text=msg.profile.format(user_id, sub, active, income),
                                            reply_markup=markup.my_profile(user=user))
 
+                elif 'tgproxy' in data:
+                    if not can_use_mtproxy(user):
+                        await bot.send_message(
+                            call.message.chat.id,
+                            text='Раздел недоступен.',
+                            reply_markup=markup.start(user=user),
+                        )
+                    else:
+                        if 'reissue' in data:
+                            key = reissue_key(user)
+                            status_text = 'Ключ перевыпущен.' if key else 'Нет доступных прокси-нод.'
+                        else:
+                            key, created = issue_or_get_key(user)
+                            if key and created:
+                                status_text = 'Новый ключ создан.'
+                            elif key:
+                                status_text = 'У вас уже есть активный ключ.'
+                            else:
+                                status_text = 'Нет доступных прокси-нод.'
+
+                        if key:
+                            proxy_markup = InlineKeyboardMarkup()
+                            proxy_markup.add(
+                                InlineKeyboardButton(text='🔁 Перевыдать ключ', callback_data='tgproxy:reissue')
+                            )
+                            proxy_markup.add(InlineKeyboardButton(text='🔙 Назад', callback_data='back'))
+                            await bot.send_message(
+                                call.message.chat.id,
+                                text=(
+                                    f"🛰 MTProto Proxy\n\n"
+                                    f"{status_text}\n\n"
+                                    f"Ссылка для Telegram:\n<code>{key.tg_proxy_link}</code>\n\n"
+                                    f"Web-ссылка:\n{key.web_proxy_link}"
+                                ),
+                                reply_markup=proxy_markup,
+                            )
+                        else:
+                            await bot.send_message(
+                                call.message.chat.id,
+                                text=status_text,
+                                reply_markup=markup.start(user=user),
+                            )
+
 
 
                 elif 'referral' in data:
@@ -1201,7 +1248,7 @@ async def callback_query_handlers(call):
                         await bot.send_message(call.message.chat.id, text="Произошла ошибка. Попробуйте позже.")
 
                 elif 'help' in data:
-                    await bot.send_message(call.message.chat.id, text=msg.help_message, reply_markup=markup.start(),
+                    await bot.send_message(call.message.chat.id, text=msg.help_message, reply_markup=markup.start(user=user),
                                            parse_mode='HTML')
 
                 elif 'popup_help' in data:
@@ -1213,7 +1260,7 @@ async def callback_query_handlers(call):
 
                 elif 'back' in data:
                     await bot.send_message(chat_id=call.message.chat.id, text=msg.main_menu_choice,
-                                           reply_markup=markup.start())
+                                           reply_markup=markup.start(user=user))
         except:
             ...
 

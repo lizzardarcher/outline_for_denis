@@ -3,6 +3,7 @@
 
 {% block title %}Личный кабинет DomVPN{% endblock title %}
 
+
 {% block content %}
     <div class="hero_area">
         <div class="bg-dark">
@@ -57,6 +58,13 @@
                                     {% endif %}
                                 </a>
                             </li>
+                            {% if show_mtproxy %}
+                                <li class="nav-item">
+                                    <a class="nav-link" href="#" data-target="tg-proxy">
+                                        TG Proxy
+                                    </a>
+                                </li>
+                            {% endif %}
                             <li class="nav-item">
                                 <a class="nav-link" href="#" data-target="instruction">
                                     Инструкция
@@ -129,6 +137,11 @@
                     <div id="notifications" class="content-section">
                         {% include 'dashboard/includes/notifications.html' %}
                     </div>
+                    {% if show_mtproxy %}
+                        <div id="tg-proxy" class="content-section">
+                            {% include 'dashboard/includes/tg-proxy.html' %}
+                        </div>
+                    {% endif %}
                     <div id="bot-info" class="content-section">
                         {% include 'dashboard/includes/bot-info.html' %}
                     </div>
