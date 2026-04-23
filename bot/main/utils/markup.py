@@ -11,7 +11,6 @@ btn_back = InlineKeyboardButton(text=f'🔙 Назад', callback_data=f'back')
 DOMAIN = settings.DOMAIN
 ALIAS_DOMAIN = settings.ALIAS_DOMAIN
 
-
 def get_app_or_start():
     markup = InlineKeyboardMarkup()
     markup.add(InlineKeyboardButton(text=f'📲 Скачать приложение', callback_data=f'download_app'))

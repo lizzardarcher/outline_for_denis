@@ -2,6 +2,7 @@ import traceback
 from datetime import timedelta, datetime
 from decimal import Decimal
 import hashlib
+import xml.etree.ElementTree as ET
 
 import requests
 from celery import shared_task
@@ -13,6 +14,7 @@ from bot.models import TelegramUser, Prices, Logging, Transaction, IncomeInfo, T
     ReferralTransaction
 
 YOOKASSA_API_BASE = "https://api.yookassa.ru/v3/payments"
+
 
 
 ### YooKassa
@@ -783,6 +785,7 @@ def ukassa_check_pending_site(self):
 ### RoboKassa
 
 ROBOKASSA_RECURRING_URL = 'https://auth.robokassa.ru/Merchant/Recurring'
+ROBOKASSA_OPSTATE_URL = 'https://auth.robokassa.ru/Merchant/WebService/Service.asmx/OpState'
 
 
 def robokassa_md5(s: str) -> str:
@@ -812,6 +815,241 @@ def post_robokassa_bot_recurring_invoice(*, merchant_login: str, password_1: str
     text = (resp.text or '').strip()
     ok = resp.ok and text.upper().startswith('OK')
     return ok, text
+
+
+def _fetch_robokassa_payment_info(inv_id: str, merchant_login: str, password_2: str):
+    signature = robokassa_md5(f"{merchant_login}:{inv_id}:{password_2}")
+    params = {
+        "MerchantLogin": merchant_login,
+        "InvoiceID": inv_id,
+        "Signature": signature,
+    }
+    try:
+        resp = requests.get(ROBOKASSA_OPSTATE_URL, params=params, timeout=15)
+        resp.raise_for_status()
+        root = ET.fromstring(resp.text)
+        result = {}
+        for child in root:
+            key = child.tag.split('}')[-1]
+            result[key] = child.text
+        return result
+    except Exception:
+        return None
+
+
+def _resolve_subscription_days(amount_value: Decimal) -> int:
+    prices = Prices.objects.get(pk=1)
+    amount_int = int(amount_value)
+    if amount_int == prices.price_1:
+        return 31
+    if amount_int == prices.price_2:
+        return 93
+    if amount_int == prices.price_3:
+        return 184
+    if amount_int == prices.price_4:
+        return 366
+    if amount_int == prices.price_5:
+        return 3
+    return 0
+
+
+def _apply_robokassa_success(transaction: Transaction, amount_value: Decimal, source_label: str,
+                             merchant_login: str, password_2: str):
+    if transaction.status == 'succeeded':
+        return
+
+    telegram_user = transaction.user
+    if not telegram_user:
+        Logging.objects.create(
+            log_level="WARNING",
+            message=f'[{source_label}] [pending-check] У транзакции id={transaction.id} нет пользователя',
+            datetime=datetime.now(),
+        )
+        return
+
+    transaction.status = 'succeeded'
+    transaction.paid = True
+    transaction.amount = amount_value
+    transaction.currency = transaction.currency or 'RUB'
+
+    payment_info = _fetch_robokassa_payment_info(
+        inv_id=str(transaction.robokassa_invoice_id or transaction.id),
+        merchant_login=merchant_login,
+        password_2=password_2,
+    )
+    robox_id = (payment_info or {}).get("RoboxID") or (payment_info or {}).get("PaymentID") or \
+               (payment_info or {}).get("TransactionID") or (payment_info or {}).get("ID")
+    if robox_id:
+        transaction.payment_id = str(robox_id)
+    elif not transaction.payment_id:
+        transaction.payment_id = f"ROBOX_INV_{transaction.robokassa_invoice_id or transaction.id}"
+
+    transaction.robokassa_invoice_id = transaction.robokassa_invoice_id or str(transaction.id)
+    transaction.save()
+
+    days = _resolve_subscription_days(amount_value)
+    if telegram_user.subscription_status:
+        telegram_user.subscription_expiration = telegram_user.subscription_expiration + timedelta(days=days)
+        telegram_user.permission_revoked = False
+    else:
+        telegram_user.subscription_status = True
+        telegram_user.subscription_expiration = datetime.now() + timedelta(days=days)
+        telegram_user.permission_revoked = False
+
+    if transaction.robokassa_is_recurring_parent and not (telegram_user.robokassa_recurring_parent_inv_id or '').strip():
+        telegram_user.robokassa_recurring_parent_inv_id = str(transaction.robokassa_invoice_id or transaction.id)
+    telegram_user.save()
+
+    referral_percentages = {
+        1: ReferralSettings.objects.get(pk=1).level_1_percentage,
+        2: ReferralSettings.objects.get(pk=1).level_2_percentage,
+        3: ReferralSettings.objects.get(pk=1).level_3_percentage,
+        4: ReferralSettings.objects.get(pk=1).level_4_percentage,
+        5: ReferralSettings.objects.get(pk=1).level_5_percentage,
+    }
+    referred_list = TelegramReferral.objects.filter(referred=telegram_user).select_related('referrer')
+    if referred_list:
+        user_ids_to_pay = [r.referrer.user_id for r in referred_list]
+        users_to_pay = {
+            u.user_id: u for u in TelegramUser.objects.filter(user_id__in=user_ids_to_pay)
+        }
+        for r in referred_list:
+            level = r.level
+            user_to_pay = users_to_pay.get(r.referrer.user_id)
+            if not user_to_pay:
+                continue
+            percent = referral_percentages.get(level)
+            if user_to_pay.special_offer:
+                referral_percentages_2 = {
+                    1: user_to_pay.special_offer.level_1_percentage,
+                    2: user_to_pay.special_offer.level_2_percentage,
+                    3: user_to_pay.special_offer.level_3_percentage,
+                    4: user_to_pay.special_offer.level_4_percentage,
+                    5: user_to_pay.special_offer.level_5_percentage,
+                }
+                percent = referral_percentages_2.get(level)
+            if percent:
+                user_to_pay.income = Decimal(user_to_pay.income) + (Decimal(amount_value) * Decimal(percent) / 100)
+                user_to_pay.save()
+                ReferralTransaction.objects.create(
+                    referral=r,
+                    amount=Decimal(amount_value) * Decimal(percent) / 100,
+                    transaction=transaction,
+                )
+
+    Logging.objects.create(
+        log_level="SUCCESS",
+        message=f'[{source_label}] [pending-check] Оплата подтверждена InvId={transaction.robokassa_invoice_id or transaction.id}',
+        datetime=datetime.now(),
+        user=telegram_user,
+    )
+
+
+
+@shared_task(bind=True, name="robokassa_check_pending_bot")
+def robokassa_check_pending_bot(self):
+    merchant_login = getattr(settings, "ROBOKASSA_MERCHANT_LOGIN_BOT", None)
+    password_2 = getattr(settings, "ROBOKASSA_PASSWORD_2_BOT", None)
+    if not merchant_login or not password_2:
+        Logging.objects.create(
+            log_level="DANGER",
+            message='[BOT] ROBOKASSA credentials not configured for pending check',
+            datetime=datetime.now(),
+        )
+        return
+
+    pending_qs = Transaction.objects.filter(
+        status="pending",
+        paid=False,
+        payment_system='RoboKassaBot',
+        timestamp__gte=datetime.now() - timedelta(days=3),
+    ).select_related('user')
+
+    for transaction in pending_qs:
+        try:
+            inv_id = str(transaction.robokassa_invoice_id or transaction.id)
+            payment_info = _fetch_robokassa_payment_info(inv_id, merchant_login, password_2)
+            if not payment_info:
+                continue
+            state = str(payment_info.get('State') or '').strip()
+            if state == '5':
+                _apply_robokassa_success(
+                    transaction=transaction,
+                    amount_value=transaction.amount,
+                    source_label='BOT/ROBO',
+                    merchant_login=merchant_login,
+                    password_2=password_2,
+                )
+            elif state in {'3', '10'}:
+                transaction.status = 'canceled'
+                transaction.paid = False
+                transaction.save(update_fields=['status', 'paid'])
+                Logging.objects.create(
+                    log_level="WARNING",
+                    message=f'[BOT/ROBO] [pending-check] InvId={inv_id} завершён неуспешно, state={state}',
+                    datetime=datetime.now(),
+                    user=transaction.user,
+                )
+        except Exception:
+            Logging.objects.create(
+                log_level="DANGER",
+                message=f'[BOT/ROBO] [pending-check] Ошибка для tx={transaction.id}: {traceback.format_exc()}',
+                datetime=datetime.now(),
+                user=transaction.user if getattr(transaction, "user", None) else None,
+            )
+
+
+@shared_task(bind=True, name="robokassa_check_pending_site")
+def robokassa_check_pending_site(self):
+    merchant_login = getattr(settings, "ROBOKASSA_MERCHANT_LOGIN_SITE", None)
+    password_2 = getattr(settings, "ROBOKASSA_PASSWORD_2_SITE", None)
+    if not merchant_login or not password_2:
+        Logging.objects.create(
+            log_level="DANGER",
+            message='[SITE] ROBOKASSA credentials not configured for pending check',
+            datetime=datetime.now(),
+        )
+        return
+
+    pending_qs = Transaction.objects.filter(
+        status="pending",
+        paid=False,
+        payment_system='RoboKassaSite',
+        timestamp__gte=datetime.now() - timedelta(days=3),
+    ).select_related('user')
+
+    for transaction in pending_qs:
+        try:
+            inv_id = str(transaction.robokassa_invoice_id or transaction.id)
+            payment_info = _fetch_robokassa_payment_info(inv_id, merchant_login, password_2)
+            if not payment_info:
+                continue
+            state = str(payment_info.get('State') or '').strip()
+            if state == '5':
+                _apply_robokassa_success(
+                    transaction=transaction,
+                    amount_value=transaction.amount,
+                    source_label='SITE/ROBO',
+                    merchant_login=merchant_login,
+                    password_2=password_2,
+                )
+            elif state in {'3', '10'}:
+                transaction.status = 'canceled'
+                transaction.paid = False
+                transaction.save(update_fields=['status', 'paid'])
+                Logging.objects.create(
+                    log_level="WARNING",
+                    message=f'[SITE/ROBO] [pending-check] InvId={inv_id} завершён неуспешно, state={state}',
+                    datetime=datetime.now(),
+                    user=transaction.user,
+                )
+        except Exception:
+            Logging.objects.create(
+                log_level="DANGER",
+                message=f'[SITE/ROBO] [pending-check] Ошибка для tx={transaction.id}: {traceback.format_exc()}',
+                datetime=datetime.now(),
+                user=transaction.user if getattr(transaction, "user", None) else None,
+            )
 
 
 @shared_task

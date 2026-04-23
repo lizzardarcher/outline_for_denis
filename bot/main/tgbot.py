@@ -1002,7 +1002,6 @@ async def callback_query_handlers(call):
                                     f"Произошла ошибка при оформлении подписки через CryptoBot. Попробуйте позже. {e}",
                                 )
 
-
                     elif 'cancel_subscription' in data:
                         # Отмена подписки
                         if user.subscription_status:

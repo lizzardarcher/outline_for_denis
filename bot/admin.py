@@ -103,6 +103,7 @@ class PredefinedTransactionKeywordFilter(admin.SimpleListFilter):
     KEYWORDS = (
         ("YooKassaSite", "Юкасса Сайт"),
         ("RoboKassaBot", "Робокасса Бот"),
+        ("RoboKassaSite", "Робокасса Сайт"),
         ("YooKassaBot", "Юкасса Бот"),
     )
 
