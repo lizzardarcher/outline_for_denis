@@ -3,12 +3,30 @@
 {% block title %} · Сервер {{ server.id }}{% endblock %}
 
 {% block content %}
+    {% if ops == "created" %}
+        <div class="alert alert-success">Сервер успешно создан.</div>
+    {% elif ops == "updated" %}
+        <div class="alert alert-success">Изменения сервера сохранены.</div>
+    {% elif ops == "init_started" %}
+        <div class="alert alert-info">Инициализация сервера запущена в фоне.</div>
+    {% endif %}
+
     <div class="card admx-card mb-3">
         {% include "admindashboardx/partials/detail_header.html" with header_title="Сервер" current_label=server.hosting|default:server.ip_address section_url=section_url section_label=section_label back_url=back_url %}
         <div class="card-body">
             <div class="mb-3 d-flex flex-wrap gap-2">
                 <a class="btn btn-sm btn-outline-light" href="{% url 'admindashboardx:keys' %}?q={{ server.hosting|default:server.ip_address }}">Ключи по серверу</a>
                 <a class="btn btn-sm btn-outline-light" href="{% url 'admindashboardx:servers' %}?q={{ server.ip_address }}">Поиск этого сервера</a>
+                <a class="btn btn-sm btn-warning" href="{% url 'admindashboardx:server_update' server_id=server.id %}">Редактировать</a>
+                <form method="post" action="{% url 'admindashboardx:server_init' server_id=server.id %}" class="d-inline">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-sm btn-info">Инициализировать (delay)</button>
+                </form>
+                <form method="post" action="{% url 'admindashboardx:server_delete' server_id=server.id %}" class="d-inline"
+                      onsubmit="return confirm('Удалить сервер #{{ server.id }}? Это действие необратимо.');">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-sm btn-danger">Удалить</button>
+                </form>
                 {% if server.ip_address and not is_support %}
                     <button type="button" class="btn btn-sm btn-outline-light admx-copy-btn"
                             data-copy-text="{{ server.ip_address }}" title="Скопировать IP">Скопировать IP</button>

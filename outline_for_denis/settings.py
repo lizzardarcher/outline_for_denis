@@ -277,6 +277,7 @@ CELERY_IMPORTS = [
     'bot.tasks',
     'apps.payment.tasks',
     'apps.mtproxy.tasks',
+    'apps.admindashboardx.tasks',
 ]
 
 CACHES = {

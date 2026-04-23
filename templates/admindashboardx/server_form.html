@@ -1,0 +1,68 @@
+{% extends "admindashboardx/admipanelbase.html" %}
+
+{% block title %} · {{ form_title }}{% endblock %}
+
+{% block content %}
+    <div class="card admx-card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span>{{ form_title }}</span>
+            <a class="btn btn-sm btn-outline-light" href="{{ back_url }}">Назад</a>
+        </div>
+        <div class="card-body">
+            <form method="post" class="row g-3">
+                {% csrf_token %}
+                <div class="col-md-6">
+                    <label class="form-label">Хостинг</label>
+                    {{ form.hosting }}
+                    {% if form.hosting.errors %}<div class="text-danger small">{{ form.hosting.errors|join:", " }}</div>{% endif %}
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">IP Address</label>
+                    {{ form.ip_address }}
+                    {% if form.ip_address.errors %}<div class="text-danger small">{{ form.ip_address.errors|join:", " }}</div>{% endif %}
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Пользователь SSH</label>
+                    {{ form.user }}
+                    {% if form.user.errors %}<div class="text-danger small">{{ form.user.errors|join:", " }}</div>{% endif %}
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Пароль SSH</label>
+                    {{ form.password }}
+                    {% if form.password.errors %}<div class="text-danger small">{{ form.password.errors|join:", " }}</div>{% endif %}
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Страна</label>
+                    {{ form.country }}
+                    {% if form.country.errors %}<div class="text-danger small">{{ form.country.errors|join:", " }}</div>{% endif %}
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Цена аренды в месяц</label>
+                    {{ form.rental_price }}
+                    {% if form.rental_price.errors %}<div class="text-danger small">{{ form.rental_price.errors|join:", " }}</div>{% endif %}
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Ключей сгенерировано</label>
+                    {{ form.keys_generated }}
+                    {% if form.keys_generated.errors %}<div class="text-danger small">{{ form.keys_generated.errors|join:", " }}</div>{% endif %}
+                </div>
+                <div class="col-md-4 d-flex align-items-end">
+                    <div class="form-check">
+                        {{ form.is_active }}
+                        <label class="form-check-label">Активен</label>
+                    </div>
+                    {% if form.is_active.errors %}<div class="text-danger small">{{ form.is_active.errors|join:", " }}</div>{% endif %}
+                </div>
+
+                {% if form.non_field_errors %}
+                    <div class="col-12"><div class="alert alert-danger mb-0">{{ form.non_field_errors|join:", " }}</div></div>
+                {% endif %}
+
+                <div class="col-12 d-flex gap-2 justify-content-end">
+                    <a class="btn btn-outline-light" href="{{ back_url }}">Отмена</a>
+                    <button type="submit" class="btn btn-primary">{{ submit_label }}</button>
+                </div>
+            </form>
+        </div>
+    </div>
+{% endblock %}

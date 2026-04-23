@@ -3,14 +3,17 @@ from decimal import Decimal
 
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.conf import settings
+from django import forms
 from django.core.paginator import Paginator
 from django.db.models import Q, Sum
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
+from django.views import View
 from django.views.generic import TemplateView
 
 from bot.models import (
+    Country,
     Logging,
     ReferralTransaction,
     Server,
@@ -21,6 +24,35 @@ from bot.models import (
     VpnKey,
     WithdrawalRequest,
 )
+from .tasks import initialize_server_task
+
+
+class ServerForm(forms.ModelForm):
+    class Meta:
+        model = Server
+        fields = (
+            "hosting",
+            "ip_address",
+            "user",
+            "password",
+            "rental_price",
+            "keys_generated",
+            "is_active",
+            "country",
+        )
+        widgets = {
+            "password": forms.PasswordInput(render_value=True, attrs={"class": "form-control"}),
+            "is_active": forms.CheckboxInput(attrs={"class": "form-check-input"}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for name, field in self.fields.items():
+            if name in ("is_active",):
+                continue
+            css = field.widget.attrs.get("class", "")
+            field.widget.attrs["class"] = f"{css} form-control".strip()
+        self.fields["country"].queryset = Country.objects.filter(is_active=True).order_by("name_for_app", "name")
 
 
 class DashboardBaseView(LoginRequiredMixin, TemplateView):
@@ -322,6 +354,106 @@ class ServersListView(DashboardBaseView):
         return context
 
 
+class ServerCreateView(DashboardBaseView):
+    template_name = "admindashboardx/server_form.html"
+    page_title = "AdminDashboardX · Новый сервер"
+    page_key = "servers"
+
+    def dispatch(self, request, *args, **kwargs):
+        if self._is_support():
+            return self._forbidden_response()
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        form = kwargs.get("form") or ServerForm()
+        context.update(
+            {
+                **self._base_context(),
+                "form": form,
+                "form_title": "Создать сервер",
+                "submit_label": "Создать",
+                "back_url": reverse("admindashboardx:servers"),
+            }
+        )
+        return context
+
+    def post(self, request, *args, **kwargs):
+        form = ServerForm(request.POST)
+        if form.is_valid():
+            server = form.save()
+            return redirect(reverse("admindashboardx:server_detail", kwargs={"server_id": server.id}) + "?ops=created")
+        return self.render_to_response(self.get_context_data(form=form))
+
+
+class ServerUpdateView(DashboardBaseView):
+    template_name = "admindashboardx/server_form.html"
+    page_title = "AdminDashboardX · Редактирование сервера"
+    page_key = "servers"
+
+    def dispatch(self, request, *args, **kwargs):
+        if self._is_support():
+            return self._forbidden_response()
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_server(self):
+        return get_object_or_404(Server, id=self.kwargs.get("server_id"))
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        server = kwargs.get("server") or self.get_server()
+        form = kwargs.get("form") or ServerForm(instance=server)
+        context.update(
+            {
+                **self._base_context(),
+                "server": server,
+                "form": form,
+                "form_title": f"Редактировать сервер #{server.id}",
+                "submit_label": "Сохранить",
+                "back_url": reverse("admindashboardx:server_detail", kwargs={"server_id": server.id}),
+            }
+        )
+        return context
+
+    def post(self, request, *args, **kwargs):
+        server = self.get_server()
+        form = ServerForm(request.POST, instance=server)
+        if form.is_valid():
+            form.save()
+            return redirect(reverse("admindashboardx:server_detail", kwargs={"server_id": server.id}) + "?ops=updated")
+        return self.render_to_response(self.get_context_data(server=server, form=form))
+
+
+class ServerDeleteView(DashboardBaseView, View):
+    page_title = "AdminDashboardX · Удаление сервера"
+    page_key = "servers"
+
+    def dispatch(self, request, *args, **kwargs):
+        if self._is_support():
+            return self._forbidden_response()
+        return super().dispatch(request, *args, **kwargs)
+
+    def post(self, request, *args, **kwargs):
+        server = get_object_or_404(Server, id=kwargs.get("server_id"))
+        server.delete()
+        return redirect(reverse("admindashboardx:servers") + "?ops=deleted")
+
+
+class ServerInitActionView(DashboardBaseView, View):
+    page_title = "AdminDashboardX · Инициализация сервера"
+    page_key = "servers"
+
+    def dispatch(self, request, *args, **kwargs):
+        if self._is_support():
+            return self._forbidden_response()
+        return super().dispatch(request, *args, **kwargs)
+
+    def post(self, request, *args, **kwargs):
+        server = get_object_or_404(Server, id=kwargs.get("server_id"))
+        initialize_server_task.delay(server.id)
+        return redirect(reverse("admindashboardx:server_detail", kwargs={"server_id": server.id}) + "?ops=init_started")
+
+
 class KeysListView(DashboardBaseView):
     template_name = "admindashboardx/keys.html"
     page_title = "AdminDashboardX · Ключи"
@@ -575,6 +707,7 @@ class ServerDetailView(DashboardBaseView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         server_id = kwargs.get("server_id")
+        ops = (self.request.GET.get("ops") or "").strip()
         server = get_object_or_404(
             Server.objects.select_related("country").only(
                 "id",
@@ -606,6 +739,7 @@ class ServerDetailView(DashboardBaseView):
                 "back_url": back_url,
                 "section_url": reverse("admindashboardx:servers"),
                 "section_label": "Серверы",
+                "ops": ops,
             }
         )
         return context

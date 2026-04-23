@@ -251,25 +251,19 @@ class VpnKey(models.Model):
 
 
 
+
 class Server(models.Model):
     hosting = models.CharField(max_length=1000, blank=True, null=True, verbose_name='Хостинг')
     ip_address = models.CharField(max_length=1000, blank=True, null=True, verbose_name='IP Address')
     user = models.CharField(max_length=1000, blank=True, null=True, default='root', verbose_name='Пользователь')
     password = models.CharField(max_length=1000, blank=True, null=True, default='<PASSWORD>', verbose_name='Пароль')
-    # configuration = models.TextField(max_length=10000, blank=True, null=True, verbose_name='Конфигурация')
     rental_price = models.DecimalField(max_digits=10, blank=True, null=True, decimal_places=2,
                                        verbose_name='Цена аренды в месяц')
     max_keys = models.IntegerField(default=200, blank=True, null=True, verbose_name='Лимит ключей', editable=False)
     keys_generated = models.IntegerField(default=0, blank=True, null=True, verbose_name='Ключей сгенерировано')
     is_active = models.BooleanField(default=True, verbose_name='Сервер Активен')
     created_at = models.DateField(auto_now_add=True, verbose_name='Дата создания')
-    api_url = models.CharField(max_length=1000, blank=True, null=True, verbose_name='API URL')
-    cert_sha256 = models.CharField(max_length=1000, blank=True, null=True, verbose_name='Certificate SHA256')
-    script_out = models.JSONField(blank=True, null=True, verbose_name='Script Out Info JSON')
     country = models.ForeignKey('Country', on_delete=models.CASCADE, null=True, blank=True, verbose_name='Страна')
-
-    is_activated = models.BooleanField(editable=False, default=False,
-                                       verbose_name='Сервер Активирован для Outline (не трогать)')
     is_activated_vless = models.BooleanField(editable=False, default=False,
                                              verbose_name='MB')
 
