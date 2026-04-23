@@ -1,0 +1,23 @@
+{% extends "admindashboardx/admipanelbase.html" %}
+{% block title %} · Site уведомления{% endblock %}
+{% block content %}
+    {% if ops == "created" %}<div class="alert alert-success">Уведомление создано.</div>{% endif %}
+    {% if ops == "updated" %}<div class="alert alert-success">Уведомление обновлено.</div>{% endif %}
+    {% if ops == "deleted" %}<div class="alert alert-success">Уведомление удалено.</div>{% endif %}
+    <div class="d-flex justify-content-end mb-3"><a class="btn btn-sm btn-primary" href="{% url 'admindashboardx:site_notification_create' %}">+ Добавить уведомление</a></div>
+    <div class="card admx-card">
+        <div class="table-responsive"><table class="table table-dark table-hover align-middle mb-0 admx-table">
+            <thead><tr><th>ID</th><th>Заголовок</th><th>Активно</th><th>Создано</th><th>С</th><th>До</th><th class="text-end">Действия</th></tr></thead>
+            <tbody>
+            {% for i in items_page %}
+                <tr>
+                    <td>{{ i.id }}</td><td>{{ i.title }}</td><td>{% if i.is_active %}✅{% else %}—{% endif %}</td><td>{{ i.created_at|date:"d.m.Y H:i" }}</td><td>{{ i.starts_at|date:"d.m.Y H:i"|default:"—" }}</td><td>{{ i.expires_at|date:"d.m.Y H:i"|default:"—" }}</td>
+                    <td class="text-end"><a class="btn btn-sm btn-outline-light" href="{% url 'admindashboardx:site_notification_update' item_id=i.id %}">Изм.</a><form method="post" action="{% url 'admindashboardx:site_notification_delete' item_id=i.id %}" class="d-inline" onsubmit="return confirm('Удалить уведомление #{{ i.id }}?');">{% csrf_token %}<button type="submit" class="btn btn-sm btn-danger">Удалить</button></form></td>
+                </tr>
+            {% empty %}<tr><td colspan="7" class="text-center text-secondary">Нет данных</td></tr>{% endfor %}
+            </tbody>
+        </table></div>
+        {% include "admindashboardx/partials/pagination.html" with page_obj=items_page page_qs=page_qs %}
+    </div>
+{% endblock %}
+

@@ -4,6 +4,7 @@
         <div class="fw-semibold">AdminDashboardX</div>
     </div>
 
+
     <nav class="admx-nav px-2 pb-3">
         <a class="admx-nav-link {% if page_key == 'index' %}active{% endif %}" href="{% url 'admindashboardx:index' %}">
             <i class="bi bi-grid-1x2-fill me-2"></i>
@@ -25,6 +26,66 @@
             <a class="admx-nav-link {% if page_key == 'servers' %}active{% endif %}" href="{% url 'admindashboardx:servers' %}">
                 <i class="bi bi-hdd-network-fill me-2"></i>
                 Серверы
+            </a>
+            <a class="admx-nav-link {% if page_key == 'countries' %}active{% endif %}" href="{% url 'admindashboardx:countries' %}">
+                <i class="bi bi-globe2 me-2"></i>
+                Страны
+            </a>
+            <a class="admx-nav-link {% if page_key == 'prices' %}active{% endif %}" href="{% url 'admindashboardx:prices' %}">
+                <i class="bi bi-cash-coin me-2"></i>
+                Цены
+            </a>
+            <a class="admx-nav-link {% if page_key == 'telegram_messages' %}active{% endif %}" href="{% url 'admindashboardx:telegram_messages' %}">
+                <i class="bi bi-telegram me-2"></i>
+                Telegram сообщения
+            </a>
+            <a class="admx-nav-link {% if page_key == 'site_notifications' %}active{% endif %}" href="{% url 'admindashboardx:site_notifications' %}">
+                <i class="bi bi-bell-fill me-2"></i>
+                Site уведомления
+            </a>
+            <a class="admx-nav-link {% if page_key == 'site_notification_states' %}active{% endif %}" href="{% url 'admindashboardx:site_notification_states' %}">
+                <i class="bi bi-bell me-2"></i>
+                Состояния уведомлений
+            </a>
+            <a class="admx-nav-link {% if page_key == 'income_info' %}active{% endif %}" href="{% url 'admindashboardx:income_info' %}">
+                <i class="bi bi-wallet2 me-2"></i>
+                IncomeInfo
+            </a>
+            <a class="admx-nav-link {% if page_key == 'referral_settings' %}active{% endif %}" href="{% url 'admindashboardx:referral_settings' %}">
+                <i class="bi bi-diagram-3-fill me-2"></i>
+                ReferralSettings
+            </a>
+            <a class="admx-nav-link {% if page_key == 'vpnkey_crud' %}active{% endif %}" href="{% url 'admindashboardx:vpnkey_crud' %}">
+                <i class="bi bi-key me-2"></i>
+                VpnKey CRUD
+            </a>
+            <a class="admx-nav-link {% if page_key == 'telegram_users_crud' %}active{% endif %}" href="{% url 'admindashboardx:telegram_users_crud' %}">
+                <i class="bi bi-person-vcard me-2"></i>
+                TelegramUser CRUD
+            </a>
+            <a class="admx-nav-link {% if page_key == 'user_profile_crud' %}active{% endif %}" href="{% url 'admindashboardx:user_profile_crud' %}">
+                <i class="bi bi-person-badge me-2"></i>
+                UserProfile CRUD
+            </a>
+            <a class="admx-nav-link {% if page_key == 'telegram_referral_crud' %}active{% endif %}" href="{% url 'admindashboardx:telegram_referral_crud' %}">
+                <i class="bi bi-share-fill me-2"></i>
+                TelegramReferral CRUD
+            </a>
+            <a class="admx-nav-link {% if page_key == 'referral_transaction_crud' %}active{% endif %}" href="{% url 'admindashboardx:referral_transaction_crud' %}">
+                <i class="bi bi-currency-exchange me-2"></i>
+                ReferralTransaction CRUD
+            </a>
+            <a class="admx-nav-link {% if page_key == 'referral_special_offer_crud' %}active{% endif %}" href="{% url 'admindashboardx:referral_special_offer_crud' %}">
+                <i class="bi bi-star-fill me-2"></i>
+                ReferralSpecialOffer CRUD
+            </a>
+            <a class="admx-nav-link {% if page_key == 'telegram_bot_crud' %}active{% endif %}" href="{% url 'admindashboardx:telegram_bot_crud' %}">
+                <i class="bi bi-robot me-2"></i>
+                TelegramBot CRUD
+            </a>
+            <a class="admx-nav-link {% if page_key == 'transaction_crud' %}active{% endif %}" href="{% url 'admindashboardx:transaction_crud' %}">
+                <i class="bi bi-receipt me-2"></i>
+                Transaction CRUD
             </a>
             <a class="admx-nav-link {% if page_key == 'keys' %}active{% endif %}" href="{% url 'admindashboardx:keys' %}">
                 <i class="bi bi-key-fill me-2"></i>

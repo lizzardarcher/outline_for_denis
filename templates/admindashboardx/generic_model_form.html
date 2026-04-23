@@ -1,0 +1,31 @@
+{% extends "admindashboardx/admipanelbase.html" %}
+
+{% block title %} · {{ form_title }}{% endblock %}
+
+{% block content %}
+    <div class="card admx-card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span>{{ form_title }}</span>
+            <a class="btn btn-sm btn-outline-light" href="{{ back_url }}">Назад</a>
+        </div>
+        <div class="card-body">
+            <form method="post" class="row g-3">
+                {% csrf_token %}
+                {% for field in form %}
+                    <div class="col-md-6">
+                        <label class="form-label">{{ field.label }}</label>
+                        {{ field }}
+                        {% if field.errors %}<div class="text-danger small">{{ field.errors|join:", " }}</div>{% endif %}
+                    </div>
+                {% endfor %}
+                {% if form.non_field_errors %}
+                    <div class="col-12"><div class="alert alert-danger mb-0">{{ form.non_field_errors|join:", " }}</div></div>
+                {% endif %}
+                <div class="col-12 d-flex gap-2 justify-content-end">
+                    <a class="btn btn-outline-light" href="{{ back_url }}">Отмена</a>
+                    <button type="submit" class="btn btn-primary">{{ submit_label }}</button>
+                </div>
+            </form>
+        </div>
+    </div>
+{% endblock %}

@@ -250,8 +250,6 @@ class VpnKey(models.Model):
         verbose_name_plural = 'VPN Ключи'
 
 
-
-
 class Server(models.Model):
     hosting = models.CharField(max_length=1000, blank=True, null=True, verbose_name='Хостинг')
     ip_address = models.CharField(max_length=1000, blank=True, null=True, verbose_name='IP Address')

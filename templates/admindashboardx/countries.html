@@ -1,0 +1,79 @@
+{% extends "admindashboardx/admipanelbase.html" %}
+
+{% block title %} · Страны{% endblock %}
+
+{% block content %}
+    {% if ops == "created" %}
+        <div class="alert alert-success">Страна успешно создана.</div>
+    {% elif ops == "updated" %}
+        <div class="alert alert-success">Изменения страны сохранены.</div>
+    {% elif ops == "deleted" %}
+        <div class="alert alert-success">Страна удалена.</div>
+    {% elif ops == "blocked" %}
+        <div class="alert alert-warning">Нельзя удалить страну: к ней привязаны серверы.</div>
+    {% endif %}
+
+    <div class="d-flex justify-content-end mb-3">
+        <a class="btn btn-sm btn-primary" href="{% url 'admindashboardx:country_create' %}">+ Добавить страну</a>
+    </div>
+
+    <div class="card admx-card mb-3 admx-sticky-filters">
+        <div class="card-body">
+            <form method="get" class="row g-2 align-items-end">
+                <div class="col-12 col-md-6 col-lg-5">
+                    <label class="form-label">Поиск</label>
+                    <input type="text" name="q" class="form-control admx-search-input" value="{{ q }}" autofocus
+                           placeholder="name, name_for_app, preset_id">
+                </div>
+                <div class="col-12 col-md-3 col-lg-3">
+                    <label class="form-label">Активность</label>
+                    <select name="is_active" class="form-select">
+                        <option value="">Все</option>
+                        <option value="true" {% if is_active == "true" %}selected{% endif %}>Активна</option>
+                        <option value="false" {% if is_active == "false" %}selected{% endif %}>Неактивна</option>
+                    </select>
+                </div>
+                {% include "admindashboardx/partials/filter_actions.html" with reset_url=reset_url %}
+            </form>
+        </div>
+    </div>
+
+    <div class="card admx-card">
+        <div class="table-responsive">
+            <table class="table table-dark table-hover align-middle mb-0 admx-table">
+                <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Название</th>
+                    <th>Name for app</th>
+                    <th>Preset ID</th>
+                    <th>Активна</th>
+                    <th class="text-end">Действия</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for c in countries_page %}
+                    <tr>
+                        <td>{{ c.id }}</td>
+                        <td>{{ c.name|default:"—" }}</td>
+                        <td>{{ c.name_for_app|default:"—" }}</td>
+                        <td>{{ c.preset_id|default:"—" }}</td>
+                        <td>{% if c.is_active %}✅{% else %}—{% endif %}</td>
+                        <td class="text-end">
+                            <a class="btn btn-sm btn-outline-light" href="{% url 'admindashboardx:country_update' country_id=c.id %}">Изм.</a>
+                            <form method="post" action="{% url 'admindashboardx:country_delete' country_id=c.id %}" class="d-inline"
+                                  onsubmit="return confirm('Удалить страну #{{ c.id }}?');">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-sm btn-danger">Удалить</button>
+                            </form>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="6" class="text-center text-secondary">Нет данных</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% include "admindashboardx/partials/pagination.html" with page_obj=countries_page page_qs=page_qs %}
+    </div>
+{% endblock %}

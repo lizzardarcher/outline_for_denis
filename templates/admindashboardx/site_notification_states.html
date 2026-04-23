@@ -1,0 +1,22 @@
+{% extends "admindashboardx/admipanelbase.html" %}
+{% block title %} · Состояния уведомлений{% endblock %}
+{% block content %}
+    {% if ops == "created" %}<div class="alert alert-success">Состояние создано.</div>{% endif %}
+    {% if ops == "updated" %}<div class="alert alert-success">Состояние обновлено.</div>{% endif %}
+    {% if ops == "deleted" %}<div class="alert alert-success">Состояние удалено.</div>{% endif %}
+    <div class="d-flex justify-content-end mb-3"><a class="btn btn-sm btn-primary" href="{% url 'admindashboardx:site_notification_state_create' %}">+ Добавить состояние</a></div>
+    <div class="card admx-card">
+        <div class="table-responsive"><table class="table table-dark table-hover align-middle mb-0 admx-table">
+            <thead><tr><th>ID</th><th>User ID</th><th>Username</th><th>Last seen notification ID</th><th>Обновлено</th><th class="text-end">Действия</th></tr></thead>
+            <tbody>
+            {% for i in items_page %}
+                <tr>
+                    <td>{{ i.id }}</td><td>{{ i.user.user_id }}</td><td>{{ i.user.username|default:"—" }}</td><td>{{ i.last_seen_notification_id }}</td><td>{{ i.updated_at|date:"d.m.Y H:i" }}</td>
+                    <td class="text-end"><a class="btn btn-sm btn-outline-light" href="{% url 'admindashboardx:site_notification_state_update' item_id=i.id %}">Изм.</a><form method="post" action="{% url 'admindashboardx:site_notification_state_delete' item_id=i.id %}" class="d-inline" onsubmit="return confirm('Удалить состояние #{{ i.id }}?');">{% csrf_token %}<button type="submit" class="btn btn-sm btn-danger">Удалить</button></form></td>
+                </tr>
+            {% empty %}<tr><td colspan="6" class="text-center text-secondary">Нет данных</td></tr>{% endfor %}
+            </tbody>
+        </table></div>
+        {% include "admindashboardx/partials/pagination.html" with page_obj=items_page page_qs=page_qs %}
+    </div>
+{% endblock %}

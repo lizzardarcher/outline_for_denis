@@ -1,0 +1,15 @@
+{% extends "admindashboardx/admipanelbase.html" %}
+{% block title %} · {{ form_title }}{% endblock %}
+{% block content %}
+    <div class="card admx-card"><div class="card-header d-flex justify-content-between align-items-center"><span>{{ form_title }}</span><a class="btn btn-sm btn-outline-light" href="{{ back_url }}">Назад</a></div>
+        <div class="card-body"><form method="post" class="row g-3">{% csrf_token %}
+            <div class="col-md-6"><label class="form-label">Заголовок</label>{{ form.title }}</div>
+            <div class="col-md-6 d-flex align-items-end"><div class="form-check">{{ form.is_active }}<label class="form-check-label">Активно</label></div></div>
+            <div class="col-12"><label class="form-label">Текст</label>{{ form.message }}</div>
+            <div class="col-md-6"><label class="form-label">Показывать с</label>{{ form.starts_at }}</div>
+            <div class="col-md-6"><label class="form-label">Показывать до</label>{{ form.expires_at }}</div>
+            {% if form.non_field_errors %}<div class="col-12"><div class="alert alert-danger mb-0">{{ form.non_field_errors|join:", " }}</div></div>{% endif %}
+            <div class="col-12 d-flex gap-2 justify-content-end"><a class="btn btn-outline-light" href="{{ back_url }}">Отмена</a><button type="submit" class="btn btn-primary">{{ submit_label }}</button></div>
+        </form></div>
+    </div>
+{% endblock %}

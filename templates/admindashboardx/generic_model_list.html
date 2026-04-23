@@ -1,0 +1,52 @@
+{% extends "admindashboardx/admipanelbase.html" %}
+{% load admx_extras %}
+
+{% block title %} · {{ item_label|title }}{% endblock %}
+
+{% block content %}
+    {% if ops == "created" %}<div class="alert alert-success">Запись создана.</div>{% endif %}
+    {% if ops == "updated" %}<div class="alert alert-success">Запись обновлена.</div>{% endif %}
+    {% if ops == "deleted" %}<div class="alert alert-success">Запись удалена.</div>{% endif %}
+    {% if ops == "blocked" %}<div class="alert alert-warning">Удаление заблокировано связями.</div>{% endif %}
+
+    <div class="d-flex justify-content-between mb-3">
+        <form method="get" class="d-flex gap-2">
+            <input type="text" name="q" class="form-control admx-search-input" value="{{ q }}" placeholder="Поиск">
+            <button type="submit" class="btn btn-outline-light">Найти</button>
+            <a class="btn btn-outline-secondary" href="{{ reset_url }}">Сброс</a>
+        </form>
+        <a class="btn btn-sm btn-primary" href="{{ create_url }}">+ Добавить</a>
+    </div>
+
+    <div class="card admx-card">
+        <div class="table-responsive">
+            <table class="table table-dark table-hover align-middle mb-0 admx-table">
+                <thead>
+                <tr>
+                    {% for field in list_fields %}<th>{{ field }}</th>{% endfor %}
+                    <th class="text-end">Действия</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for i in items_page %}
+                    <tr>
+                        {% for field in list_fields %}
+                            <td class="admx-message-cell">{{ i|get_attr:field }}</td>
+                        {% endfor %}
+                        <td class="text-end">
+                            <a class="btn btn-sm btn-outline-light" href="{% url edit_url_name item_id=i.id %}">Изм.</a>
+                            <form method="post" action="{% url delete_url_name item_id=i.id %}" class="d-inline" onsubmit="return confirm('Удалить запись #{{ i.id }}?');">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-sm btn-danger">Удалить</button>
+                            </form>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="99" class="text-center text-secondary">Нет данных</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% include "admindashboardx/partials/pagination.html" with page_obj=items_page page_qs=page_qs %}
+    </div>
+{% endblock %}

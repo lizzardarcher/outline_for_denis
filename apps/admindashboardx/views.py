@@ -4,6 +4,7 @@ from decimal import Decimal
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.conf import settings
 from django import forms
+from django.forms import modelform_factory
 from django.core.paginator import Paginator
 from django.db.models import Q, Sum
 from django.shortcuts import get_object_or_404, redirect, render
@@ -14,10 +15,18 @@ from django.views.generic import TemplateView
 
 from bot.models import (
     Country,
+    IncomeInfo,
     Logging,
+    Prices,
+    ReferralSettings,
     ReferralTransaction,
+    ReferralSpecialOffer,
     Server,
+    SiteNotification,
+    SiteNotificationState,
+    TelegramBot,
     TelegramReferral,
+    TelegramMessage,
     TelegramUser,
     Transaction,
     UserProfile,
@@ -25,7 +34,6 @@ from bot.models import (
     WithdrawalRequest,
 )
 from .tasks import initialize_server_task
-
 
 class ServerForm(forms.ModelForm):
     class Meta:
@@ -53,6 +61,86 @@ class ServerForm(forms.ModelForm):
             css = field.widget.attrs.get("class", "")
             field.widget.attrs["class"] = f"{css} form-control".strip()
         self.fields["country"].queryset = Country.objects.filter(is_active=True).order_by("name_for_app", "name")
+
+
+class CountryForm(forms.ModelForm):
+    class Meta:
+        model = Country
+        fields = ("name", "name_for_app", "preset_id", "is_active")
+        widgets = {
+            "is_active": forms.CheckboxInput(attrs={"class": "form-check-input"}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for name, field in self.fields.items():
+            if name == "is_active":
+                continue
+            css = field.widget.attrs.get("class", "")
+            field.widget.attrs["class"] = f"{css} form-control".strip()
+
+
+class PricesForm(forms.ModelForm):
+    class Meta:
+        model = Prices
+        fields = ("price_1", "price_2", "price_3", "price_4", "price_5")
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for field in self.fields.values():
+            css = field.widget.attrs.get("class", "")
+            field.widget.attrs["class"] = f"{css} form-control".strip()
+
+
+class TelegramMessageForm(forms.ModelForm):
+    class Meta:
+        model = TelegramMessage
+        fields = ("text", "status", "send_to_subscribed", "send_to_notsubscribed", "counter")
+        widgets = {
+            "text": forms.Textarea(attrs={"rows": 5}),
+            "send_to_subscribed": forms.CheckboxInput(attrs={"class": "form-check-input"}),
+            "send_to_notsubscribed": forms.CheckboxInput(attrs={"class": "form-check-input"}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for name, field in self.fields.items():
+            if name in ("send_to_subscribed", "send_to_notsubscribed"):
+                continue
+            css = field.widget.attrs.get("class", "")
+            field.widget.attrs["class"] = f"{css} form-control".strip()
+
+
+class SiteNotificationForm(forms.ModelForm):
+    class Meta:
+        model = SiteNotification
+        fields = ("title", "message", "is_active", "starts_at", "expires_at")
+        widgets = {
+            "message": forms.Textarea(attrs={"rows": 5}),
+            "is_active": forms.CheckboxInput(attrs={"class": "form-check-input"}),
+            "starts_at": forms.DateTimeInput(attrs={"type": "datetime-local"}),
+            "expires_at": forms.DateTimeInput(attrs={"type": "datetime-local"}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for name, field in self.fields.items():
+            if name == "is_active":
+                continue
+            css = field.widget.attrs.get("class", "")
+            field.widget.attrs["class"] = f"{css} form-control".strip()
+
+
+class SiteNotificationStateForm(forms.ModelForm):
+    class Meta:
+        model = SiteNotificationState
+        fields = ("user", "last_seen_notification_id")
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for field in self.fields.values():
+            css = field.widget.attrs.get("class", "")
+            field.widget.attrs["class"] = f"{css} form-control".strip()
 
 
 class DashboardBaseView(LoginRequiredMixin, TemplateView):
@@ -505,6 +593,491 @@ class KeysListView(DashboardBaseView):
         return context
 
 
+class CountriesListView(DashboardBaseView):
+    template_name = "admindashboardx/countries.html"
+    page_title = "AdminDashboardX · Страны"
+    page_key = "countries"
+
+    def dispatch(self, request, *args, **kwargs):
+        if self._is_support():
+            return self._forbidden_response()
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        query = (self.request.GET.get("q") or "").strip()
+        is_active = (self.request.GET.get("is_active") or "").strip()
+        ops = (self.request.GET.get("ops") or "").strip()
+
+        countries_qs = Country.objects.only(
+            "id",
+            "name",
+            "name_for_app",
+            "preset_id",
+            "is_active",
+        ).order_by("name_for_app", "name", "id")
+        if query:
+            countries_qs = countries_qs.filter(
+                Q(name__icontains=query)
+                | Q(name_for_app__icontains=query)
+                | Q(preset_id__icontains=query)
+            )
+        if is_active in ("true", "false"):
+            countries_qs = countries_qs.filter(is_active=(is_active == "true"))
+
+        context.update(
+            {
+                **self._base_context(),
+                "countries_page": self._paginate(countries_qs, per_page=50),
+                "q": query,
+                "is_active": is_active,
+                "ops": ops,
+                "page_qs": self._page_qs(),
+                "reset_url": reverse("admindashboardx:countries"),
+            }
+        )
+        return context
+
+
+class CountryCreateView(DashboardBaseView):
+    template_name = "admindashboardx/country_form.html"
+    page_title = "AdminDashboardX · Новая страна"
+    page_key = "countries"
+
+    def dispatch(self, request, *args, **kwargs):
+        if self._is_support():
+            return self._forbidden_response()
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        form = kwargs.get("form") or CountryForm()
+        context.update(
+            {
+                **self._base_context(),
+                "form": form,
+                "form_title": "Создать страну",
+                "submit_label": "Создать",
+                "back_url": reverse("admindashboardx:countries"),
+            }
+        )
+        return context
+
+    def post(self, request, *args, **kwargs):
+        form = CountryForm(request.POST)
+        if form.is_valid():
+            form.save()
+            return redirect(reverse("admindashboardx:countries") + "?ops=created")
+        return self.render_to_response(self.get_context_data(form=form))
+
+
+class CountryUpdateView(DashboardBaseView):
+    template_name = "admindashboardx/country_form.html"
+    page_title = "AdminDashboardX · Редактирование страны"
+    page_key = "countries"
+
+    def dispatch(self, request, *args, **kwargs):
+        if self._is_support():
+            return self._forbidden_response()
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_country(self):
+        return get_object_or_404(Country, id=self.kwargs.get("country_id"))
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        country = kwargs.get("country") or self.get_country()
+        form = kwargs.get("form") or CountryForm(instance=country)
+        context.update(
+            {
+                **self._base_context(),
+                "country": country,
+                "form": form,
+                "form_title": f"Редактировать страну #{country.id}",
+                "submit_label": "Сохранить",
+                "back_url": reverse("admindashboardx:countries"),
+            }
+        )
+        return context
+
+    def post(self, request, *args, **kwargs):
+        country = self.get_country()
+        form = CountryForm(request.POST, instance=country)
+        if form.is_valid():
+            form.save()
+            return redirect(reverse("admindashboardx:countries") + "?ops=updated")
+        return self.render_to_response(self.get_context_data(country=country, form=form))
+
+
+class CountryDeleteView(DashboardBaseView, View):
+    page_title = "AdminDashboardX · Удаление страны"
+    page_key = "countries"
+
+    def dispatch(self, request, *args, **kwargs):
+        if self._is_support():
+            return self._forbidden_response()
+        return super().dispatch(request, *args, **kwargs)
+
+    def post(self, request, *args, **kwargs):
+        country = get_object_or_404(Country, id=kwargs.get("country_id"))
+        if Server.objects.filter(country=country).exists():
+            return redirect(reverse("admindashboardx:countries") + "?ops=blocked")
+        country.delete()
+        return redirect(reverse("admindashboardx:countries") + "?ops=deleted")
+
+
+class PricesListView(DashboardBaseView):
+    template_name = "admindashboardx/prices.html"
+    page_title = "AdminDashboardX · Цены"
+    page_key = "prices"
+
+    def dispatch(self, request, *args, **kwargs):
+        if self._is_support():
+            return self._forbidden_response()
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        ops = (self.request.GET.get("ops") or "").strip()
+        items_qs = Prices.objects.only("id", "price_1", "price_2", "price_3", "price_4", "price_5").order_by("id")
+        context.update(
+            {
+                **self._base_context(),
+                "items_page": self._paginate(items_qs, per_page=50),
+                "ops": ops,
+                "page_qs": self._page_qs(),
+                "reset_url": reverse("admindashboardx:prices"),
+            }
+        )
+        return context
+
+
+class PricesCreateView(DashboardBaseView):
+    template_name = "admindashboardx/prices_form.html"
+    page_title = "AdminDashboardX · Новая цена"
+    page_key = "prices"
+
+    def dispatch(self, request, *args, **kwargs):
+        if self._is_support():
+            return self._forbidden_response()
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        form = kwargs.get("form") or PricesForm()
+        context.update({**self._base_context(), "form": form, "form_title": "Создать запись цен", "submit_label": "Создать", "back_url": reverse("admindashboardx:prices")})
+        return context
+
+    def post(self, request, *args, **kwargs):
+        form = PricesForm(request.POST)
+        if form.is_valid():
+            form.save()
+            return redirect(reverse("admindashboardx:prices") + "?ops=created")
+        return self.render_to_response(self.get_context_data(form=form))
+
+
+class PricesUpdateView(DashboardBaseView):
+    template_name = "admindashboardx/prices_form.html"
+    page_title = "AdminDashboardX · Редактирование цены"
+    page_key = "prices"
+
+    def dispatch(self, request, *args, **kwargs):
+        if self._is_support():
+            return self._forbidden_response()
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_item(self):
+        return get_object_or_404(Prices, id=self.kwargs.get("item_id"))
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        item = kwargs.get("item") or self.get_item()
+        form = kwargs.get("form") or PricesForm(instance=item)
+        context.update({**self._base_context(), "form": form, "form_title": f"Редактировать цены #{item.id}", "submit_label": "Сохранить", "back_url": reverse("admindashboardx:prices")})
+        return context
+
+    def post(self, request, *args, **kwargs):
+        item = self.get_item()
+        form = PricesForm(request.POST, instance=item)
+        if form.is_valid():
+            form.save()
+            return redirect(reverse("admindashboardx:prices") + "?ops=updated")
+        return self.render_to_response(self.get_context_data(item=item, form=form))
+
+
+class PricesDeleteView(DashboardBaseView, View):
+    page_title = "AdminDashboardX · Удаление цены"
+    page_key = "prices"
+
+    def dispatch(self, request, *args, **kwargs):
+        if self._is_support():
+            return self._forbidden_response()
+        return super().dispatch(request, *args, **kwargs)
+
+    def post(self, request, *args, **kwargs):
+        get_object_or_404(Prices, id=kwargs.get("item_id")).delete()
+        return redirect(reverse("admindashboardx:prices") + "?ops=deleted")
+
+
+class TelegramMessagesListView(DashboardBaseView):
+    template_name = "admindashboardx/telegram_messages.html"
+    page_title = "AdminDashboardX · Telegram сообщения"
+    page_key = "telegram_messages"
+
+    def dispatch(self, request, *args, **kwargs):
+        if self._is_support():
+            return self._forbidden_response()
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        ops = (self.request.GET.get("ops") or "").strip()
+        items_qs = TelegramMessage.objects.only(
+            "id", "text", "created_at", "status", "send_to_subscribed", "send_to_notsubscribed", "counter"
+        ).order_by("-created_at", "-id")
+        context.update({**self._base_context(), "items_page": self._paginate(items_qs, per_page=50), "ops": ops, "page_qs": self._page_qs(), "reset_url": reverse("admindashboardx:telegram_messages")})
+        return context
+
+
+class TelegramMessageCreateView(DashboardBaseView):
+    template_name = "admindashboardx/telegram_message_form.html"
+    page_title = "AdminDashboardX · Новое Telegram сообщение"
+    page_key = "telegram_messages"
+
+    def dispatch(self, request, *args, **kwargs):
+        if self._is_support():
+            return self._forbidden_response()
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        form = kwargs.get("form") or TelegramMessageForm()
+        context.update({**self._base_context(), "form": form, "form_title": "Создать Telegram сообщение", "submit_label": "Создать", "back_url": reverse("admindashboardx:telegram_messages")})
+        return context
+
+    def post(self, request, *args, **kwargs):
+        form = TelegramMessageForm(request.POST)
+        if form.is_valid():
+            form.save()
+            return redirect(reverse("admindashboardx:telegram_messages") + "?ops=created")
+        return self.render_to_response(self.get_context_data(form=form))
+
+
+class TelegramMessageUpdateView(DashboardBaseView):
+    template_name = "admindashboardx/telegram_message_form.html"
+    page_title = "AdminDashboardX · Редактирование Telegram сообщения"
+    page_key = "telegram_messages"
+
+    def dispatch(self, request, *args, **kwargs):
+        if self._is_support():
+            return self._forbidden_response()
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_item(self):
+        return get_object_or_404(TelegramMessage, id=self.kwargs.get("item_id"))
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        item = kwargs.get("item") or self.get_item()
+        form = kwargs.get("form") or TelegramMessageForm(instance=item)
+        context.update({**self._base_context(), "form": form, "form_title": f"Редактировать Telegram сообщение #{item.id}", "submit_label": "Сохранить", "back_url": reverse("admindashboardx:telegram_messages")})
+        return context
+
+    def post(self, request, *args, **kwargs):
+        item = self.get_item()
+        form = TelegramMessageForm(request.POST, instance=item)
+        if form.is_valid():
+            form.save()
+            return redirect(reverse("admindashboardx:telegram_messages") + "?ops=updated")
+        return self.render_to_response(self.get_context_data(item=item, form=form))
+
+
+class TelegramMessageDeleteView(DashboardBaseView, View):
+    page_title = "AdminDashboardX · Удаление Telegram сообщения"
+    page_key = "telegram_messages"
+
+    def dispatch(self, request, *args, **kwargs):
+        if self._is_support():
+            return self._forbidden_response()
+        return super().dispatch(request, *args, **kwargs)
+
+    def post(self, request, *args, **kwargs):
+        get_object_or_404(TelegramMessage, id=kwargs.get("item_id")).delete()
+        return redirect(reverse("admindashboardx:telegram_messages") + "?ops=deleted")
+
+
+class SiteNotificationsListView(DashboardBaseView):
+    template_name = "admindashboardx/site_notifications.html"
+    page_title = "AdminDashboardX · Site уведомления"
+    page_key = "site_notifications"
+
+    def dispatch(self, request, *args, **kwargs):
+        if self._is_support():
+            return self._forbidden_response()
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        ops = (self.request.GET.get("ops") or "").strip()
+        items_qs = SiteNotification.objects.only("id", "title", "is_active", "created_at", "starts_at", "expires_at").order_by("-id")
+        context.update({**self._base_context(), "items_page": self._paginate(items_qs, per_page=50), "ops": ops, "page_qs": self._page_qs(), "reset_url": reverse("admindashboardx:site_notifications")})
+        return context
+
+
+class SiteNotificationCreateView(DashboardBaseView):
+    template_name = "admindashboardx/site_notification_form.html"
+    page_title = "AdminDashboardX · Новое site уведомление"
+    page_key = "site_notifications"
+
+    def dispatch(self, request, *args, **kwargs):
+        if self._is_support():
+            return self._forbidden_response()
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        form = kwargs.get("form") or SiteNotificationForm()
+        context.update({**self._base_context(), "form": form, "form_title": "Создать site уведомление", "submit_label": "Создать", "back_url": reverse("admindashboardx:site_notifications")})
+        return context
+
+    def post(self, request, *args, **kwargs):
+        form = SiteNotificationForm(request.POST)
+        if form.is_valid():
+            form.save()
+            return redirect(reverse("admindashboardx:site_notifications") + "?ops=created")
+        return self.render_to_response(self.get_context_data(form=form))
+
+
+class SiteNotificationUpdateView(DashboardBaseView):
+    template_name = "admindashboardx/site_notification_form.html"
+    page_title = "AdminDashboardX · Редактирование site уведомления"
+    page_key = "site_notifications"
+
+    def dispatch(self, request, *args, **kwargs):
+        if self._is_support():
+            return self._forbidden_response()
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_item(self):
+        return get_object_or_404(SiteNotification, id=self.kwargs.get("item_id"))
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        item = kwargs.get("item") or self.get_item()
+        form = kwargs.get("form") or SiteNotificationForm(instance=item)
+        context.update({**self._base_context(), "form": form, "form_title": f"Редактировать site уведомление #{item.id}", "submit_label": "Сохранить", "back_url": reverse("admindashboardx:site_notifications")})
+        return context
+
+    def post(self, request, *args, **kwargs):
+        item = self.get_item()
+        form = SiteNotificationForm(request.POST, instance=item)
+        if form.is_valid():
+            form.save()
+            return redirect(reverse("admindashboardx:site_notifications") + "?ops=updated")
+        return self.render_to_response(self.get_context_data(item=item, form=form))
+
+
+class SiteNotificationDeleteView(DashboardBaseView, View):
+    page_title = "AdminDashboardX · Удаление site уведомления"
+    page_key = "site_notifications"
+
+    def dispatch(self, request, *args, **kwargs):
+        if self._is_support():
+            return self._forbidden_response()
+        return super().dispatch(request, *args, **kwargs)
+
+    def post(self, request, *args, **kwargs):
+        get_object_or_404(SiteNotification, id=kwargs.get("item_id")).delete()
+        return redirect(reverse("admindashboardx:site_notifications") + "?ops=deleted")
+
+
+class SiteNotificationStatesListView(DashboardBaseView):
+    template_name = "admindashboardx/site_notification_states.html"
+    page_title = "AdminDashboardX · Состояния уведомлений"
+    page_key = "site_notification_states"
+
+    def dispatch(self, request, *args, **kwargs):
+        if self._is_support():
+            return self._forbidden_response()
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        ops = (self.request.GET.get("ops") or "").strip()
+        items_qs = SiteNotificationState.objects.select_related("user").only(
+            "id", "last_seen_notification_id", "updated_at", "user__user_id", "user__username"
+        ).order_by("-updated_at", "-id")
+        context.update({**self._base_context(), "items_page": self._paginate(items_qs, per_page=50), "ops": ops, "page_qs": self._page_qs(), "reset_url": reverse("admindashboardx:site_notification_states")})
+        return context
+
+
+class SiteNotificationStateCreateView(DashboardBaseView):
+    template_name = "admindashboardx/site_notification_state_form.html"
+    page_title = "AdminDashboardX · Новое состояние уведомлений"
+    page_key = "site_notification_states"
+
+    def dispatch(self, request, *args, **kwargs):
+        if self._is_support():
+            return self._forbidden_response()
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        form = kwargs.get("form") or SiteNotificationStateForm()
+        context.update({**self._base_context(), "form": form, "form_title": "Создать состояние уведомлений", "submit_label": "Создать", "back_url": reverse("admindashboardx:site_notification_states")})
+        return context
+
+    def post(self, request, *args, **kwargs):
+        form = SiteNotificationStateForm(request.POST)
+        if form.is_valid():
+            form.save()
+            return redirect(reverse("admindashboardx:site_notification_states") + "?ops=created")
+        return self.render_to_response(self.get_context_data(form=form))
+
+
+class SiteNotificationStateUpdateView(DashboardBaseView):
+    template_name = "admindashboardx/site_notification_state_form.html"
+    page_title = "AdminDashboardX · Редактирование состояния уведомлений"
+    page_key = "site_notification_states"
+
+    def dispatch(self, request, *args, **kwargs):
+        if self._is_support():
+            return self._forbidden_response()
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_item(self):
+        return get_object_or_404(SiteNotificationState, id=self.kwargs.get("item_id"))
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        item = kwargs.get("item") or self.get_item()
+        form = kwargs.get("form") or SiteNotificationStateForm(instance=item)
+        context.update({**self._base_context(), "form": form, "form_title": f"Редактировать состояние уведомлений #{item.id}", "submit_label": "Сохранить", "back_url": reverse("admindashboardx:site_notification_states")})
+        return context
+
+    def post(self, request, *args, **kwargs):
+        item = self.get_item()
+        form = SiteNotificationStateForm(request.POST, instance=item)
+        if form.is_valid():
+            form.save()
+            return redirect(reverse("admindashboardx:site_notification_states") + "?ops=updated")
+        return self.render_to_response(self.get_context_data(item=item, form=form))
+
+
+class SiteNotificationStateDeleteView(DashboardBaseView, View):
+    page_title = "AdminDashboardX · Удаление состояния уведомлений"
+    page_key = "site_notification_states"
+
+    def dispatch(self, request, *args, **kwargs):
+        if self._is_support():
+            return self._forbidden_response()
+        return super().dispatch(request, *args, **kwargs)
+
+    def post(self, request, *args, **kwargs):
+        get_object_or_404(SiteNotificationState, id=kwargs.get("item_id")).delete()
+        return redirect(reverse("admindashboardx:site_notification_states") + "?ops=deleted")
+
+
 class UserDetailView(DashboardBaseView):
     template_name = "admindashboardx/user_detail.html"
     page_title = "AdminDashboardX · Пользователь"
@@ -743,3 +1316,232 @@ class ServerDetailView(DashboardBaseView):
             }
         )
         return context
+
+
+class GenericCRUDListView(DashboardBaseView):
+    template_name = "admindashboardx/generic_model_list.html"
+    model = None
+    page_key = ""
+    page_title = "AdminDashboardX · Список"
+    list_fields = ("id",)
+    search_fields = ()
+    reset_url_name = ""
+    create_url_name = ""
+    edit_url_name = ""
+    delete_url_name = ""
+    item_label = "запись"
+
+    def dispatch(self, request, *args, **kwargs):
+        if self._is_support():
+            return self._forbidden_response()
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        query = (self.request.GET.get("q") or "").strip()
+        ops = (self.request.GET.get("ops") or "").strip()
+        qs = self.model.objects.all().order_by("-id")
+        if query and self.search_fields:
+            predicate = Q()
+            for field in self.search_fields:
+                predicate |= Q(**{f"{field}__icontains": query})
+            qs = qs.filter(predicate)
+        context.update(
+            {
+                **self._base_context(),
+                "items_page": self._paginate(qs, per_page=50),
+                "q": query,
+                "ops": ops,
+                "list_fields": self.list_fields,
+                "item_label": self.item_label,
+                "page_qs": self._page_qs(),
+                "reset_url": reverse(self.reset_url_name),
+                "create_url": reverse(self.create_url_name),
+                "edit_url_name": self.edit_url_name,
+                "delete_url_name": self.delete_url_name,
+            }
+        )
+        return context
+
+
+class GenericCRUDCreateView(DashboardBaseView):
+    template_name = "admindashboardx/generic_model_form.html"
+    model = None
+    page_key = ""
+    list_url_name = ""
+    form_title = "Создать"
+    submit_label = "Создать"
+    fields = "__all__"
+
+    def dispatch(self, request, *args, **kwargs):
+        if self._is_support():
+            return self._forbidden_response()
+        return super().dispatch(request, *args, **kwargs)
+
+    def _form_class(self):
+        return modelform_factory(self.model, fields=self.fields)
+
+    def _decorate_form(self, form):
+        for field in form.fields.values():
+            css = field.widget.attrs.get("class", "")
+            if isinstance(field.widget, forms.CheckboxInput):
+                field.widget.attrs["class"] = "form-check-input"
+            else:
+                field.widget.attrs["class"] = f"{css} form-control".strip()
+        return form
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        form = kwargs.get("form") or self._form_class()()
+        form = self._decorate_form(form)
+        context.update(
+            {
+                **self._base_context(),
+                "form": form,
+                "form_title": self.form_title,
+                "submit_label": self.submit_label,
+                "back_url": reverse(self.list_url_name),
+            }
+        )
+        return context
+
+    def post(self, request, *args, **kwargs):
+        form = self._form_class()(request.POST)
+        if form.is_valid():
+            form.save()
+            return redirect(reverse(self.list_url_name) + "?ops=created")
+        return self.render_to_response(self.get_context_data(form=form))
+
+
+class GenericCRUDUpdateView(GenericCRUDCreateView):
+    submit_label = "Сохранить"
+
+    def get_item(self):
+        return get_object_or_404(self.model, id=self.kwargs.get("item_id"))
+
+    def get_context_data(self, **kwargs):
+        item = kwargs.get("item") or self.get_item()
+        form = kwargs.get("form") or self._form_class()(instance=item)
+        return super().get_context_data(form=form)
+
+    def post(self, request, *args, **kwargs):
+        item = self.get_item()
+        form = self._form_class()(request.POST, instance=item)
+        if form.is_valid():
+            form.save()
+            return redirect(reverse(self.list_url_name) + "?ops=updated")
+        return self.render_to_response(self.get_context_data(item=item, form=form))
+
+
+class GenericCRUDDeleteView(DashboardBaseView, View):
+    model = None
+    page_key = ""
+    list_url_name = ""
+
+    def dispatch(self, request, *args, **kwargs):
+        if self._is_support():
+            return self._forbidden_response()
+        return super().dispatch(request, *args, **kwargs)
+
+    def post(self, request, *args, **kwargs):
+        item = get_object_or_404(self.model, id=self.kwargs.get("item_id"))
+        try:
+            item.delete()
+            return redirect(reverse(self.list_url_name) + "?ops=deleted")
+        except Exception:
+            return redirect(reverse(self.list_url_name) + "?ops=blocked")
+
+
+class IncomeInfoListView(GenericCRUDListView):
+    model = IncomeInfo; page_key = "income_info"; page_title = "AdminDashboardX · IncomeInfo"
+    list_fields = ("id", "total_amount", "user_balance_total")
+    reset_url_name = "admindashboardx:income_info"; create_url_name = "admindashboardx:income_info_create"
+    edit_url_name = "admindashboardx:income_info_update"; delete_url_name = "admindashboardx:income_info_delete"; item_label = "income info"
+class IncomeInfoCreateView(GenericCRUDCreateView): model = IncomeInfo; page_key = "income_info"; list_url_name = "admindashboardx:income_info"; form_title = "Создать IncomeInfo"
+class IncomeInfoUpdateView(GenericCRUDUpdateView): model = IncomeInfo; page_key = "income_info"; list_url_name = "admindashboardx:income_info"; form_title = "Редактировать IncomeInfo"
+class IncomeInfoDeleteView(GenericCRUDDeleteView): model = IncomeInfo; page_key = "income_info"; list_url_name = "admindashboardx:income_info"
+
+class ReferralSettingsListView(GenericCRUDListView):
+    model = ReferralSettings; page_key = "referral_settings"; page_title = "AdminDashboardX · ReferralSettings"
+    list_fields = ("id", "level_1_percentage", "level_2_percentage", "level_3_percentage", "level_4_percentage", "level_5_percentage")
+    reset_url_name = "admindashboardx:referral_settings"; create_url_name = "admindashboardx:referral_settings_create"
+    edit_url_name = "admindashboardx:referral_settings_update"; delete_url_name = "admindashboardx:referral_settings_delete"; item_label = "referral settings"
+class ReferralSettingsCreateView(GenericCRUDCreateView): model = ReferralSettings; page_key = "referral_settings"; list_url_name = "admindashboardx:referral_settings"; form_title = "Создать ReferralSettings"
+class ReferralSettingsUpdateView(GenericCRUDUpdateView): model = ReferralSettings; page_key = "referral_settings"; list_url_name = "admindashboardx:referral_settings"; form_title = "Редактировать ReferralSettings"
+class ReferralSettingsDeleteView(GenericCRUDDeleteView): model = ReferralSettings; page_key = "referral_settings"; list_url_name = "admindashboardx:referral_settings"
+
+class VpnKeyCRUDListView(GenericCRUDListView):
+    model = VpnKey; page_key = "vpnkey_crud"; page_title = "AdminDashboardX · VpnKey CRUD"
+    list_fields = ("key_id", "protocol", "port", "method", "created_at", "user", "server")
+    search_fields = ("key_id", "protocol", "method")
+    reset_url_name = "admindashboardx:vpnkey_crud"; create_url_name = "admindashboardx:vpnkey_create"
+    edit_url_name = "admindashboardx:vpnkey_update"; delete_url_name = "admindashboardx:vpnkey_delete"; item_label = "vpn key"
+class VpnKeyCreateView(GenericCRUDCreateView): model = VpnKey; page_key = "vpnkey_crud"; list_url_name = "admindashboardx:vpnkey_crud"; form_title = "Создать VpnKey"; fields = "__all__"
+class VpnKeyUpdateView(GenericCRUDUpdateView): model = VpnKey; page_key = "vpnkey_crud"; list_url_name = "admindashboardx:vpnkey_crud"; form_title = "Редактировать VpnKey"; fields = "__all__"
+class VpnKeyDeleteView(GenericCRUDDeleteView): model = VpnKey; page_key = "vpnkey_crud"; list_url_name = "admindashboardx:vpnkey_crud"
+
+class TelegramUserCRUDListView(GenericCRUDListView):
+    model = TelegramUser; page_key = "telegram_users_crud"; page_title = "AdminDashboardX · TelegramUser CRUD"
+    list_fields = ("id", "user_id", "username", "first_name", "last_name", "subscription_status")
+    search_fields = ("user_id", "username", "first_name", "last_name")
+    reset_url_name = "admindashboardx:telegram_users_crud"; create_url_name = "admindashboardx:telegram_user_create"
+    edit_url_name = "admindashboardx:telegram_user_update"; delete_url_name = "admindashboardx:telegram_user_delete"; item_label = "telegram user"
+class TelegramUserCreateView(GenericCRUDCreateView): model = TelegramUser; page_key = "telegram_users_crud"; list_url_name = "admindashboardx:telegram_users_crud"; form_title = "Создать TelegramUser"
+class TelegramUserUpdateView(GenericCRUDUpdateView): model = TelegramUser; page_key = "telegram_users_crud"; list_url_name = "admindashboardx:telegram_users_crud"; form_title = "Редактировать TelegramUser"
+class TelegramUserDeleteView(GenericCRUDDeleteView): model = TelegramUser; page_key = "telegram_users_crud"; list_url_name = "admindashboardx:telegram_users_crud"
+
+class UserProfileCRUDListView(GenericCRUDListView):
+    model = UserProfile; page_key = "user_profile_crud"; page_title = "AdminDashboardX · UserProfile CRUD"
+    list_fields = ("id", "user", "telegram_user", "site_password_generated")
+    reset_url_name = "admindashboardx:user_profile_crud"; create_url_name = "admindashboardx:user_profile_create"
+    edit_url_name = "admindashboardx:user_profile_update"; delete_url_name = "admindashboardx:user_profile_delete"; item_label = "user profile"
+class UserProfileCreateView(GenericCRUDCreateView): model = UserProfile; page_key = "user_profile_crud"; list_url_name = "admindashboardx:user_profile_crud"; form_title = "Создать UserProfile"
+class UserProfileUpdateView(GenericCRUDUpdateView): model = UserProfile; page_key = "user_profile_crud"; list_url_name = "admindashboardx:user_profile_crud"; form_title = "Редактировать UserProfile"
+class UserProfileDeleteView(GenericCRUDDeleteView): model = UserProfile; page_key = "user_profile_crud"; list_url_name = "admindashboardx:user_profile_crud"
+
+class TelegramReferralCRUDListView(GenericCRUDListView):
+    model = TelegramReferral; page_key = "telegram_referral_crud"; page_title = "AdminDashboardX · TelegramReferral CRUD"
+    list_fields = ("id", "referrer", "referred", "level")
+    reset_url_name = "admindashboardx:telegram_referral_crud"; create_url_name = "admindashboardx:telegram_referral_create"
+    edit_url_name = "admindashboardx:telegram_referral_update"; delete_url_name = "admindashboardx:telegram_referral_delete"; item_label = "telegram referral"
+class TelegramReferralCreateView(GenericCRUDCreateView): model = TelegramReferral; page_key = "telegram_referral_crud"; list_url_name = "admindashboardx:telegram_referral_crud"; form_title = "Создать TelegramReferral"
+class TelegramReferralUpdateView(GenericCRUDUpdateView): model = TelegramReferral; page_key = "telegram_referral_crud"; list_url_name = "admindashboardx:telegram_referral_crud"; form_title = "Редактировать TelegramReferral"
+class TelegramReferralDeleteView(GenericCRUDDeleteView): model = TelegramReferral; page_key = "telegram_referral_crud"; list_url_name = "admindashboardx:telegram_referral_crud"
+
+class ReferralTransactionCRUDListView(GenericCRUDListView):
+    model = ReferralTransaction; page_key = "referral_transaction_crud"; page_title = "AdminDashboardX · ReferralTransaction CRUD"
+    list_fields = ("id", "referral", "transaction", "amount", "timestamp")
+    reset_url_name = "admindashboardx:referral_transaction_crud"; create_url_name = "admindashboardx:referral_transaction_create"
+    edit_url_name = "admindashboardx:referral_transaction_update"; delete_url_name = "admindashboardx:referral_transaction_delete"; item_label = "referral transaction"
+class ReferralTransactionCreateView(GenericCRUDCreateView): model = ReferralTransaction; page_key = "referral_transaction_crud"; list_url_name = "admindashboardx:referral_transaction_crud"; form_title = "Создать ReferralTransaction"
+class ReferralTransactionUpdateView(GenericCRUDUpdateView): model = ReferralTransaction; page_key = "referral_transaction_crud"; list_url_name = "admindashboardx:referral_transaction_crud"; form_title = "Редактировать ReferralTransaction"
+class ReferralTransactionDeleteView(GenericCRUDDeleteView): model = ReferralTransaction; page_key = "referral_transaction_crud"; list_url_name = "admindashboardx:referral_transaction_crud"
+
+class ReferralSpecialOfferCRUDListView(GenericCRUDListView):
+    model = ReferralSpecialOffer; page_key = "referral_special_offer_crud"; page_title = "AdminDashboardX · ReferralSpecialOffer CRUD"
+    list_fields = ("id", "especial_for_user", "level_1_percentage", "level_2_percentage", "level_3_percentage", "level_4_percentage", "level_5_percentage")
+    reset_url_name = "admindashboardx:referral_special_offer_crud"; create_url_name = "admindashboardx:referral_special_offer_create"
+    edit_url_name = "admindashboardx:referral_special_offer_update"; delete_url_name = "admindashboardx:referral_special_offer_delete"; item_label = "special offer"
+class ReferralSpecialOfferCreateView(GenericCRUDCreateView): model = ReferralSpecialOffer; page_key = "referral_special_offer_crud"; list_url_name = "admindashboardx:referral_special_offer_crud"; form_title = "Создать ReferralSpecialOffer"
+class ReferralSpecialOfferUpdateView(GenericCRUDUpdateView): model = ReferralSpecialOffer; page_key = "referral_special_offer_crud"; list_url_name = "admindashboardx:referral_special_offer_crud"; form_title = "Редактировать ReferralSpecialOffer"
+class ReferralSpecialOfferDeleteView(GenericCRUDDeleteView): model = ReferralSpecialOffer; page_key = "referral_special_offer_crud"; list_url_name = "admindashboardx:referral_special_offer_crud"
+
+class TelegramBotCRUDListView(GenericCRUDListView):
+    model = TelegramBot; page_key = "telegram_bot_crud"; page_title = "AdminDashboardX · TelegramBot CRUD"
+    list_fields = ("id", "username", "title", "created_at")
+    search_fields = ("username", "title")
+    reset_url_name = "admindashboardx:telegram_bot_crud"; create_url_name = "admindashboardx:telegram_bot_create"
+    edit_url_name = "admindashboardx:telegram_bot_update"; delete_url_name = "admindashboardx:telegram_bot_delete"; item_label = "telegram bot"
+class TelegramBotCreateView(GenericCRUDCreateView): model = TelegramBot; page_key = "telegram_bot_crud"; list_url_name = "admindashboardx:telegram_bot_crud"; form_title = "Создать TelegramBot"
+class TelegramBotUpdateView(GenericCRUDUpdateView): model = TelegramBot; page_key = "telegram_bot_crud"; list_url_name = "admindashboardx:telegram_bot_crud"; form_title = "Редактировать TelegramBot"
+class TelegramBotDeleteView(GenericCRUDDeleteView): model = TelegramBot; page_key = "telegram_bot_crud"; list_url_name = "admindashboardx:telegram_bot_crud"
+
+class TransactionCRUDListView(GenericCRUDListView):
+    model = Transaction; page_key = "transaction_crud"; page_title = "AdminDashboardX · Transaction CRUD"
+    list_fields = ("id", "user", "amount", "currency", "status", "payment_system", "payment_id")
+    search_fields = ("payment_id", "description")
+    reset_url_name = "admindashboardx:transaction_crud"; create_url_name = "admindashboardx:transaction_create"
+    edit_url_name = "admindashboardx:transaction_update"; delete_url_name = "admindashboardx:transaction_delete"; item_label = "transaction"
+class TransactionCreateView(GenericCRUDCreateView): model = Transaction; page_key = "transaction_crud"; list_url_name = "admindashboardx:transaction_crud"; form_title = "Создать Transaction"
+class TransactionUpdateView(GenericCRUDUpdateView): model = Transaction; page_key = "transaction_crud"; list_url_name = "admindashboardx:transaction_crud"; form_title = "Редактировать Transaction"
+class TransactionDeleteView(GenericCRUDDeleteView): model = Transaction; page_key = "transaction_crud"; list_url_name = "admindashboardx:transaction_crud"
