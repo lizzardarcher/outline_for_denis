@@ -1,4 +1,5 @@
 import json
+from typing import Optional
 from urllib.parse import quote
 
 import requests
@@ -32,16 +33,17 @@ class CelerityAPI:
             path = f"/{path}"
         return f"{self.base_url}{path}"
 
-    def _make_request(self, method, path, data=None, params=None):
+    def _make_request(self, method, path, data=None, params=None, timeout=None):
         """
         Returns:
-            tuple: (success: bool, body: dict | str | None) — как в MarzbanAPI.
+            tuple: (success: bool, body: dict, str или None) — как в MarzbanAPI.
         """
         if not self.base_url:
             return False, "C3CELERYTY_API_ENDPOINT is not set"
         if not self.api_key:
             return False, "C3CELERYTY_API_KEY is not set"
 
+        req_timeout = self.timeout if timeout is None else timeout
         url = self._url(path)
         try:
             response = requests.request(
@@ -50,7 +52,7 @@ class CelerityAPI:
                 headers=self.headers,
                 json=data,
                 params=params,
-                timeout=self.timeout,
+                timeout=req_timeout,
             )
             if response.status_code == 204:
                 return True, None
@@ -111,6 +113,47 @@ class CelerityAPI:
         """GET /nodes"""
         return self._make_request("GET", "/nodes", params=params)
 
+
+    def find_node_id_by_ip(self, ip: str, node_type: Optional[str] = None):
+        """
+        Ищет _id ноды по IP (и опционально type: hysteria или xray).
+
+        Returns:
+            (True, node_id_str) или (False, error_message)
+        """
+        needle = (ip or "").strip()
+        if not needle:
+            return False, "Пустой ip"
+
+        ok, data = self.list_nodes()
+        if not ok:
+            return False, data
+        if not isinstance(data, list):
+            return False, f"Неожиданный ответ list_nodes: {type(data).__name__}"
+
+        candidates = []
+        for n in data:
+            if not isinstance(n, dict):
+                continue
+            if str(n.get("ip") or "").strip() != needle:
+                continue
+            ntype = n.get("type") or "hysteria"
+            if node_type is not None and ntype != node_type:
+                continue
+            candidates.append(n)
+
+        if not candidates:
+            return False, f"Нода с ip={needle!r} не найдена (type filter={node_type!r})"
+        if len(candidates) > 1:
+            return False, (
+                f"Несколько нод с ip={needle!r}: {len(candidates)}. Уточните node_type или удалите дубликаты."
+            )
+
+        nid = self._extract_group_id(candidates[0])
+        if not nid:
+            return False, "У записи ноды нет _id"
+        return True, nid
+
     def get_node(self, node_id: str):
         """GET /nodes/:id"""
         nid = quote(str(node_id), safe="")
@@ -126,9 +169,36 @@ class CelerityAPI:
         return self._make_request("POST", "/nodes", data=data)
 
     def sync_node(self, node_id: str):
-        """POST /nodes/:id/sync"""
+        """POST /nodes/:id/sync — применить конфиг (короткая операция)."""
         nid = quote(str(node_id), safe="")
         return self._make_request("POST", f"/nodes/{nid}/sync")
+
+    def setup_node(
+        self,
+        node_id: str,
+        data=None,
+        *,
+        request_timeout=300,
+    ):
+        """
+        POST /nodes/:id/setup — «Настроить автоматически» в панели (SSH: установка Hysteria / Xray,
+        порт-хоппинг, сервис). Долгая операция (минуты); у HTTP-клиента увеличен timeout.
+
+        Тело (опционально, для Hysteria по умолчанию всё true):
+            installHysteria, setupPortHopping, restartService
+        """
+        nid = quote(str(node_id), safe="")
+        body = data if data is not None else {
+            "installHysteria": True,
+            "setupPortHopping": True,
+            "restartService": True,
+        }
+        return self._make_request(
+            "POST",
+            f"/nodes/{nid}/setup",
+            data=body,
+            timeout=request_timeout,
+        )
 
     # --- Группы серверов (scope stats:read) ---
 

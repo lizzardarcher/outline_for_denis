@@ -12,7 +12,8 @@
   без флагов — только чтение (GET /stats, /nodes, /users, get_user);
   --create-user / --delete-user / --add-node — одно действие (взаимоисключающие);
   для --create-user и --add-node в тело запроса добавляется groups: [<id>] (группа CELERITY_SERVER_GROUP_NAME);
-  для --add-node в тело добавляется ssh (username из Server.user, password из Server.password, порт CELERITY_SSH_PORT).
+  для --add-node в тело добавляется ssh (username из Server.user, password из Server.password, порт CELERITY_SSH_PORT);
+  --auto-setup-node — POST /nodes/:id/setup («Настроить автоматически»), нода по IP Server или CELERITY_NODE_ID.
 """
 from __future__ import annotations
 
@@ -20,7 +21,7 @@ import argparse
 import json
 import sys
 from datetime import datetime
-from typing import Any
+from typing import Any, Optional
 
 
 # Корень проекта должен быть в PYTHONPATH; при запуске как файл — добавляем родителя bot/main
@@ -57,6 +58,11 @@ CELERITY_SSH_PRIVATE_KEY = None
 CELERITY_NODE_DOMAIN = None
 CELERITY_NODE_SNI = None
 
+# POST /nodes/:id/setup — таймаут HTTP-клиента (сек.); на сервере установка может занимать 1–3 мин.
+CELERITY_SETUP_REQUEST_TIMEOUT = 300
+# Если Mongo _id ноды уже известен — задайте, чтобы не искать по IP:
+CELERITY_NODE_ID = None  # например "674a1b2c3d4e5f6789abcdef"
+
 # Пустой пароль или заводская заглушка модели Server — не считаем за SSH-кредит
 _SERVER_PASSWORD_PLACEHOLDERS = frozenset(("", "<PASSWORD>"))
 
@@ -86,7 +92,7 @@ def _node_body_for_log(body: dict) -> str:
     return json.dumps(o, indent=2, ensure_ascii=False, default=str)
 
 
-def _mask_key(key: str | None, keep: int = 6) -> str:
+def _mask_key(key: Optional[str], keep: int = 6) -> str:
     if not key:
         return "(пусто)"
     k = key.strip()
@@ -238,6 +244,7 @@ def _run_read_only_suite(api: CelerityAPI, user: TelegramUser, server: Server) -
     elif ok and isinstance(data, dict) and "data" in data:
         _dump("users['data']", True, data.get("data"))
 
+
     celerity_user_id = str(user.user_id)
     _banner(f"GET /users/{celerity_user_id}")
     ok, data = api.get_user(celerity_user_id)
@@ -249,7 +256,6 @@ def _run_read_only_suite(api: CelerityAPI, user: TelegramUser, server: Server) -
             _banner("GET /files/info/:token")
             ok2, info = api.get_subscription_info(str(token))
             _dump("subscription info", ok2, info)
-
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Тест CelerityAPI (C³ CELERITY)")
@@ -269,10 +275,18 @@ def main() -> None:
         action="store_true",
         help="POST /nodes — Server + группа + ssh (password из Server.password или CELERITY_SSH_PRIVATE_KEY)",
     )
+    action.add_argument(
+        "--auto-setup-node",
+        action="store_true",
+        help=(
+            "POST /nodes/:id/setup — установка ПО по SSH (как «Управление → Настроить автоматически»). "
+            "Долго (до нескольких минут). Нода: CELERITY_NODE_ID или поиск по IP Server и CELERITY_NODE_TYPE."
+        ),
+    )
     parser.add_argument(
         "--sync-all",
         action="store_true",
-        help="POST /sync — все ноды (после основного сценария: только в режиме без --create/--delete/--add)",
+        help="POST /sync — все ноды (только в режиме без --create/--delete/--add/--auto-setup-node)",
     )
     args = parser.parse_args()
 
@@ -306,6 +320,24 @@ def main() -> None:
         print(_node_body_for_log(body))
         ok, data = api.create_node(body)
         _dump("create_node", ok, data)
+    elif args.auto_setup_node:
+        _banner("POST /nodes/:id/setup (автонастройка по SSH, до нескольких минут)")
+        if CELERITY_NODE_ID:
+            node_id = str(CELERITY_NODE_ID).strip()
+            print(f"Используется CELERITY_NODE_ID={node_id!r}")
+        else:
+            ip = (server.ip_address or "").strip()
+            print(f"Поиск ноды: ip={ip!r}, type={CELERITY_NODE_TYPE!r}")
+            ok_find, node_id = api.find_node_id_by_ip(ip, CELERITY_NODE_TYPE)
+            if not ok_find:
+                print(f"\nОШИБКА: {node_id!r}")
+                sys.exit(1)
+            print(f"Найдена нода _id={node_id!r}")
+        print(
+            f"Таймаут HTTP: {CELERITY_SETUP_REQUEST_TIMEOUT}s (тело: installHysteria, setupPortHopping, restartService = true)"
+        )
+        ok, data = api.setup_node(node_id, request_timeout=CELERITY_SETUP_REQUEST_TIMEOUT)
+        _dump("setup_node", ok, data)
     else:
         _run_read_only_suite(api, user, server)
         if args.sync_all:
