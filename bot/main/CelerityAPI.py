@@ -26,6 +26,7 @@ class CelerityAPI:
             "X-API-Key": self.api_key,
         }
 
+
     def _url(self, path: str) -> str:
         if not path.startswith("/"):
             path = f"/{path}"
@@ -117,7 +118,10 @@ class CelerityAPI:
 
     def create_node(self, data: dict):
         """
-        POST /nodes — создание ноды (поля см. модель Node в README CELERITY-panel: type, name, ip, port, …).
+        POST /nodes — создание ноды (type, name, ip, port, groups, …).
+
+        Для SSH-терминала и автонастройки в теле должен быть объект ssh:
+        {"port": 22, "username": "root", "password": "..."} и/или "privateKey" (PEM).
         """
         return self._make_request("POST", "/nodes", data=data)
 

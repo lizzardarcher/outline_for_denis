@@ -11,7 +11,8 @@
 Режимы:
   без флагов — только чтение (GET /stats, /nodes, /users, get_user);
   --create-user / --delete-user / --add-node — одно действие (взаимоисключающие);
-  для --create-user и --add-node в тело запроса добавляется groups: [<id>] (группа CELERITY_SERVER_GROUP_NAME).
+  для --create-user и --add-node в тело запроса добавляется groups: [<id>] (группа CELERITY_SERVER_GROUP_NAME);
+  для --add-node в тело добавляется ssh (username из Server.user, password из Server.password, порт CELERITY_SSH_PORT).
 """
 from __future__ import annotations
 
@@ -48,9 +49,16 @@ CELERITY_SERVER_GROUP_ID = None  # например "674a1b2c3d4e5f6789abcdef"
 # --- Тело POST /nodes при --add-node (дополняется ip/name из Server) ---
 CELERITY_NODE_TYPE = "hysteria"
 CELERITY_NODE_PORT = 443
+# SSH для панели (автонастройка, терминал в UI): см. поля ssh в CELERITY hyNodeModel
+CELERITY_SSH_PORT = 22
+# Опционально: PEM приватного ключа вместо пароля (если задан — уходит в ssh.privateKey)
+CELERITY_SSH_PRIVATE_KEY = None
 # Необязательно: домен/SNI панели; оставьте None — поле не попадёт в JSON
 CELERITY_NODE_DOMAIN = None
 CELERITY_NODE_SNI = None
+
+# Пустой пароль или заводская заглушка модели Server — не считаем за SSH-кредит
+_SERVER_PASSWORD_PLACEHOLDERS = frozenset(("", "<PASSWORD>"))
 
 
 def _ts() -> str:
@@ -60,6 +68,22 @@ def _ts() -> str:
 def _banner(title: str) -> None:
     line = "=" * 72
     print(f"\n{line}\n  {_ts()}  {title}\n{line}")
+
+
+def _node_body_for_log(body: dict) -> str:
+    """Копия тела POST /nodes для лога без секретов."""
+    try:
+        o = json.loads(json.dumps(body, default=str))
+    except (TypeError, ValueError):
+        return str(body)
+    ssh = o.get("ssh")
+    if isinstance(ssh, dict):
+        if ssh.get("password"):
+            ssh["password"] = "***"
+        pk = ssh.get("privateKey")
+        if pk:
+            ssh["privateKey"] = f"<PEM, {len(pk)} символов>"
+    return json.dumps(o, indent=2, ensure_ascii=False, default=str)
 
 
 def _mask_key(key: str | None, keep: int = 6) -> str:
@@ -144,12 +168,38 @@ def _build_node_payload(server: Server, group_id: str) -> dict:
         print("ОШИБКА: у Server пустой ip_address — ноду добавить нельзя.")
         sys.exit(1)
     name = (server.hosting or "").strip() or f"server-{server.pk}-{ip}"
+
+    ssh_user = (server.user or "root").strip() or "root"
+    ssh_password = (server.password or "").strip()
+    key_pem = (CELERITY_SSH_PRIVATE_KEY or "").strip() if CELERITY_SSH_PRIVATE_KEY else ""
+
+    if ssh_password in _SERVER_PASSWORD_PLACEHOLDERS:
+        ssh_password = ""
+    if not ssh_password and not key_pem:
+        print(
+            "ОШИБКА: для SSH в панели нужен пароль или ключ.\n"
+            "  • Укажите реальный SSH-пароль в Django: Server.password (запись "
+            f"id={TEST_SERVER_PK}).\n"
+            "  • Либо задайте PEM в константе CELERITY_SSH_PRIVATE_KEY в этом скрипте."
+        )
+        sys.exit(1)
+
+    ssh_obj: dict = {
+        "port": int(CELERITY_SSH_PORT),
+        "username": ssh_user,
+    }
+    if ssh_password:
+        ssh_obj["password"] = ssh_password
+    if key_pem:
+        ssh_obj["privateKey"] = key_pem
+
     body: dict = {
         "type": CELERITY_NODE_TYPE,
         "name": name,
         "ip": ip,
         "port": int(CELERITY_NODE_PORT),
         "groups": [group_id],
+        "ssh": ssh_obj,
     }
     if CELERITY_NODE_DOMAIN:
         body["domain"] = CELERITY_NODE_DOMAIN
@@ -217,7 +267,7 @@ def main() -> None:
     action.add_argument(
         "--add-node",
         action="store_true",
-        help="POST /nodes — ip/hosting/port из Server + константы CELERITY_NODE_*",
+        help="POST /nodes — Server + группа + ssh (password из Server.password или CELERITY_SSH_PRIVATE_KEY)",
     )
     parser.add_argument(
         "--sync-all",
@@ -252,8 +302,8 @@ def main() -> None:
         group_id = _resolve_celerity_group_id(api)
         _banner("POST /nodes (create_node)")
         body = _build_node_payload(server, group_id)
-        print("Тело запроса (CELERITY_NODE_* + Server + группа):")
-        print(json.dumps(body, indent=2, ensure_ascii=False))
+        print("Тело запроса (CELERITY_* + Server + группа + ssh), секреты замаскированы:")
+        print(_node_body_for_log(body))
         ok, data = api.create_node(body)
         _dump("create_node", ok, data)
     else:
@@ -262,7 +312,6 @@ def main() -> None:
             _banner("POST /sync")
             ok, data = api.sync_all()
             _dump("sync_all", ok, data)
-
 
     _banner("Готово")
     print("Проверка завершена.\n")
