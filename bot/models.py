@@ -264,6 +264,12 @@ class Server(models.Model):
     country = models.ForeignKey('Country', on_delete=models.CASCADE, null=True, blank=True, verbose_name='Страна')
     is_activated_vless = models.BooleanField(editable=False, default=False,
                                              verbose_name='MB')
+    is_c3celeryty_activated = models.BooleanField(
+        editable=False,
+        default=False,
+        verbose_name='C3 Celeryty',
+        help_text='Нода Hysteria2 в панели C3 Celeryty настроена и готова к выдаче ключей.',
+    )
 
     def __str__(self):
         return f"{self.hosting} ({self.created_at}) {self.country.name}"

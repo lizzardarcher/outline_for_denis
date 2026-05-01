@@ -143,7 +143,9 @@ async def getlogin(message):
         profile = tg_user.user_profile
 
         site_domain = settings.ALIAS_DOMAIN
-        login_url = f"{site_domain}/auth/accounts/login/"
+        proxy_domain = settings.PROXY_DOMAIN
+        # login_url = f"{site_domain}/auth/accounts/login/"
+        login_url = f"{proxy_domain}"
 
         if not profile.site_password_generated:
             password = _generate_and_set_site_password(django_user)
@@ -155,6 +157,7 @@ async def getlogin(message):
                 f"Логин: <code>{django_user.username}</code>\n"
                 f"Пароль: <code>{password}</code>\n\n"
                 f"Сайт: {login_url}\n\n"
+                f"Ссылка содержит актуальный на данный момент адрес сайта\n\n"
                 "Рекомендуем сразу изменить пароль в личном кабинете после первого входа."
             )
         else:
@@ -162,6 +165,7 @@ async def getlogin(message):
                 "Ваш логин для входа на сайт DomVPN:\n\n"
                 f"Логин: <code>{django_user.username}</code>\n\n"
                 f"Сайт: {login_url}\n\n"
+                f"Ссылка содержит актуальный на данный момент адрес сайта\n\n"
                 "Пароль уже был выдан ранее.\n"
                 "Если вы его забыли — используйте кнопку «Изменить пароль на сайте» в разделе Профиль."
             )

@@ -8,6 +8,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = os.getenv('DJANGO_SECRET_KEY')
 ALIAS_DOMAIN = 'https://dom-vpn.su'
+PROXY_DOMAIN = 'https://tm3949.craftum.io'
+
 DEBUG = True
 # DEBUG = False
 
@@ -49,6 +51,7 @@ RECAPTCHA_PRIVATE_KEY = os.getenv('RECAPTCHA_PRIVATE_KEY')
 RECAPTCHA_DEFAULT_LANGUAGE = 'ru'
 
 MARZBAN_API=os.getenv('MARZBAN_API')
+C3CELERYTY_API_KEY= os.getenv('C3CELERYTY_API_KEY')
 
 YOOKASSA_SHOP_ID = os.getenv('YOOKASSA_SHOP_ID_LIVE')
 YOOKASSA_SECRET = os.getenv('YOOKASSA_SECRET_LIVE')

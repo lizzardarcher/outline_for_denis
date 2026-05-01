@@ -5,6 +5,9 @@
       <sshConfig authType="PASSWORD" host="179.43.180.203" id="7e6e7a4a-ada6-4109-81fe-6a543121071e" port="22" nameFormat="DESCRIPTIVE" username="root" useOpenSSHConfig="true" />
       <sshConfig authType="PASSWORD" host="45.12.142.197" id="6f1d974b-6ab4-428e-b8c0-af54ea97252e" port="22" nameFormat="DESCRIPTIVE" username="root" useOpenSSHConfig="true" />
       <sshConfig authType="PASSWORD" host="185.246.118.194" id="32b227e5-55b7-4021-b37d-ad3b3e68bebc" port="22" nameFormat="DESCRIPTIVE" username="root" useOpenSSHConfig="true" />
+      <sshConfig authType="PASSWORD" connectionConfig="{&quot;serverAliveInterval&quot;:300}" host="154.222.8.12" id="08aa63b2-efec-4b49-8411-0e4c32f6781a" port="22" customName="hiddify manager" nameFormat="CUSTOM" username="root" useOpenSSHConfig="true">
+        <option name="customName" value="hiddify manager" />
+      </sshConfig>
     </configs>
   </component>
 </project>

@@ -572,7 +572,7 @@ class ServerAdmin(BaseAdmin):
 
     list_display = (
         'hosting', 'ip_address', 'user', 'password', 'rental_price', 'max_keys', 'get_key_generated', 'is_active',
-        'country', 'created_at', 'is_activated_vless')
+        'country', 'created_at', 'is_activated_vless', 'is_c3celeryty_activated')
     list_display_links = ('hosting',)
     fields = ( 'hosting', 'ip_address', 'user', 'password', 'rental_price', 'max_keys', 'is_active', 'country', 'created_at')
     readonly_fields = ('max_keys', 'created_at',)
