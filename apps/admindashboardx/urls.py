@@ -70,6 +70,7 @@ from .views import (
     UserProfileDeleteView,
     UserProfileUpdateView,
     UserDetailView,
+    UserAnalyticsExcelExportView,
     UsersListView,
     VpnKeyCRUDListView,
     VpnKeyCreateView,
@@ -77,12 +78,12 @@ from .views import (
     VpnKeyUpdateView,
 )
 
-
 app_name = "admindashboardx"
 
 urlpatterns = [
     path("", AdminDashboardIndexView.as_view(), name="index"),
     path("users/", UsersListView.as_view(), name="users"),
+    path("users/export/analytics/xlsx/", UserAnalyticsExcelExportView.as_view(), name="users_analytics_export_xlsx"),
     path("users/<int:telegram_user_id>/", UserDetailView.as_view(), name="user_detail"),
     path("transactions/", TransactionsListView.as_view(), name="transactions"),
     path("transactions/<int:tx_id>/", TransactionDetailView.as_view(), name="transaction_detail"),
@@ -155,3 +156,4 @@ urlpatterns = [
     path("transactions-crud/<int:item_id>/delete/", TransactionDeleteView.as_view(), name="transaction_delete"),
     path("keys/", KeysListView.as_view(), name="keys"),
 ]
+

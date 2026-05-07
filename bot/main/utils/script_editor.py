@@ -11,10 +11,14 @@ from __future__ import annotations
 
 import os
 import re
+import traceback
 from datetime import timedelta
 
 import django
 from django.utils import timezone
+
+from bot.main.MarzbanAPI import MarzbanAPI
+from bot.models import TelegramUser, VpnKey, Logging
 
 
 def _setup_django() -> None:
@@ -107,6 +111,17 @@ def run_invalid_payment_method_report(
         # user.save()
         counter += 1
 
-
+def delete_expired_keys():
+    vpn_keys = VpnKey.objects.filter(user__subscription_status=False)
+    for key in vpn_keys:
+        try:
+            MarzbanAPI().delete_user(username=str(key.user.user_id))
+            key.delete()
+            print("User key deleted")
+        except Exception:
+            Logging.objects.create(log_level='FATAL',
+                                   message=f'[BOT] [Ошибка при удалении ключа:\n{traceback.format_exc()}]',
+                                   datetime=timezone.now())
 if __name__ == "__main__":
-    run_invalid_payment_method_report()
+    delete_expired_keys()
+#     run_invalid_payment_method_report()

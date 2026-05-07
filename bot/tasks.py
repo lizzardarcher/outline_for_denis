@@ -67,7 +67,8 @@ def update_user_subscription_status():
         try:
             user.subscription_status = False
             user.save()
-            revoke_mtproxy_keys_for_user_task.delay(user.user_id, reason="subscription_expired")
+
+            # revoke_mtproxy_keys_for_user_task.delay(user.user_id, reason="subscription_expired")
             try:
                 bot.send_message(chat_id=user.user_id, text=msg.subscription_expired)
             except:

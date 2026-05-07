@@ -1,17 +1,20 @@
-from datetime import timedelta
+from collections import defaultdict
+from datetime import datetime, timedelta
 from decimal import Decimal
 
-from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.conf import settings
 from django import forms
 from django.forms import modelform_factory
 from django.core.paginator import Paginator
 from django.db.models import Q, Sum
+from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
 from django.views import View
 from django.views.generic import TemplateView
+from openpyxl import Workbook
 
 from bot.models import (
     Country,
@@ -287,6 +290,105 @@ class UsersListView(DashboardBaseView):
             }
         )
         return context
+
+
+class UserAnalyticsExcelExportView(LoginRequiredMixin, UserPassesTestMixin, View):
+    """
+    Агрегаты по всем TelegramUser (pk = id в БД).
+    Дата когорты: User.date_joined (дата), если есть UserProfile и Django User; иначе TelegramUser.join_date.
+    Исключаются только те TelegramUser, у кого связанный через профиль User — staff или superuser.
+    Конверсия: % когорты с ≥1 успешной транзакцией (paid=True OR status='succeeded').
+    """
+
+    login_url = "login"
+    raise_exception = True
+
+    SUCCESS_Q = Q(paid=True) | Q(status="succeeded")
+
+    def test_func(self):
+        return self.request.user.is_superuser
+
+    def get(self, request, *args, **kwargs):
+        paid_tg_pks = set(
+            Transaction.objects.filter(self.SUCCESS_Q)
+            .exclude(user_id__isnull=True)
+            .values_list("user_id", flat=True)
+            .distinct()
+        )
+
+        profile_by_tg_id = {}
+        for p in UserProfile.objects.select_related("user").exclude(telegram_user_id__isnull=True).iterator(
+            chunk_size=4096
+        ):
+            profile_by_tg_id[p.telegram_user_id] = p
+
+        daily_buckets = defaultdict(list)
+        monthly_buckets = defaultdict(list)
+        yearly_buckets = defaultdict(list)
+
+        for tg in TelegramUser.objects.only("id", "join_date").iterator(chunk_size=4096):
+            profile = profile_by_tg_id.get(tg.id)
+            if profile is not None:
+                user = profile.user
+                if user.is_staff or user.is_superuser:
+                    continue
+                dj = user.date_joined
+                if dj:
+                    day = dj.date() if hasattr(dj, "date") else dj
+                else:
+                    day = tg.join_date
+            else:
+                day = tg.join_date
+
+            if not day:
+                continue
+
+            pk = tg.id
+            daily_buckets[day].append(pk)
+            monthly_buckets[(day.year, day.month)].append(pk)
+            yearly_buckets[day.year].append(pk)
+
+        def rows_for(bucket_map, key_display_fn):
+            out = []
+            for key in sorted(bucket_map.keys()):
+                ids = bucket_map[key]
+                n = len(ids)
+                paid_n = sum(1 for pk in ids if pk in paid_tg_pks)
+                conv = (paid_n / n) * 100 if n else 0.0
+                out.append((key_display_fn(key), n, paid_n, conv))
+            return out
+
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "User_Analytics"
+
+        def append_section(title, data_rows):
+            ws.append([title])
+            ws.append(["period", "new_users", "with_successful_payment", "conversion_rate_%"])
+            for period_label, n, paid_n, conv in data_rows:
+                ws.append([period_label, n, paid_n, f"{conv:.2f}%"])
+            ws.append([])
+
+        append_section(
+            "Daily (cohort date: User.date_joined if linked else TelegramUser.join_date)",
+            rows_for(daily_buckets, lambda k: k.isoformat() if hasattr(k, "isoformat") else str(k)),
+        )
+        append_section(
+            "Monthly",
+            rows_for(monthly_buckets, lambda k: f"{k[0]:04d}-{k[1]:02d}"),
+        )
+        append_section(
+            "Yearly",
+            rows_for(yearly_buckets, lambda k: f"{k:04d}"),
+        )
+
+        response = HttpResponse(
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+        filename = f"user_analytics_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.xlsx"
+        response["Content-Disposition"] = f'attachment; filename="{filename}"'
+        wb.save(response)
+        return response
 
 
 class TransactionsListView(DashboardBaseView):
@@ -1431,7 +1533,6 @@ class GenericCRUDUpdateView(GenericCRUDCreateView):
             form.save()
             return redirect(reverse(self.list_url_name) + "?ops=updated")
         return self.render_to_response(self.get_context_data(item=item, form=form))
-
 
 class GenericCRUDDeleteView(DashboardBaseView, View):
     model = None
