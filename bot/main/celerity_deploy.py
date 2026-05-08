@@ -3,6 +3,11 @@
 """
 C³ CELERITY: создание ноды в панели (при необходимости) и автоматическая установка ПО (POST /nodes/:id/setup).
 
+Политика ключей (на будущее, единая для Marzban и Celerity):
+  У пользователя один активный ключ на протокол/панель. При замене ключа: сначала удаляем
+  пользователя из Marzban и из Celerity (насколько применимо), затем создаём нового пользователя
+  в нужной панели с тем же стабильным идентификатором (обычно Telegram user_id).
+
 Запуск из корня проекта (где manage.py):
 
   Только setup (нода уже в панели):
@@ -18,6 +23,11 @@ C³ CELERITY: создание ноды в панели (при необходи
 
   Массовый только setup (ноды уже в панели), is_c3celeryty_activated=False:
     python3 bot/main/celerity_deploy.py
+
+  Пользователь в панели (отладка / разбор ответа API для парсинга ключа):
+    python3 bot/main/celerity_deploy.py --celerity-create-user --celerity-user-id 123456789
+    python3 bot/main/celerity_deploy.py --celerity-delete-user --celerity-user-id 123456789
+    python3 bot/main/celerity_deploy.py --celerity-get-user --celerity-user-id 123456789
 
 Константы группы и SSH совпадают по смыслу с test_celerity_api.py (группа «Марвел», порт 443, и т.д.).
 Переменные окружения: C3CELERYTY_API_ENDPOINT, C3CELERYTY_API_KEY.
@@ -375,6 +385,108 @@ def _run_provision_two_phase(
     return ok_n, skip_n, fail_create_n, fail_setup_n
 
 
+def _require_celerity_user_id(args: argparse.Namespace) -> str:
+    raw = getattr(args, "celerity_user_id", None)
+    uid = (raw if raw is not None else "").strip()
+    if not uid:
+        _log("ОШИБКА: укажите --celerity-user-id (обычно Telegram user_id, как в Marzban username)")
+        sys.exit(2)
+    return uid
+
+
+def _run_celerity_user_cli(api: CelerityAPI, args: argparse.Namespace) -> None:
+    """Один из режимов --celerity-*-user; завершает процесс через sys.exit."""
+    uid = _require_celerity_user_id(args)
+    display_name = (args.celerity_display_name or "").strip() or uid
+
+    if args.celerity_get_user:
+        _log(f"GET /users/{uid!r}")
+        ok, data = api.get_user(uid)
+        if not ok:
+            _log(f"ОШИБКА get_user: {data!r}")
+            sys.exit(1)
+        print(json.dumps(data, indent=2, ensure_ascii=False, default=str))
+        if isinstance(data, dict) and data.get("subscriptionToken"):
+            tok = str(data["subscriptionToken"])
+            _log("GET /files/info/:token (публичный маршрут, без X-API-Key)")
+            ok_i, info = api.get_subscription_info(tok)
+            if ok_i:
+                print("\n--- subscription info (GET /files/info/:token) ---")
+                print(json.dumps(info, indent=2, ensure_ascii=False, default=str))
+            else:
+                _log(
+                    f"WARN: /files/info не удался: {info!r} "
+                    "(на пустом nodes[] у пользователя панель часто отдаёт 404 — см. ниже GET /files/:token)"
+                )
+
+            _log("GET /files/:token?format=uri — список URI подписки (для парсинга ключа)")
+            ok_f, sub = api.get_subscription_content(tok, params={"format": "uri"})
+            if ok_f:
+                print("\n--- subscription content (GET /files/:token?format=uri) ---")
+                if isinstance(sub, str):
+                    body = sub.strip()
+                    lim = 12000
+                    if len(body) > lim:
+                        print(body[:lim] + "\n… [обрезано, всего символов: %d]" % len(body))
+                    else:
+                        print(body if body else "(пусто — проверьте ноды в группе пользователя)")
+                else:
+                    print(json.dumps(sub, indent=2, ensure_ascii=False, default=str))
+            else:
+                _log(f"WARN: GET /files/:token не удался: {sub!r}")
+        sys.exit(0)
+
+    if args.celerity_delete_user:
+        if args.dry_run:
+            _log(f"DRY-RUN: DELETE /users/{uid!r}")
+            sys.exit(0)
+        _log(f"DELETE /users/{uid!r}")
+        ok, data = api.delete_user(uid)
+        if ok:
+            _log("OK: пользователь удалён (или ответ 204)")
+            sys.exit(0)
+        err_txt = data
+        if isinstance(data, dict):
+            err_txt = data.get("error", data)
+        low = str(err_txt).lower()
+        if "not found" in low or "404" in low:
+            _log(f"WARN: пользователь не найден (возможно уже удалён): {data!r}")
+            sys.exit(0)
+        _log(f"ОШИБКА delete_user: {data!r}")
+        sys.exit(1)
+
+    if args.celerity_create_user:
+        if args.dry_run:
+            body = {
+                "userId": uid,
+                "username": display_name,
+                "enabled": True,
+                "groups": [
+                    f"<ObjectId группы «{CELERITY_SERVER_GROUP_NAME}» — реальный id подставляется после GET /groups>"
+                ],
+            }
+            _log("DRY-RUN: POST /users (тело без запросов к панели)")
+            print(json.dumps(body, indent=2, ensure_ascii=False))
+            sys.exit(0)
+        group_id = _resolve_celerity_group_id(api)
+        body = {
+            "userId": uid,
+            "username": display_name,
+            "enabled": True,
+            "groups": [group_id],
+        }
+        _log(f"POST /users userId={uid!r} username={display_name!r}")
+        ok, data = api.create_user(body)
+        if not ok:
+            _log(f"ОШИБКА create_user: {data!r}")
+            sys.exit(1)
+        print(json.dumps(data, indent=2, ensure_ascii=False, default=str))
+        _log("OK: create_user")
+        sys.exit(0)
+
+    sys.exit(2)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="C³ CELERITY: provision (опц.) + setup нод для Server",
@@ -387,8 +499,8 @@ def main() -> None:
   Один сервер (provision + setup):
     python3 bot/main/celerity_deploy.py --provision --ip 185.246.118.59
 
-  Только setup (ноды уже в панели):
-    python3 bot/main/celerity_deploy.py --ip 185.246.118.59
+  Разбор ответа API пользователя (ключ/subscription):
+    python3 bot/main/celerity_deploy.py --celerity-get-user --celerity-user-id 123456789
 """,
     )
     parser.add_argument(
@@ -403,7 +515,7 @@ def main() -> None:
     parser.add_argument(
         "--dry-run",
         action="store_true",
-        help="Не вызывать create/setup (только лог плановых действий; поиск ноды в панели выполняется)",
+        help="Не вызывать create/setup нод; для --celerity-create-user/--celerity-delete-user — без POST/DELETE в панель.",
     )
     parser.add_argument(
         "--include-already-c3",
@@ -446,6 +558,34 @@ def main() -> None:
         metavar="SEC",
         help="HTTP timeout для POST /setup",
     )
+    user_grp = parser.add_mutually_exclusive_group()
+    user_grp.add_argument(
+        "--celerity-create-user",
+        action="store_true",
+        help="POST /users в Celerity (нужен --celerity-user-id; группа — как у нод, см. константы).",
+    )
+    user_grp.add_argument(
+        "--celerity-delete-user",
+        action="store_true",
+        help="DELETE /users/:userId в Celerity.",
+    )
+    user_grp.add_argument(
+        "--celerity-get-user",
+        action="store_true",
+        help="GET /users/:userId — полный JSON в stdout; при наличии subscriptionToken дополнительно GET /files/info.",
+    )
+    parser.add_argument(
+        "--celerity-user-id",
+        default=None,
+        metavar="ID",
+        help="Идентификатор userId в панели Celerity (как правило str(TelegramUser.user_id)).",
+    )
+    parser.add_argument(
+        "--celerity-display-name",
+        default=None,
+        metavar="NAME",
+        help="Поле username при POST /users (по умолчанию совпадает с --celerity-user-id).",
+    )
     args = parser.parse_args()
 
     endpoint = getattr(settings, "C3CELERYTY_API_ENDPOINT", None) or ""
@@ -455,6 +595,17 @@ def main() -> None:
     if not endpoint.strip() or not (key or "").strip():
         _log("ОШИБКА: задайте C3CELERYTY_API_ENDPOINT и C3CELERYTY_API_KEY")
         sys.exit(2)
+
+    api = CelerityAPI()
+
+    user_mode = bool(
+        args.celerity_create_user or args.celerity_delete_user or args.celerity_get_user
+    )
+    if user_mode and args.provision:
+        _log("ОШИБКА: нельзя совмещать --provision с --celerity-create-user / --celerity-delete-user / --celerity-get-user")
+        sys.exit(2)
+    if user_mode:
+        _run_celerity_user_cli(api, args)
 
     if args.limit < 0:
         _log("ОШИБКА: --limit не может быть отрицательным")
@@ -471,8 +622,6 @@ def main() -> None:
         _log(
             "Нет записей Server по фильтрам (is_active, is_c3celeryty_activated, --ip, --server-id)."
         )
-
-    api = CelerityAPI()
 
     if args.provision:
         group_id: Optional[str] = None

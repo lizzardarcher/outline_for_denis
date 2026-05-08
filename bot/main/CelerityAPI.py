@@ -1,5 +1,5 @@
 import json
-from typing import Optional
+from typing import Any, Dict, Mapping, Optional
 from urllib.parse import quote
 
 import requests
@@ -33,23 +33,43 @@ class CelerityAPI:
             path = f"/{path}"
         return f"{self.base_url}{path}"
 
-    def _make_request(self, method, path, data=None, params=None, timeout=None):
+    def _make_request(
+        self,
+        method,
+        path,
+        data=None,
+        params=None,
+        timeout=None,
+        *,
+        auth: bool = True,
+        extra_headers: Optional[Mapping[str, str]] = None,
+    ):
         """
         Returns:
-            tuple: (success: bool, body: dict, str или None) — как в MarzbanAPI.
+            tuple: (success: bool, body: dict | str | None) — как в MarzbanAPI.
+
+        Args:
+            auth: False для публичных маршрутов /files и /files/info (README: без API key).
+            extra_headers: дополнительные заголовки (например User-Agent для /files/:token).
         """
         if not self.base_url:
             return False, "C3CELERYTY_API_ENDPOINT is not set"
-        if not self.api_key:
+        if auth and not self.api_key:
             return False, "C3CELERYTY_API_KEY is not set"
 
         req_timeout = self.timeout if timeout is None else timeout
         url = self._url(path)
+        if auth:
+            headers: Dict[str, str] = dict(self.headers)
+        else:
+            headers = {"Accept": "*/*"}
+        if extra_headers:
+            headers.update(dict(extra_headers))
         try:
             response = requests.request(
                 method,
                 url,
-                headers=self.headers,
+                headers=headers,
                 json=data,
                 params=params,
                 timeout=req_timeout,
@@ -91,6 +111,7 @@ class CelerityAPI:
         """PUT /users/:userId"""
         uid = quote(str(user_id), safe="")
         return self._make_request("PUT", f"/users/{uid}", data=data)
+
 
     def delete_user(self, user_id: str):
         """DELETE /users/:userId"""
@@ -283,9 +304,31 @@ class CelerityAPI:
         uid = quote(str(user_id), safe="")
         return self._make_request("POST", f"/kick/{uid}")
 
-    # --- Подписки (без API key в README — токен в URL; для management пригодится info) ---
+    # --- Подписки (публичные маршруты /files* — без X-API-Key, см. README CELERITY) ---
 
     def get_subscription_info(self, token: str):
-        """GET /files/info/:token — метаданные подписки (трафик, срок)."""
+        """GET /files/info/:token — метаданные подписки (трафик, срок). Запрос без API key."""
         t = quote(str(token), safe="")
-        return self._make_request("GET", f"/files/info/{t}")
+        return self._make_request("GET", f"/files/info/{t}", auth=False)
+
+    def get_subscription_content(
+        self,
+        token: str,
+        params: Optional[Dict[str, Any]] = None,
+        *,
+        user_agent: Optional[str] = None,
+    ):
+        """
+        GET /files/:token — тело подписки (URI-list, clash и т.д. по User-Agent и ?format=).
+
+        Параметр format: uri | clash | singbox — см. README панели.
+        """
+        t = quote(str(token), safe="")
+        extra = {"User-Agent": user_agent} if user_agent else None
+        return self._make_request(
+            "GET",
+            f"/files/{t}",
+            params=params,
+            auth=False,
+            extra_headers=extra,
+        )
