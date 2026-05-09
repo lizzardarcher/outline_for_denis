@@ -34,8 +34,8 @@ def start(user: TelegramUser = None):
     markup.row(btn5)
     markup.row(btn6)
     markup.row(btn7)
-    if user and (user.username or "").strip().lower() == "megafoll":
-        markup.row(InlineKeyboardButton(text='🛰 TG Proxy', callback_data='tgproxy:show'))
+    # if user and (user.username or "").strip().lower() == "megafoll":
+    #     markup.row(InlineKeyboardButton(text='🛰 TG Proxy', callback_data='tgproxy:show'))
     return markup
 
 

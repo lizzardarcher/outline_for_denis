@@ -96,7 +96,7 @@
             {% if vpn_key and vpn_key.access_url %}
                 <div class="d-flex flex-wrap align-items-center mb-2">
                     {% if vpn_key.protocol %}
-                        <span class="badge badge-primary dv-badge-proto mr-2">{{ vpn_key.protocol|upper }}</span>
+                        <span class="badge badge-primary dv-badge-proto text-black mr-2">{{ vpn_key.protocol|upper }}</span>
                     {% endif %}
                     {% if vpn_key.server and vpn_key.server.country %}
                         <span class="text-muted small mb-0">{{ vpn_key.server.country.name_for_app }}</span>
@@ -293,9 +293,6 @@
                 <h5 class="modal-title font-weight-bold" id="change_keyLabel" style="color: #13056e;">
                     <i class="fa fa-sliders mr-2"></i>Настройка VPN-ключа
                 </h5>
-                <button type="button" class="close" data-dismiss="modal" aria-label="Закрыть">
-                    <span aria-hidden="true">&times;</span>
-                </button>
             </div>
             <div class="modal-body pt-2">
                 <form action="{% url 'get_new_key' %}" method="get">
