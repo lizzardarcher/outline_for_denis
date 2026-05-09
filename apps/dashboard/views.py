@@ -53,9 +53,9 @@ class ProfileView(LoginRequiredMixin, SuccessMessageMixin, TemplateView):
         context['servers'] = Server.objects.filter(is_active=True).values_list('country__name_for_app',
                                                                                flat=True).distinct()
         try:
-            context['vpn_key'] = VpnKey.objects.select_related('user').get(user=tg_user)
+            context['vpn_key'] = VpnKey.objects.select_related('user', 'server', 'server__country').get(user=tg_user)
         except VpnKey.DoesNotExist:
-            ...
+            context['vpn_key'] = None
         context['total_users'] = TelegramUser.objects.count()
         context['countries'] = Country.objects.filter(is_active=True)
         context['subscription'] = Prices.objects.get(id=1)
@@ -92,7 +92,6 @@ class ProfileView(LoginRequiredMixin, SuccessMessageMixin, TemplateView):
         if context['show_mtproxy']:
             context['mtproxy_key'] = get_active_key(tg_user)
         return context
-
 
 class MarkNotificationReadView(LoginRequiredMixin, View):
     def post(self, request, *args, **kwargs):
