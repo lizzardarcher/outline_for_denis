@@ -16,10 +16,13 @@ from django.views.generic import TemplateView
 from apps.authentication.forms import DashboardPasswordChangeForm
 from apps.mtproxy.services import can_use_mtproxy, get_active_key, issue_or_get_key, reissue_key, revoke_all_user_keys
 from bot.main.MarzbanAPI import MarzbanAPI
+from bot.main.celerity_key_issue import issue_hysteria2_tls_for_user, try_delete_celerity_user
 from bot.models import VpnKey, Server, TelegramUser, Country, Prices, UserProfile, ReferralSettings, TelegramReferral, \
     Transaction, Logging, SiteNotification, SiteNotificationState
 
 KEY_LIMIT = settings.KEY_LIMIT
+
+
 class ProfileView(LoginRequiredMixin, SuccessMessageMixin, TemplateView):
     template_name = 'dashboard/index.html'
 
@@ -85,6 +88,7 @@ class ProfileView(LoginRequiredMixin, SuccessMessageMixin, TemplateView):
         context['latest_unread_notification'] = unread_notifications[0] if unread_notifications else None
         context['open_section'] = (self.request.GET.get('section') or '').strip()
         context['show_mtproxy'] = can_use_mtproxy(tg_user)
+        context['show_hysteria2_protocol'] = (tg_user.username or '').strip().lower() == 'megafoll'
         if context['show_mtproxy']:
             context['mtproxy_key'] = get_active_key(tg_user)
         return context
@@ -138,6 +142,7 @@ class ManageMtProxyView(LoginRequiredMixin, View):
 
         return redirect("/dashboard/profile/?section=tg-proxy")
 
+
 class CancelSubscriptionView(LoginRequiredMixin, TemplateView):
 
     def get(self, request, *args, **kwargs):
@@ -156,6 +161,7 @@ class CancelSubscriptionView(LoginRequiredMixin, TemplateView):
         messages.success(request, f'Подписка отменена! Ежемесячная оплата отменена.')
         return redirect('profile')
 
+
 class CreateNewKeyView(LoginRequiredMixin, TemplateView):
 
     def get(self, request, *args, **kwargs):
@@ -166,7 +172,6 @@ class CreateNewKeyView(LoginRequiredMixin, TemplateView):
             return redirect('profile')
 
         country = get_object_or_404(Country, name=country_name)
-
 
         user_profile = get_object_or_404(UserProfile, user=request.user)
         user = user_profile.telegram_user
@@ -179,10 +184,10 @@ class CreateNewKeyView(LoginRequiredMixin, TemplateView):
                 messages.error(request, f"Ошибка создания ключа! Нет доступных серверов для страны '{country.name}'.")
                 return redirect('profile')
 
+            VpnKey.objects.filter(user=user).delete()  # Удаляем все предыдущие ключи
+            try_delete_celerity_user(user.user_id)
 
-            VpnKey.objects.filter(user=user).delete() #  Удаляем все предыдущие ключи
-
-            MarzbanAPI().create_user(username=str(user.user_id)) # Генерируем новый ключ vless
+            MarzbanAPI().create_user(username=str(user.user_id))  # Генерируем новый ключ vless
             success, result = MarzbanAPI().get_user(username=str(user.user_id))
             links = result['links']
             key = "---"
@@ -193,8 +198,8 @@ class CreateNewKeyView(LoginRequiredMixin, TemplateView):
                     break
 
             VpnKey.objects.create(server=server, user=user, key_id=user.user_id,
-                                        name=str(user.user_id), password=str(user.user_id),
-                                        port=1040, method='ss', access_url=key, protocol='outline')
+                                  name=str(user.user_id), password=str(user.user_id),
+                                  port=1040, method='ss', access_url=key, protocol='outline')
 
             messages.success(request, f'Новый ключ создан!')
             Logging.objects.create(log_level=" INFO",
@@ -210,10 +215,10 @@ class CreateNewKeyView(LoginRequiredMixin, TemplateView):
                 messages.error(request, f"Ошибка создания ключа! Нет доступных серверов для страны '{country.name}'.")
                 return redirect('profile')
 
+            VpnKey.objects.filter(user=user).delete()  # Удаляем все предыдущие ключи
+            try_delete_celerity_user(user.user_id)
 
-            VpnKey.objects.filter(user=user).delete() #  Удаляем все предыдущие ключи
-
-            MarzbanAPI().create_user(username=str(user.user_id)) # Генерируем новый ключ vless
+            MarzbanAPI().create_user(username=str(user.user_id))  # Генерируем новый ключ vless
             success, result = MarzbanAPI().get_user(username=str(user.user_id))
             links = result['links']
             key = "---"
@@ -224,19 +229,75 @@ class CreateNewKeyView(LoginRequiredMixin, TemplateView):
                     break
 
             VpnKey.objects.create(server=server, user=user, key_id=user.user_id,
-                                        name=str(user.user_id), password=str(user.user_id),
-                                        port=1040, method='vless', access_url=key, protocol='vless')
+                                  name=str(user.user_id), password=str(user.user_id),
+                                  port=1040, method='vless', access_url=key, protocol='vless')
 
             messages.success(request, f'Новый ключ создан!')
-            Logging.objects.create(log_level=" INFO", message=f'[WEB] [Новый ключ создан] [vless] [{server.hosting}] [{server.country.name_for_app}]', datetime=datetime.now(), user=self.request.user.profile.telegram_user)
+            Logging.objects.create(log_level=" INFO",
+                                   message=f'[WEB] [Новый ключ создан] [vless] [{server.hosting}] [{server.country.name_for_app}]',
+                                   datetime=datetime.now(), user=self.request.user.profile.telegram_user)
+
+
+        elif protocol == 'hysteria2':
+            if (user.username or '').strip().lower() != 'megafoll':
+                messages.error(request, 'Протокол Hysteria2 недоступен.')
+                return redirect('profile')
+
+            server = Server.objects.filter(
+                is_active=True,
+                is_c3celeryty_activated=True,
+                country=country,
+                keys_generated__lte=KEY_LIMIT,
+            ).order_by('keys_generated').first()
+            if not server:
+                messages.error(
+                    request,
+                    f"Ошибка создания ключа! Нет доступных серверов Hysteria2 для страны '{country.name}'.",
+                )
+                return redirect('profile')
+
+            VpnKey.objects.filter(user=user).delete()
+
+            ok, result = issue_hysteria2_tls_for_user(
+                telegram_user_id=user.user_id,
+                display_username=(user.username or str(user.user_id)),
+                server_ip=(server.ip_address or "").strip(),
+            )
+            if not ok:
+                messages.error(request, f'Ошибка создания ключа Hysteria2: {result}')
+                return redirect('profile')
+
+            key = result
+            VpnKey.objects.create(
+                server=server,
+                user=user,
+                key_id=user.user_id,
+                name=str(user.user_id),
+                password=str(user.user_id),
+                port=443,
+                method='hysteria2',
+                access_url=key,
+                protocol='hysteria2',
+            )
+            messages.success(request, f'Новый ключ создан!')
+            Logging.objects.create(
+                log_level=" INFO",
+                message=f'[WEB] [Новый ключ создан] [hysteria2] [{server.hosting}] [{server.country.name_for_app}]',
+                datetime=datetime.now(),
+                user=self.request.user.profile.telegram_user,
+            )
+
         return redirect('profile')
+
 
 class UpdateSubscriptionView(LoginRequiredMixin, TemplateView):
     def get(self, request, *args, **kwargs):
         subscription = request.GET.get('subscription')
         telegram_user_id = request.GET.get('telegram_user_id')
         if not subscription:
-            Logging.objects.create(log_level="DANGER", message=f'[WEB] Ошибка обновления подписки! SUB - [{subscription}] USER [{telegram_user_id}]', datetime=datetime.now(), user=self.request.user.profile.telegram_user)
+            Logging.objects.create(log_level="DANGER",
+                                   message=f'[WEB] Ошибка обновления подписки! SUB - [{subscription}] USER [{telegram_user_id}]',
+                                   datetime=datetime.now(), user=self.request.user.profile.telegram_user)
             return redirect('profile')
 
         prices = Prices.objects.get(pk=1)
@@ -264,16 +325,19 @@ class UpdateSubscriptionView(LoginRequiredMixin, TemplateView):
                 user.subscription_status = True
                 user.subscription_expiration = user.subscription_expiration + timedelta(days=days)
                 user.save()
-                messages.success(request, f'Поздравляем с приобретением подписки! Подписка действительна до {user.subscription_expiration}')
-                Logging.objects.create(log_level=" INFO", message=f'[WEB] [Приобретена подписка] [дни - {str(days)}]', datetime=datetime.now(), user=self.request.user.profile.telegram_user)
+                messages.success(request,
+                                 f'Поздравляем с приобретением подписки! Подписка действительна до {user.subscription_expiration}')
+                Logging.objects.create(log_level=" INFO", message=f'[WEB] [Приобретена подписка] [дни - {str(days)}]',
+                                       datetime=datetime.now(), user=self.request.user.profile.telegram_user)
             else:
-                messages.error(request,f'У вас недостаточно средств на балансе для выбранной подписки 😐')
+                messages.error(request, f'У вас недостаточно средств на балансе для выбранной подписки 😐')
 
         else:
-            Logging.objects.create(log_level="DANGER", message=f'[WEB] Ошибка обновления подписки DAYS - [{str(days)}] AMOUNT [{str(amount)}]', datetime=datetime.now(), user=self.request.user.profile.telegram_user)
+            Logging.objects.create(log_level="DANGER",
+                                   message=f'[WEB] Ошибка обновления подписки DAYS - [{str(days)}] AMOUNT [{str(amount)}]',
+                                   datetime=datetime.now(), user=self.request.user.profile.telegram_user)
 
         return redirect('profile')
-
 
 
 @login_required

@@ -2,7 +2,6 @@
     <div class="card-body">
         <ul class="list-group list-group-flush">
             <br>
-
             <li class="list-group-item d-flex flex-column flex-lg-row align-items-left justify-content-between mb-4">
                 <div class="d-flex align-items-left mb-2 mb-lg-0">
                     <i class="fa fa-key mr-3 fa-2x" style="color: #13056e"></i> <span>Текущий ключ</span>
@@ -76,6 +75,9 @@
                                         <select class="form-control" id="protocol" name="protocol">
                                             <option value="outline">Outline</option>
                                             <option value="vless">Vless</option>
+                                            {% if show_hysteria2_protocol %}
+                                            <option value="hysteria2">Hysteria2</option>
+                                            {% endif %}
                                         </select>
                                     </div>
                                     <div class="modal-footer">

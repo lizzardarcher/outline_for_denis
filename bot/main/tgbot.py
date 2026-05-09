@@ -27,6 +27,7 @@ from bot.main.utils import msg
 from bot.main.utils import markup
 
 from bot.main.MarzbanAPI import MarzbanAPI
+from bot.main.celerity_key_issue import issue_hysteria2_tls_for_user, try_delete_celerity_user
 from apps.mtproxy.services import can_use_mtproxy, issue_or_get_key, reissue_key, revoke_all_user_keys
 
 from bot.main.utils.utils import return_matches, robokassa_md5
@@ -138,6 +139,7 @@ async def getlogin(message):
                 'subscription_expiration': datetime.now() - timedelta(days=1),
             }
         )
+
 
         django_user = _ensure_site_user_for_telegram_user(tg_user)
         profile = tg_user.user_profile
@@ -521,7 +523,7 @@ async def callback_query_handlers(call):
 
                 elif 'manage' in data:
                     await bot.send_message(call.message.chat.id, msg.choose_protocol,
-                                           reply_markup=markup.choose_protocol())
+                                           reply_markup=markup.choose_protocol(user=user))
 
                 elif 'country' in data:
 
@@ -568,6 +570,41 @@ async def callback_query_handlers(call):
                             await bot.send_message(call.message.chat.id, msg.no_subscription,
                                                    reply_markup=markup.get_subscription())
 
+                    elif 'hysteria2' in data:
+                        if (user.username or "").strip().lower() != "megafoll":
+                            await bot.send_message(
+                                call.message.chat.id,
+                                "Протокол Hysteria2 недоступен.",
+                                reply_markup=markup.choose_protocol(user=user),
+                            )
+                            return
+                        if user.subscription_status:
+                            country = return_matches(country_list, data[-1])[0]
+                            if country:
+                                try:
+                                    key = VpnKey.objects.filter(user=user, server__country__name=country).last()
+                                    if key and key.protocol == "hysteria2":
+                                        await bot.send_message(
+                                            call.message.chat.id,
+                                            text=f'{msg.key_avail}\n<code>{key.access_url}</code>',
+                                            reply_markup=markup.key_menu(country, "hysteria2"),
+                                        )
+                                    else:
+                                        await bot.send_message(
+                                            call.message.chat.id,
+                                            text=msg.get_new_key,
+                                            reply_markup=markup.get_new_key(country, "hysteria2"),
+                                        )
+                                except Exception:
+                                    await bot.send_message(
+                                        call.message.chat.id,
+                                        text=msg.get_new_key,
+                                        reply_markup=markup.get_new_key(country, "hysteria2"),
+                                    )
+                        else:
+                            await bot.send_message(call.message.chat.id, msg.no_subscription,
+                                                   reply_markup=markup.get_subscription())
+
                 elif 'protocol_outline' in data:
 
                     await bot.send_message(call.message.chat.id, msg.avail_location_choice,
@@ -578,55 +615,139 @@ async def callback_query_handlers(call):
                     await bot.send_message(call.message.chat.id, msg.avail_location_choice,
                                            reply_markup=markup.get_avail_location('vless'))
 
+                elif 'protocol_hysteria2' in data:
+                    if (user.username or "").strip().lower() != "megafoll":
+                        await bot.send_message(
+                            call.message.chat.id,
+                            "Протокол Hysteria2 недоступен.",
+                            reply_markup=markup.choose_protocol(user=user),
+                        )
+                        return
+                    await bot.send_message(call.message.chat.id, msg.avail_location_choice,
+                                           reply_markup=markup.get_avail_location('hysteria2'))
+
                 elif 'account' in data:
 
                     if 'get_new_key' in call.data or 'swap_key' in call.data:
                         protocol = call.data.split(':')[1]
+                        if protocol == "hysteria2" and (user.username or "").strip().lower() != "megafoll":
+                            await bot.send_message(
+                                call.message.chat.id,
+                                "Протокол Hysteria2 недоступен.",
+                                reply_markup=markup.choose_protocol(user=user),
+                            )
+                            return
                         if user.subscription_status:
                             try:
                                 country = call.data.split('_')[-1]
-                                server = Server.objects.filter(
-                                    is_active=True,
-                                    is_activated_vless=True,
-                                    country__name=country,
-                                    keys_generated__lte=200).order_by('keys_generated').first()
+                                if protocol == "hysteria2":
+                                    server = Server.objects.filter(
+                                        is_active=True,
+                                        is_c3celeryty_activated=True,
+                                        country__name=country,
+                                        keys_generated__lte=200,
+                                    ).order_by("keys_generated").first()
+                                else:
+                                    server = Server.objects.filter(
+                                        is_active=True,
+                                        is_activated_vless=True,
+                                        country__name=country,
+                                        keys_generated__lte=200,
+                                    ).order_by("keys_generated").first()
 
-                                VpnKey.objects.filter(user=user).delete()  # Удаляем все предыдущие ключи
-                                wait_msg = await bot.send_message(call.message.chat.id,
-                                                                  text='Ожидайте, ключи генерируются...')
-                                MarzbanAPI().delete_user(username=str(user.user_id))
-                                await asyncio.sleep(2)
-                                await bot.delete_message(wait_msg.chat.id, wait_msg.message_id)
+                                if not server:
+                                    await bot.send_message(
+                                        call.message.chat.id,
+                                        "Нет доступного сервера для выбранной страны.",
+                                        reply_markup=markup.start(user=user),
+                                    )
+                                    return
 
-                                MarzbanAPI().create_user(username=str(user.user_id))  # Генерируем новый ключ
-                                success, result = MarzbanAPI().get_user(username=str(user.user_id))
+                                VpnKey.objects.filter(user=user).delete()
+                                wait_msg = await bot.send_message(
+                                    call.message.chat.id,
+                                    text="Ожидайте, ключи генерируются...",
+                                )
 
-                                links = result['links']
-                                key = "---"
-                                for link in links:
+                                if protocol == "hysteria2":
+                                    ok, result = issue_hysteria2_tls_for_user(
+                                        telegram_user_id=user.user_id,
+                                        display_username=(user.username or str(user.user_id)),
+                                        server_ip=(server.ip_address or "").strip(),
+                                    )
+                                    await bot.delete_message(wait_msg.chat.id, wait_msg.message_id)
+                                    if not ok:
+                                        await bot.send_message(
+                                            call.message.chat.id,
+                                            f"Ошибка Hysteria2: {result}",
+                                            reply_markup=markup.start(user=user),
+                                        )
+                                        return
+                                    key_obj = VpnKey.objects.create(
+                                        server=server,
+                                        user=user,
+                                        key_id=user.user_id,
+                                        name=str(user.user_id),
+                                        password=str(user.user_id),
+                                        port=443,
+                                        method="hysteria2",
+                                        access_url=result,
+                                        protocol="hysteria2",
+                                    )
+                                else:
+                                    try_delete_celerity_user(user.user_id)
+                                    MarzbanAPI().delete_user(username=str(user.user_id))
+                                    await asyncio.sleep(2)
+                                    await bot.delete_message(wait_msg.chat.id, wait_msg.message_id)
 
-                                    if protocol == 'outline':
-                                        if server.ip_address in link and "ss://" in link and not "vless://" in link:
-                                            key = link
-                                            break
+                                    MarzbanAPI().create_user(username=str(user.user_id))
+                                    success, result = MarzbanAPI().get_user(username=str(user.user_id))
 
-                                    if protocol == 'vless':
-                                        if server.ip_address in link and "vless://" in link:
-                                            key = link
-                                            break
+                                    links = result["links"]
+                                    key = "---"
+                                    for link in links:
 
-                                key = VpnKey.objects.create(server=server, user=user, key_id=user.user_id,
-                                                            name=str(user.user_id), password=str(user.user_id),
-                                                            port=1040, method=protocol, access_url=key,
-                                                            protocol=protocol)
-                                Logging.objects.create(log_level=" INFO",
-                                                       message=f'[BOT] [Новый ключ создан] [{protocol}] [{server.hosting}] [{server.country.name_for_app}]',
-                                                       datetime=datetime.now(),
-                                                       user=user)
+                                        if protocol == "outline":
+                                            if (
+                                                server.ip_address in link
+                                                and "ss://" in link
+                                                and "vless://" not in link
+                                            ):
+                                                key = link
+                                                break
 
-                                await bot.send_message(call.message.chat.id,
-                                                       text=f'{msg.key_avail}\n<code>{key.access_url}</code>',
-                                                       reply_markup=markup.key_menu(country, protocol))
+                                        if protocol == "vless":
+                                            if server.ip_address in link and "vless://" in link:
+                                                key = link
+                                                break
+
+                                    key_obj = VpnKey.objects.create(
+                                        server=server,
+                                        user=user,
+                                        key_id=user.user_id,
+                                        name=str(user.user_id),
+                                        password=str(user.user_id),
+                                        port=1040,
+                                        method=protocol,
+                                        access_url=key,
+                                        protocol=protocol,
+                                    )
+
+                                Logging.objects.create(
+                                    log_level=" INFO",
+                                    message=(
+                                        f"[BOT] [Новый ключ создан] [{protocol}] "
+                                        f"[{server.hosting}] [{server.country.name_for_app}]"
+                                    ),
+                                    datetime=datetime.now(),
+                                    user=user,
+                                )
+
+                                await bot.send_message(
+                                    call.message.chat.id,
+                                    text=f"{msg.key_avail}\n<code>{key_obj.access_url}</code>",
+                                    reply_markup=markup.key_menu(country, protocol),
+                                )
                             except:
                                 ...
                         else:

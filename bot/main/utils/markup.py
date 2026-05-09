@@ -39,10 +39,13 @@ def start(user: TelegramUser = None):
     return markup
 
 
-def choose_protocol():
+
+def choose_protocol(user: TelegramUser = None):
     markup = InlineKeyboardMarkup()
     markup.add(InlineKeyboardButton(text=f'🚀 VLESS', callback_data=f'protocol_vless'))
     markup.add(InlineKeyboardButton(text=f'🔑 OUTLINE', callback_data=f'protocol_outline'))
+    if user and (user.username or "").strip().lower() == "megafoll":
+        markup.add(InlineKeyboardButton(text="⚡ Hysteria2", callback_data="protocol_hysteria2"))
     markup.add(btn_back)
     return markup
 
@@ -109,9 +112,11 @@ def for_sender():
 
 def get_avail_location(protocol: str):
     markup = InlineKeyboardMarkup()
-    # countries = Country.objects.filter(is_active=True)
-    servers = Server.objects.filter(is_active=True)
-    countries = set([x.country for x in servers])
+    if protocol == "hysteria2":
+        servers = Server.objects.filter(is_active=True, is_c3celeryty_activated=True)
+    else:
+        servers = Server.objects.filter(is_active=True)
+    countries = set([x.country for x in servers if x.country_id])
     for country in countries:
         markup.add(InlineKeyboardButton(text=country.name_for_app, callback_data=f'country:{protocol}:{country.name}'))
     markup.add(btn_back)
