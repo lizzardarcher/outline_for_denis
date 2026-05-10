@@ -8,7 +8,7 @@ from django.conf import settings
 from django import forms
 from django.forms import modelform_factory
 from django.core.paginator import Paginator
-from django.db.models import Count, Q, Sum
+from django.db.models import Case, Count, F, IntegerField, Q, Sum, Value, When
 from django.db.models.functions import TruncDay
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -215,38 +215,74 @@ class AdminDashboardIndexView(DashboardBaseView):
         now = timezone.now()
         today = timezone.localdate()
 
-        successful_payments = Transaction.objects.filter(self._SUCCESS_PAYMENT_Q).exclude(side="Вывод средств")
-
-        revenue_day = successful_payments.filter(timestamp__date=today).aggregate(t=Sum("amount")).get("t") or Decimal(
-            "0"
+        pay_ok = Transaction.objects.filter(self._SUCCESS_PAYMENT_Q).exclude(side="Вывод средств")
+        amt_field = Transaction._meta.get_field("amount")
+        zero_money = Value(Decimal("0"), output_field=amt_field)
+        rev_row = pay_ok.aggregate(
+            revenue_day=Sum(
+                Case(When(timestamp__date=today, then=F("amount")), default=zero_money, output_field=amt_field)
+            ),
+            revenue_month=Sum(
+                Case(
+                    When(Q(timestamp__year=today.year, timestamp__month=today.month), then=F("amount")),
+                    default=zero_money,
+                    output_field=amt_field,
+                )
+            ),
+            revenue_year=Sum(
+                Case(When(timestamp__year=today.year, then=F("amount")), default=zero_money, output_field=amt_field)
+            ),
         )
-        revenue_month = successful_payments.filter(
-            timestamp__year=today.year,
-            timestamp__month=today.month,
-        ).aggregate(t=Sum("amount")).get("t") or Decimal("0")
-        revenue_year = successful_payments.filter(timestamp__year=today.year).aggregate(t=Sum("amount")).get(
-            "t"
-        ) or Decimal("0")
+        revenue_day = rev_row["revenue_day"] or Decimal("0")
+        revenue_month = rev_row["revenue_month"] or Decimal("0")
+        revenue_year = rev_row["revenue_year"] or Decimal("0")
 
-        income_row = IncomeInfo.objects.order_by("-pk").first()
+        income_row = IncomeInfo.objects.only("total_amount").order_by("-pk").first()
         revenue_project_total = (
             income_row.total_amount if income_row and income_row.total_amount is not None else Decimal("0")
         )
 
-        users_total = TelegramUser.objects.count()
-        users_month = TelegramUser.objects.filter(join_date__year=today.year, join_date__month=today.month).count()
-        users_day = TelegramUser.objects.filter(join_date=today).count()
+        users_row = TelegramUser.objects.aggregate(
+            users_total=Count("id"),
+            users_month=Count(
+                Case(
+                    When(Q(join_date__year=today.year, join_date__month=today.month), then=Value(1)),
+                    output_field=IntegerField(),
+                )
+            ),
+            users_day=Count(Case(When(join_date=today, then=Value(1)), output_field=IntegerField())),
+        )
 
-        tx_qs = Transaction.objects.all()
-        tx_count_total = tx_qs.count()
-        tx_count_month = tx_qs.filter(timestamp__year=today.year, timestamp__month=today.month).count()
-        tx_count_day = tx_qs.filter(timestamp__date=today).count()
+        tx_row = Transaction.objects.aggregate(
+            tx_count_total=Count("id"),
+            tx_count_month=Count(
+                Case(
+                    When(Q(timestamp__year=today.year, timestamp__month=today.month), then=Value(1)),
+                    output_field=IntegerField(),
+                )
+            ),
+            tx_count_day=Count(Case(When(timestamp__date=today, then=Value(1)), output_field=IntegerField())),
+        )
 
-        wd_qs = WithdrawalRequest.objects.all()
-        wd_with_ts = WithdrawalRequest.objects.exclude(timestamp__isnull=True)
-        wd_count_total = wd_qs.count()
-        wd_count_month = wd_with_ts.filter(timestamp__year=today.year, timestamp__month=today.month).count()
-        wd_count_day = wd_with_ts.filter(timestamp__date=today).count()
+        wd_row = WithdrawalRequest.objects.aggregate(
+            wd_count_total=Count("id"),
+            wd_count_month=Count(
+                Case(
+                    When(
+                        Q(timestamp__isnull=False)
+                        & Q(timestamp__year=today.year, timestamp__month=today.month),
+                        then=Value(1),
+                    ),
+                    output_field=IntegerField(),
+                )
+            ),
+            wd_count_day=Count(
+                Case(
+                    When(Q(timestamp__isnull=False) & Q(timestamp__date=today), then=Value(1)),
+                    output_field=IntegerField(),
+                )
+            ),
+        )
 
         error_levels = ("WARNING", "FATAL")
         period_days = 30
@@ -261,15 +297,15 @@ class AdminDashboardIndexView(DashboardBaseView):
                 "revenue_year": revenue_year,
                 "revenue_month": revenue_month,
                 "revenue_day": revenue_day,
-                "users_total": users_total,
-                "users_month": users_month,
-                "users_day": users_day,
-                "tx_count_total": tx_count_total,
-                "tx_count_month": tx_count_month,
-                "tx_count_day": tx_count_day,
-                "wd_count_total": wd_count_total,
-                "wd_count_month": wd_count_month,
-                "wd_count_day": wd_count_day,
+                "users_total": users_row["users_total"],
+                "users_month": users_row["users_month"],
+                "users_day": users_row["users_day"],
+                "tx_count_total": tx_row["tx_count_total"],
+                "tx_count_month": tx_row["tx_count_month"],
+                "tx_count_day": tx_row["tx_count_day"],
+                "wd_count_total": wd_row["wd_count_total"],
+                "wd_count_month": wd_row["wd_count_month"],
+                "wd_count_day": wd_row["wd_count_day"],
                 "period_days": period_days,
                 "kpi_error_logs": kpi_error_logs,
             }
@@ -424,7 +460,6 @@ def _admx_build_revenue_insights(
 
 def _admx_payment_system_labels():
     return dict(Transaction._meta.get_field("payment_system").choices)
-
 
 class RevenueAnalyticsView(DashboardBaseView):
     """Доходы, пользователи, конверсия, автосписания (несколько ПС), платёжные системы, ошибки — по окну дней."""
