@@ -97,14 +97,14 @@ class CreatePaymentView(View):
                                        user=request.user.profile.telegram_user,
                                        currency='RUB', income_info=IncomeInfo.objects.get(pk=1), side='Приход средств',
                                        description='Приобретение подписки', payment_id=payment.id, payment_system='YooKassaSite')
-            Logging.objects.create(log_level="INFO", message=f'[WEB] [Платёжный запрос на сумму {str(amount)} р.]',
+            Logging.objects.create(category="payment", log_level="INFO", message=f'[WEB] [Платёжный запрос на сумму {str(amount)} р.]',
                                    datetime=datetime.now(), user=self.request.user.profile.telegram_user)
 
             # Перенаправляем пользователя на страницу ЮKassa
             return redirect(payment.confirmation.confirmation_url)
 
         except Exception as e:
-            Logging.objects.create(log_level="DANGER",
+            Logging.objects.create(category="payment", log_level="DANGER",
                                    message=f'[WEB] [Ошибка платёжного запроса {str(traceback.format_exc())}]',
                                    datetime=datetime.now(), user=self.request.user.profile.telegram_user)
             return redirect('profile')
@@ -139,7 +139,7 @@ class YookassaTGBOTWebhookView(View):
 
         # Обработка события
         if 'succeeded' in str(event_type):
-            Logging.objects.create(log_level="SUCCESS", message=f'[BOT] [Приём вебхука] [{event_type}]', user=telegram_user,
+            Logging.objects.create(category="payment", log_level="SUCCESS", message=f'[BOT] [Приём вебхука] [{event_type}]', user=telegram_user,
                                    datetime=datetime.now())
             try:
                 payment_id = payment_data.get('id')
@@ -178,7 +178,7 @@ class YookassaTGBOTWebhookView(View):
                         telegram_user.permission_revoked = False
                         telegram_user.save()
 
-                    Logging.objects.create(log_level="INFO",
+                    Logging.objects.create(category="payment", log_level="INFO",
                                            message=f'[BOT] [Обработка платежа] [{event_type}] [Сумма: {amount_value}] [Дни:{days}]',
                                            datetime=datetime.now(), user=telegram_user)
 
@@ -224,19 +224,19 @@ class YookassaTGBOTWebhookView(View):
                                     amount=Decimal(amount_value) * Decimal(percent) / 100,
                                     transaction=transaction
                                 )
-                    Logging.objects.create(log_level="SUCCESS",
+                    Logging.objects.create(category="payment", log_level="SUCCESS",
                                            message=f'[BOT] [Платёж  на сумму {str(amount_value)} р. прошёл]',
                                            datetime=datetime.now(), user=telegram_user)
                     return HttpResponse(f'Обновляем баланс пользователя', status=200)
 
             except Exception as e:
-                Logging.objects.create(log_level="DANGER",
+                Logging.objects.create(category="payment", log_level="DANGER",
                                        message=f'[BOT]  [Ошибка при приёме вебхука {str(traceback.format_exc())}]',
                                        datetime=datetime.now(), user=telegram_user)
                 return HttpResponse('OK', status=200)
 
         elif 'canceled' in str(event_type):
-            Logging.objects.create(log_level="WARNING", message=f'[BOT] [Приём вебхука] [{event_type}]', user=telegram_user,
+            Logging.objects.create(category="payment", log_level="WARNING", message=f'[BOT] [Приём вебхука] [{event_type}]', user=telegram_user,
                                    datetime=datetime.now())
             try:
                 payment_id = payment_data.get('id')
@@ -245,16 +245,16 @@ class YookassaTGBOTWebhookView(View):
                 transaction.status = status
                 transaction.paid = False
                 transaction.save()
-                Logging.objects.create(log_level="WARNING",
+                Logging.objects.create(category="payment", log_level="WARNING",
                                        message=f'[BOT] [Платёж  на сумму {str(traceback.format_exc())} р. отменён]',
                                        datetime=datetime.now(), user=self.request.user.profile.telegram_user)
             except Exception as e:
-                Logging.objects.create(log_level="DANGER",
+                Logging.objects.create(category="payment", log_level="DANGER",
                                        message=f'[BOT] [Ошибка при приёме вебхука {str(traceback.format_exc())}]',
                                        datetime=datetime.now(), user=self.request.user.profile.telegram_user)
             return HttpResponse('OK', status=200)
         else:
-            Logging.objects.create(log_level="DANGER", message=f'[BOT] [Непонятно что] [.......]',
+            Logging.objects.create(category="payment", log_level="DANGER", message=f'[BOT] [Непонятно что] [.......]',
                                    datetime=datetime.now())
             return HttpResponse('OK', status=200)
 
@@ -262,7 +262,7 @@ class YookassaTGBOTWebhookView(View):
 @method_decorator(csrf_exempt, name='dispatch')
 class YookassaSiteWebhookView(View):
     def post(self, request, *args, **kwargs):
-        # Logging.objects.create(log_level="WARNING", message=f'[WEB] [Приём вебхука] [{str(request.body)}]', datetime=datetime.now())
+        # Logging.objects.create(category="payment", log_level="WARNING", message=f'[WEB] [Приём вебхука] [{str(request.body)}]', datetime=datetime.now())
 
         try:
             data = json.loads(request.body)
@@ -277,7 +277,7 @@ class YookassaSiteWebhookView(View):
 
         # Обработка события
         if 'succeeded' in str(event_type):
-            Logging.objects.create(log_level="SUCCESS", message=f'[WEB] [Приём вебхука] [{event_type}]',user=telegram_user,
+            Logging.objects.create(category="payment", log_level="SUCCESS", message=f'[WEB] [Приём вебхука] [{event_type}]',user=telegram_user,
                                    datetime=datetime.now())
             try:
                 payment_id = payment_data.get('id')
@@ -316,7 +316,7 @@ class YookassaSiteWebhookView(View):
                         telegram_user.payment_method_id = payment_method_id
                         telegram_user.save()
 
-                    Logging.objects.create(log_level="INFO",
+                    Logging.objects.create(category="payment", log_level="INFO",
                                            message=f'[WEB] [Обработка платежа] [{event_type}] [Сумма: {amount_value}] [Дни:{days}]',
                                            datetime=datetime.now(), user=telegram_user)
 
@@ -361,19 +361,19 @@ class YookassaSiteWebhookView(View):
                                     amount=Decimal(amount_value) * Decimal(percent) / 100,
                                     transaction=transaction
                                 )
-                    Logging.objects.create(log_level="SUCCESS",
+                    Logging.objects.create(category="payment", log_level="SUCCESS",
                                            message=f'[WEB] [Платёж  на сумму {str(amount_value)} р. прошёл]',
                                            datetime=datetime.now(), user=telegram_user)
                     return HttpResponse(f'Обновляем баланс пользователя', status=200)
 
             except Exception as e:
-                Logging.objects.create(log_level="DANGER",
+                Logging.objects.create(category="payment", log_level="DANGER",
                                        message=f'[WEB] [Ошибка при приёме вебхука {str(traceback.format_exc())}]',
                                        datetime=datetime.now(), user=telegram_user)
                 return HttpResponse('OK', status=200)
 
         elif 'canceled' in str(event_type):
-            Logging.objects.create(log_level="WARNING", message=f'[WEB] [Приём вебхука] [{event_type}]', user=telegram_user,
+            Logging.objects.create(category="payment", log_level="WARNING", message=f'[WEB] [Приём вебхука] [{event_type}]', user=telegram_user,
                                    datetime=datetime.now())
             try:
                 payment_id = payment_data.get('id')
@@ -382,15 +382,15 @@ class YookassaSiteWebhookView(View):
                 transaction.status = status
                 transaction.paid = False
                 transaction.save()
-                Logging.objects.create(log_level="WARNING",
+                Logging.objects.create(category="payment", log_level="WARNING",
                                        message=f'[WEB] [Платёж  на сумму {str(traceback.format_exc())} р. отменён]',
                                        datetime=datetime.now(), user=self.request.user.profile.telegram_user)
             except Exception as e:
-                Logging.objects.create(log_level="DANGER",
+                Logging.objects.create(category="payment", log_level="DANGER",
                                        message=f'[WEB] [Ошибка при приёме вебхука {str(traceback.format_exc())}]',
                                        datetime=datetime.now(), user=self.request.user.profile.telegram_user)
             return HttpResponse('OK', status=200)
         else:
-            Logging.objects.create(log_level="DANGER", message=f'[WEB] [Непонятно что] [.......]',
+            Logging.objects.create(category="payment", log_level="DANGER", message=f'[WEB] [Непонятно что] [.......]',
                                    datetime=datetime.now())
             return HttpResponse('OK', status=200)

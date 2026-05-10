@@ -29,7 +29,13 @@ touch /root/.mtproxymax_installed
 
 def _create_log(message, level="INFO"):
     try:
-        Logging.objects.create(log_level=level, message=message, datetime=timezone.now(), user=None)
+        Logging.objects.create(
+            category="mtproxy",
+            log_level=level,
+            message=message,
+            datetime=timezone.now(),
+            user=None,
+        )
     except Exception:
         pass
 
@@ -375,7 +381,6 @@ def calculate_mtproxy_abuse_score_task():
                 f"[MTPROXY] [ABUSE] key={key.id} user={key.user.user_id} auto-revoked score={new_score}",
                 level="WARNING",
             )
-
 
 @shared_task
 def revoke_mtproxy_keys_for_user_task(telegram_user_id: int, reason: str = "subscription_inactive"):

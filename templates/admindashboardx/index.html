@@ -2,7 +2,6 @@
 
 {% block title %} · Главная{% endblock %}
 
-
 {% block content %}
     <div class="row g-3 mb-4">
         <div class="col-12 col-md-6 col-xl-3">
@@ -66,6 +65,7 @@
                         <thead>
                         <tr>
                             <th>Время</th>
+                            <th>Категория</th>
                             <th>Уровень</th>
                             <th>Пользователь</th>
                             <th>Сообщение</th>
@@ -75,13 +75,14 @@
                         {% for row in recent_error_logs %}
                             <tr>
                                 <td>{{ row.datetime|date:"d.m.Y H:i" }}</td>
+                                <td>{{ row.get_category_display }}</td>
                                 <td>{{ row.log_level }}</td>
                                 <td>{% if row.user %}{{ row.user.user_id }}{% else %}—{% endif %}</td>
                                 <td class="admx-message-cell">{{ row.message }}</td>
                             </tr>
                         {% empty %}
                             <tr>
-                                <td colspan="4" class="text-center text-secondary">Нет данных</td>
+                                <td colspan="5" class="text-center text-secondary">Нет данных</td>
                             </tr>
                         {% endfor %}
                         </tbody>

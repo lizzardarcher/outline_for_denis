@@ -58,6 +58,7 @@ def _init_marzban_single_server(server: Server, cloud_init: str) -> bool:
     SSH cloud-init marzban-node + регистрация ноды в Marzban. При успехе — is_activated_vless=True.
     """
     Logging.objects.create(
+        category='vpn',
         log_level='DEBUG',
         message=f'[CELERY] [Marzban] Инициализация сервера {server.hosting}...',
     )
@@ -79,6 +80,7 @@ def _init_marzban_single_server(server: Server, cloud_init: str) -> bool:
             )
             if 'True' not in str(new_node):
                 Logging.objects.create(
+                    category='vpn',
                     log_level='DEBUG',
                     message=f'[CELERY] [Marzban] add_node не подтвердился: {server.hosting}',
                 )
@@ -86,12 +88,14 @@ def _init_marzban_single_server(server: Server, cloud_init: str) -> bool:
             server.is_activated_vless = True
             server.save()
             Logging.objects.create(
+                category='vpn',
                 log_level='INFO',
                 message=f'[CELERY] [Marzban] Готово: {server.hosting}',
             )
             return True
         except Exception:
             Logging.objects.create(
+                category='vpn',
                 log_level='DEBUG',
                 message=f'[CELERY] [Marzban] Ошибка после SSH (add_node): {server.hosting}\n{traceback.format_exc()}',
             )
@@ -99,18 +103,21 @@ def _init_marzban_single_server(server: Server, cloud_init: str) -> bool:
 
     except paramiko.AuthenticationException:
         Logging.objects.create(
+            category='vpn',
             log_level='ERROR',
             message=f'[CELERY] [Marzban] SSH аутентификация: {server.hosting}',
         )
         return False
     except paramiko.SSHException as e:
         Logging.objects.create(
+            category='vpn',
             log_level='ERROR',
             message=f'[CELERY] [Marzban] SSH: {server.hosting}: {e}',
         )
         return False
     except Exception as e:
         Logging.objects.create(
+            category='vpn',
             log_level='ERROR',
             message=f'[CELERY] [Marzban] {server.hosting}: {e}\n{traceback.format_exc()}',
         )
@@ -120,6 +127,7 @@ def _init_marzban_single_server(server: Server, cloud_init: str) -> bool:
 @shared_task
 def create_log_entry():
     Logging.objects.create(
+        category='celery',
         log_level='DEBUG',
         message='CELERY TASKS TESTING'
     )
@@ -155,7 +163,6 @@ def update_total_income(*args, **kwargs):
     income_info.save()
     return None
 
-
 @shared_task
 def update_user_subscription_status():
 
@@ -177,10 +184,10 @@ def update_user_subscription_status():
             except:
                 pass
 
-            Logging.objects.create(log_level='WARNING', message='[BOT] [Закончилась подписка у пользователя]',
+            Logging.objects.create(category='bot', log_level='WARNING', message='[BOT] [Закончилась подписка у пользователя]',
                                    datetime=timezone.now(), user=user)
         except Exception as e:
-            Logging.objects.create(log_level='FATAL',
+            Logging.objects.create(category='bot', log_level='FATAL',
                                    message=f'[BOT] [Ошибка при автообновлении статуса подписки:\n{traceback.format_exc()}]',
                                    datetime=timezone.now())
 
@@ -191,7 +198,7 @@ def update_user_subscription_status():
             try_delete_celerity_user(key.user.user_id)
             key.delete()
         except Exception:
-            Logging.objects.create(log_level='FATAL',
+            Logging.objects.create(category='bot', log_level='FATAL',
                                    message=f'[BOT] [Ошибка при удалении ключа:\n{traceback.format_exc()}]',
                                    datetime=timezone.now())
 
@@ -234,15 +241,15 @@ def reload_servers():
     servers = Server.objects.filter(is_activated_vless=True)
     for server in servers:
         try:
-            Logging.objects.create(log_level='DEBUG', message=f'[CELERY] Reloading server {server.hosting}...')
+            Logging.objects.create(category='celery', log_level='DEBUG', message=f'[CELERY] Reloading server {server.hosting}...')
             ssh = paramiko.SSHClient()
             ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
             ssh.connect(server.ip_address, username=server.user, password=server.password)
             stdin, stdout, stderr = ssh.exec_command('sudo reboot')  # or any other command to reload the server
             ssh.close()
-            Logging.objects.create(log_level='DEBUG', message=f'[CELERY] Reloading server {server.hosting}...Done')
+            Logging.objects.create(category='celery', log_level='DEBUG', message=f'[CELERY] Reloading server {server.hosting}...Done')
         except Exception as e:
-            Logging.objects.create(log_level='ERROR', message=f'[CELERY] {traceback.format_exc()}')
+            Logging.objects.create(category='celery', log_level='ERROR', message=f'[CELERY] {traceback.format_exc()}')
             pass
 
 
@@ -263,6 +270,7 @@ def init_celerity_servers():
 
         def _log(level: str, msg: str) -> None:
             Logging.objects.create(
+                category='vpn',
                 log_level=level,
                 message=f'[CELERY] [Celerity] [{label}] {msg}',
             )
@@ -306,6 +314,7 @@ def init_marzban_and_celerity_servers():
 
         def _log(level: str, msg: str) -> None:
             Logging.objects.create(
+                category='vpn',
                 log_level=level,
                 message=f'[CELERY] [Marzban+Celerity] [{label}] {msg}',
             )

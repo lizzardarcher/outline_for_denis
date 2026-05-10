@@ -109,12 +109,12 @@ def _apply_subscription_and_referrals(
         telegram_user.save()
 
     Logging.objects.create(
+        category="payment",
         log_level="INFO",
         message=f"[CRYPTO] [Обработка платежа] [Сумма: {amount_value}] [Дни: {days}]",
         datetime=datetime.now(),
         user=telegram_user,
     )
-
     # Рефералка
     referral_percentages = {
         1: ReferralSettings.objects.get(pk=1).level_1_percentage,
@@ -165,13 +165,12 @@ def _apply_subscription_and_referrals(
                 )
 
     Logging.objects.create(
+        category="payment",
         log_level="SUCCESS",
         message=f"[CRYPTO] [Платёж на сумму {amount_value} прошёл] [transaction_id={transaction.id}]",
         datetime=datetime.now(),
         user=telegram_user,
     )
-
-
 # ====== САЙТ: СОЗДАНИЕ ПЛАТЕЖА ЧЕРЕЗ CRYPTOBOT ======
 
 class CreateCryptoBotPaymentView(LoginRequiredMixin, View):
@@ -244,16 +243,17 @@ class CreateCryptoBotPaymentView(LoginRequiredMixin, View):
                 transaction.save()
 
             Logging.objects.create(
+                category="payment",
                 log_level="INFO",
                 message=f"[WEB-CRYPTO] [Платёжный запрос на сумму {amount_decimal} {asset}]",
                 datetime=datetime.now(),
                 user=telegram_user,
             )
-
             return redirect(pay_url)
 
         except Exception:
             Logging.objects.create(
+                category="payment",
                 log_level="DANGER",
                 message=f"[WEB-CRYPTO] [Ошибка платёжного запроса {traceback.format_exc()}]",
                 datetime=datetime.now(),
@@ -303,6 +303,7 @@ class CryptoBotSiteWebhookView(View):
 
         if not transaction:
             Logging.objects.create(
+                category="payment",
                 log_level="WARNING",
                 message=f"[WEB-CRYPTO] [Webhook] Транзакция не найдена (invoice_id={invoice_id})",
                 datetime=datetime.now(),
@@ -316,6 +317,7 @@ class CryptoBotSiteWebhookView(View):
         telegram_user = transaction.user
         if not telegram_user:
             Logging.objects.create(
+                category="payment",
                 log_level="WARNING",
                 message=f"[WEB-CRYPTO] [Webhook] У транзакции id={transaction.id} нет TelegramUser",
                 datetime=datetime.now(),
@@ -337,12 +339,12 @@ class CryptoBotSiteWebhookView(View):
 
         except Exception:
             Logging.objects.create(
+                category="payment",
                 log_level="DANGER",
                 message=f"[WEB-CRYPTO] [Ошибка при обработке webhook]\n{traceback.format_exc()}",
                 datetime=datetime.now(),
                 user=telegram_user,
             )
-
         return HttpResponse("OK", status=200)
 
 
@@ -382,6 +384,7 @@ class CryptoBotBotWebhookView(View):
 
         if not transaction:
             Logging.objects.create(
+                category="payment",
                 log_level="WARNING",
                 message=f"[BOT-CRYPTO] [Webhook] Транзакция не найдена (invoice_id={invoice_id})",
                 datetime=datetime.now(),
@@ -394,6 +397,7 @@ class CryptoBotBotWebhookView(View):
         telegram_user = transaction.user
         if not telegram_user:
             Logging.objects.create(
+                category="payment",
                 log_level="WARNING",
                 message=f"[BOT-CRYPTO] [Webhook] У транзакции id={transaction.id} нет TelegramUser",
                 datetime=datetime.now(),
@@ -415,12 +419,12 @@ class CryptoBotBotWebhookView(View):
 
         except Exception:
             Logging.objects.create(
+                category="payment",
                 log_level="DANGER",
                 message=f"[BOT-CRYPTO] [Ошибка при обработке webhook]\n{traceback.format_exc()}",
                 datetime=datetime.now(),
                 user=telegram_user,
             )
-
         return HttpResponse("OK", status=200)
 
 

@@ -249,7 +249,6 @@ class VpnKey(models.Model):
         verbose_name = 'VPN Ключ'
         verbose_name_plural = 'VPN Ключи'
 
-
 class Server(models.Model):
     hosting = models.CharField(max_length=1000, blank=True, null=True, verbose_name='Хостинг')
     ip_address = models.CharField(max_length=1000, blank=True, null=True, verbose_name='IP Address')
@@ -402,8 +401,26 @@ LOG_LEVEL = (
     ('SUCCESS', 'SUCCESS'),
 )
 
+LOG_CATEGORY = (
+    ('payment', 'Платежи'),
+    ('bot', 'Бот Telegram'),
+    ('celery', 'Celery / фоновые задачи'),
+    ('web', 'Сайт / личный кабинет'),
+    ('vpn', 'VPN / ключи / Marzban / Celerity'),
+    ('mtproxy', 'MTProto proxy'),
+    ('admin', 'Админка / служебное'),
+    ('other', 'Прочее'),
+)
+
 class Logging(models.Model):
     log_level = models.CharField(max_length=50, null=True, blank=True, choices=LOG_LEVEL, verbose_name='LOG LEVEL')
+    category = models.CharField(
+        max_length=32,
+        choices=LOG_CATEGORY,
+        default='other',
+        db_index=True,
+        verbose_name='Категория',
+    )
     message = models.TextField(max_length=4000, null=True, blank=True, verbose_name='Сообщение')
     datetime = models.DateTimeField(auto_now_add=True, verbose_name='Время')
     user = models.ForeignKey(to='TelegramUser', null=True, blank=True, on_delete=models.SET_NULL, verbose_name='Аккаунт')

@@ -32,7 +32,7 @@ def ukassa_bot_attempt_recurring_payment():
         permission_revoked=False
     )
 
-    Logging.objects.create(log_level="INFO",
+    Logging.objects.create(category="payment", log_level="INFO",
                            message=f'[CELERY] [BOT] [Списание] [Начало] [количество пользователей: {users_to_charge.count()}]',
                            datetime=datetime.now())
     success = 0
@@ -156,11 +156,11 @@ def ukassa_bot_attempt_recurring_payment():
                                 user_to_pay.income = income
                                 user_to_pay.save()
 
-                    Logging.objects.create(log_level="SUCCESS", message=msg, datetime=datetime.now(), user=user)
+                    Logging.objects.create(category="payment", log_level="SUCCESS", message=msg, datetime=datetime.now(), user=user)
 
                 elif payment.status == 'waiting_for_capture' or payment.status == 'pending':
                     msg = f"[CELERY] [BOT]  Платеж для пользователя {user.user_id} в статусе {payment.status}. Требуется дополнительная проверка."
-                    Logging.objects.create(log_level="WARNING", message=msg, datetime=datetime.now(), user=user)
+                    Logging.objects.create(category="payment", log_level="WARNING", message=msg, datetime=datetime.now(), user=user)
 
                 elif payment.status == 'canceled':
                     canceled += 1
@@ -255,14 +255,14 @@ def ukassa_bot_attempt_recurring_payment():
                         message += f"Неизвестная причина: {reason}"
 
                     msg = message
-                    Logging.objects.create(log_level="WARNING", message=msg, datetime=datetime.now(), user=user)
+                    Logging.objects.create(category="payment", log_level="WARNING", message=msg, datetime=datetime.now(), user=user)
 
                 else:
                     unknown += 1
                     msg = f"[CELERY] [BOT]  Неизвестный статус платежа {payment.status} для пользователя {user.user_id}."
                     user.payment_method_id = ''
                     user.save()
-                    Logging.objects.create(log_level="WARNING", message=msg, datetime=datetime.now(), user=user)
+                    Logging.objects.create(category="payment", log_level="WARNING", message=msg, datetime=datetime.now(), user=user)
 
             except Exception as e:
                 failed += 1
@@ -273,9 +273,10 @@ def ukassa_bot_attempt_recurring_payment():
                 elif 'Payment method is not available' in msg:
                     user.payment_method_id = ''
                     user.save()
-                Logging.objects.create(log_level="FATAL", message=msg, datetime=datetime.now(), user=user)
+                Logging.objects.create(category="payment", log_level="FATAL", message=msg, datetime=datetime.now(), user=user)
 
     Logging.objects.create(
+        category="payment",
         log_level="INFO",
         message=f"[CELERY] [BOT]  [Списание] [Конец] [успешно: {str(success)} | отменено: {str(canceled)} | ошибка: {str(failed)} | неизвестно: {str(unknown)}]",
         datetime=datetime.now()
@@ -295,7 +296,7 @@ def ukassa_site_attempt_recurring_payment():
         permission_revoked=False
     )
 
-    Logging.objects.create(log_level="INFO",
+    Logging.objects.create(category="payment", log_level="INFO",
                            message=f'[CELERY] [SITE] [Списание] [Начало] [количество пользователей: {users_to_charge.count()}]',
                            datetime=datetime.now())
     success = 0
@@ -409,11 +410,11 @@ def ukassa_site_attempt_recurring_payment():
                                     user_to_pay.income = income
                                     user_to_pay.save()
 
-                        Logging.objects.create(log_level="SUCCESS", message=msg, datetime=datetime.now(), user=user)
+                        Logging.objects.create(category="payment", log_level="SUCCESS", message=msg, datetime=datetime.now(), user=user)
 
                     elif payment.status == 'waiting_for_capture' or payment.status == 'pending':
                         msg = f"[CELERY] [SITE] Платеж для пользователя {user.user_id} в статусе {payment.status}. Требуется дополнительная проверка."
-                        Logging.objects.create(log_level="WARNING", message=msg, datetime=datetime.now(), user=user)
+                        Logging.objects.create(category="payment", log_level="WARNING", message=msg, datetime=datetime.now(), user=user)
 
                     elif payment.status == 'canceled':
                         canceled += 1
@@ -508,14 +509,14 @@ def ukassa_site_attempt_recurring_payment():
                             message += f"Неизвестная причина: {reason}"
 
                         msg = message
-                        Logging.objects.create(log_level="WARNING", message=msg, datetime=datetime.now(), user=user)
+                        Logging.objects.create(category="payment", log_level="WARNING", message=msg, datetime=datetime.now(), user=user)
 
                     else:
                         unknown += 1
                         msg = f"[CELERY] [SITE] Неизвестный статус платежа {payment.status} для пользователя {user.user_id}."
                         user.payment_method_id = ''
                         user.save()
-                        Logging.objects.create(log_level="WARNING", message=msg, datetime=datetime.now(), user=user)
+                        Logging.objects.create(category="payment", log_level="WARNING", message=msg, datetime=datetime.now(), user=user)
 
                 except Exception as e:
                     failed += 1
@@ -526,16 +527,16 @@ def ukassa_site_attempt_recurring_payment():
                     elif 'Payment method is not available' in msg:
                         user.payment_method_id = ''
                         user.save()
-                    Logging.objects.create(log_level="FATAL", message=msg, datetime=datetime.now(), user=user)
+                    Logging.objects.create(category="payment", log_level="FATAL", message=msg, datetime=datetime.now(), user=user)
             except Exception as e:
                 pass
 
     Logging.objects.create(
+        category="payment",
         log_level="INFO",
         message=f"[CELERY] [SITE] [Списание] [Конец] [успешно: {str(success)} | отменено: {str(canceled)} | ошибка: {str(failed)} | неизвестно: {str(unknown)}]",
         datetime=datetime.now()
     )
-
 
 def _fetch_payment_from_yookassa(payment_id: str, shop_id: str, secret_key: str, timeout: int = 10):
     """
@@ -569,7 +570,7 @@ def _process_payment_data(payment_data: dict, transaction: Transaction, telegram
             amount_value = 0.0
 
         if "succeeded" in str(event_status):
-            Logging.objects.create(log_level="SUCCESS",
+            Logging.objects.create(category="payment", log_level="SUCCESS",
                                    message=f'[{source_label}] [Приём опроса] [succeeded] [payment_id={transaction.payment_id}]',
                                    datetime=timezone.now())
             # Защита от повторной обработки
@@ -623,7 +624,7 @@ def _process_payment_data(payment_data: dict, transaction: Transaction, telegram
                         telegram_user.permission_revoked = False
                         telegram_user.save()
 
-                Logging.objects.create(log_level="INFO",
+                Logging.objects.create(category="payment", log_level="INFO",
                                        message=f'[{source_label}] [Обработка платежа] [payment_id={transaction.payment_id}] [Сумма: {amount_value}] [Дни: {days}]',
                                        datetime=timezone.now(), user=telegram_user)
 
@@ -685,16 +686,16 @@ def _process_payment_data(payment_data: dict, transaction: Transaction, telegram
                                 )
                             except Exception:
                                 # не критично, просто логируем
-                                Logging.objects.create(log_level="DANGER",
+                                Logging.objects.create(category="payment", log_level="DANGER",
                                                        message=f'[{source_label}] [Ошибка реферальной выплаты] [payment_id={transaction.payment_id}] [{traceback.format_exc()}]',
                                                        datetime=timezone.now(), user=telegram_user)
 
-                Logging.objects.create(log_level="SUCCESS",
+                Logging.objects.create(category="payment", log_level="SUCCESS",
                                        message=f'[{source_label}] [Платёж на сумму {str(amount_value)} р. прошёл] [payment_id={transaction.payment_id}]',
                                        datetime=timezone.now(), user=telegram_user)
 
         elif "canceled" in str(event_status):
-            Logging.objects.create(log_level="WARNING",
+            Logging.objects.create(category="payment", log_level="WARNING",
                                    message=f'[{source_label}] [Приём опроса] [canceled] [payment_id={transaction.payment_id}]',
                                    datetime=timezone.now())
             try:
@@ -702,15 +703,15 @@ def _process_payment_data(payment_data: dict, transaction: Transaction, telegram
                 transaction.paid = False
                 transaction.save()
             except Exception:
-                Logging.objects.create(log_level="DANGER",
+                Logging.objects.create(category="payment", log_level="DANGER",
                                        message=f'[{source_label}] [Ошибка при обработке canceled] [payment_id={transaction.payment_id}] [{traceback.format_exc()}]',
                                        datetime=timezone.now(), user=telegram_user)
         else:
-            Logging.objects.create(log_level="DANGER",
+            Logging.objects.create(category="payment", log_level="DANGER",
                                    message=f'[{source_label}] [Неизвестный статус при опросе] [status={event_status}] [payment_id={transaction.payment_id}]',
                                    datetime=timezone.now())
     except Exception:
-        Logging.objects.create(log_level="DANGER", message=f'{traceback.format_exc()}', datetime=timezone.now())
+        Logging.objects.create(category="payment", log_level="DANGER", message=f'{traceback.format_exc()}', datetime=timezone.now())
 
 
 @shared_task(bind=True, name="yookassa_check_pending_bot")
@@ -722,7 +723,7 @@ def ukassa_check_pending_bot(self):
     shop_id = getattr(settings, "YOOKASSA_SHOP_ID_BOT", None)
     secret = getattr(settings, "YOOKASSA_SECRET_BOT", None)
     if not shop_id or not secret:
-        Logging.objects.create(log_level="DANGER", message='[BOT] YOOKASSA credentials not configured',
+        Logging.objects.create(category="payment", log_level="DANGER", message='[BOT] YOOKASSA credentials not configured',
                                datetime=timezone.now())
         return
 
@@ -744,7 +745,7 @@ def ukassa_check_pending_bot(self):
             telegram_user = transaction.user if isinstance(transaction.user, TelegramUser) else None
             _process_payment_data(payment_data, transaction, telegram_user, source_label="BOT")
         except Exception:
-            Logging.objects.create(log_level="DANGER",
+            Logging.objects.create(category="payment", log_level="DANGER",
                                    message=f'[BOT] [Ошибка при опросе платежа {str(traceback.format_exc())}] [payment_id={getattr(transaction, "payment_id", None)}]',
                                    datetime=timezone.now())
 
@@ -757,7 +758,7 @@ def ukassa_check_pending_site(self):
     shop_id = getattr(settings, "YOOKASSA_SHOP_ID_SITE", None)
     secret = getattr(settings, "YOOKASSA_SECRET_SITE", None)
     if not shop_id or not secret:
-        Logging.objects.create(log_level="DANGER", message='[WEB] YOOKASSA credentials not configured',
+        Logging.objects.create(category="payment", log_level="DANGER", message='[WEB] YOOKASSA credentials not configured',
                                datetime=timezone.now())
         return
 
@@ -777,7 +778,7 @@ def ukassa_check_pending_site(self):
             telegram_user = transaction.user if isinstance(transaction.user, TelegramUser) else None
             _process_payment_data(payment_data, transaction, telegram_user, source_label="WEB")
         except Exception:
-            Logging.objects.create(log_level="DANGER",
+            Logging.objects.create(category="payment", log_level="DANGER",
                                    message=f'[WEB] [Ошибка при опросе платежа {str(traceback.format_exc())}] [payment_id={getattr(transaction, "payment_id", None)}]',
                                    datetime=timezone.now())
 
@@ -861,8 +862,8 @@ def _apply_robokassa_success(transaction: Transaction, amount_value: Decimal, so
     telegram_user = transaction.user
     if not telegram_user:
         Logging.objects.create(
+            category="payment",
             log_level="WARNING",
-            message=f'[{source_label}] [pending-check] У транзакции id={transaction.id} нет пользователя',
             datetime=datetime.now(),
         )
         return
@@ -938,6 +939,7 @@ def _apply_robokassa_success(transaction: Transaction, amount_value: Decimal, so
                 )
 
     Logging.objects.create(
+        category="payment",
         log_level="SUCCESS",
         message=f'[{source_label}] [pending-check] Оплата подтверждена InvId={transaction.robokassa_invoice_id or transaction.id}',
         datetime=datetime.now(),
@@ -952,8 +954,8 @@ def robokassa_check_pending_bot(self):
     password_2 = getattr(settings, "ROBOKASSA_PASSWORD_2_BOT", None)
     if not merchant_login or not password_2:
         Logging.objects.create(
+            category="payment",
             log_level="DANGER",
-            message='[BOT] ROBOKASSA credentials not configured for pending check',
             datetime=datetime.now(),
         )
         return
@@ -985,15 +987,15 @@ def robokassa_check_pending_bot(self):
                 transaction.paid = False
                 transaction.save(update_fields=['status', 'paid'])
                 Logging.objects.create(
+                    category="payment",
                     log_level="WARNING",
-                    message=f'[BOT/ROBO] [pending-check] InvId={inv_id} завершён неуспешно, state={state}',
                     datetime=datetime.now(),
                     user=transaction.user,
                 )
         except Exception:
             Logging.objects.create(
+                category="payment",
                 log_level="DANGER",
-                message=f'[BOT/ROBO] [pending-check] Ошибка для tx={transaction.id}: {traceback.format_exc()}',
                 datetime=datetime.now(),
                 user=transaction.user if getattr(transaction, "user", None) else None,
             )
@@ -1005,8 +1007,8 @@ def robokassa_check_pending_site(self):
     password_2 = getattr(settings, "ROBOKASSA_PASSWORD_2_SITE", None)
     if not merchant_login or not password_2:
         Logging.objects.create(
+            category="payment",
             log_level="DANGER",
-            message='[SITE] ROBOKASSA credentials not configured for pending check',
             datetime=datetime.now(),
         )
         return
@@ -1038,15 +1040,15 @@ def robokassa_check_pending_site(self):
                 transaction.paid = False
                 transaction.save(update_fields=['status', 'paid'])
                 Logging.objects.create(
+                    category="payment",
                     log_level="WARNING",
-                    message=f'[SITE/ROBO] [pending-check] InvId={inv_id} завершён неуспешно, state={state}',
                     datetime=datetime.now(),
                     user=transaction.user,
                 )
         except Exception:
             Logging.objects.create(
+                category="payment",
                 log_level="DANGER",
-                message=f'[SITE/ROBO] [pending-check] Ошибка для tx={transaction.id}: {traceback.format_exc()}',
                 datetime=datetime.now(),
                 user=transaction.user if getattr(transaction, "user", None) else None,
             )
@@ -1060,6 +1062,7 @@ def robokassa_bot_attempt_recurring_payment():
     Зарегистрировать задачу в django-celery-beat (интервал как у ukassa_bot_attempt_recurring_payment).
     """
     Logging.objects.create(
+        category="payment",
         log_level="INFO",
         message=f'[CELERY] [BOT] [RoboKassa рекуррент]',
         datetime=datetime.now(),
@@ -1071,6 +1074,7 @@ def robokassa_bot_attempt_recurring_payment():
     ).exclude(robokassa_recurring_parent_inv_id='')
 
     Logging.objects.create(
+        category="payment",
         log_level="INFO",
         message=f'[CELERY] [BOT] [RoboKassa рекуррент] [Начало] [пользователей: {users_to_charge.count()}]',
         datetime=datetime.now(),
@@ -1116,8 +1120,8 @@ def robokassa_bot_attempt_recurring_payment():
             if ok:
                 success_init += 1
                 Logging.objects.create(
+                    category="payment",
                     log_level="INFO",
-                    message=f'[CELERY] [BOT] [RoboKassa] Инициировано списание InvId={tx.id} ответ={body[:200]}',
                     datetime=datetime.now(),
                     user=user
                 )
@@ -1126,21 +1130,22 @@ def robokassa_bot_attempt_recurring_payment():
                 tx.status = 'failed'
                 tx.save(update_fields=['status'])
                 Logging.objects.create(
+                    category="payment",
                     log_level="WARNING",
-                    message=f'[CELERY] [BOT] [RoboKassa] Не OK user={user.user_id} InvId={tx.id}: {body[:500]}',
                     datetime=datetime.now(),
                     user=user,
                 )
         except Exception as e:
             failed += 1
             Logging.objects.create(
+                category="payment",
                 log_level="FATAL",
-                message=f'[CELERY] [BOT] [RoboKassa] Исключение user={user.user_id}: {e}\n{traceback.format_exc()}',
                 datetime=datetime.now(),
                 user=user,
             )
 
     Logging.objects.create(
+        category="payment",
         log_level="INFO",
         message=f'[CELERY] [BOT] [RoboKassa рекуррент] [Конец] инициировано: {success_init}, ошибок: {failed}',
         datetime=datetime.now(),
@@ -1154,6 +1159,7 @@ def robokassa_site_attempt_recurring_payment():
     Факт оплаты и продление подписки — в RobokassaSiteResultView (ResultURL).
     """
     Logging.objects.create(
+        category="payment",
         log_level="INFO",
         message='[CELERY] [SITE] [RoboKassa рекуррент]',
         datetime=datetime.now(),
@@ -1166,6 +1172,7 @@ def robokassa_site_attempt_recurring_payment():
 
 
     Logging.objects.create(
+        category="payment",
         log_level="INFO",
         message=f'[CELERY] [SITE] [RoboKassa рекуррент] [Начало] [пользователей: {users_to_charge.count()}]',
         datetime=datetime.now(),
@@ -1226,8 +1233,8 @@ def robokassa_site_attempt_recurring_payment():
             if ok:
                 success_init += 1
                 Logging.objects.create(
+                    category="payment",
                     log_level="INFO",
-                    message=f'[CELERY] [SITE] [RoboKassa] Инициировано списание InvId={tx.id} ответ={body[:200]}',
                     datetime=datetime.now(),
                     user=user,
                 )
@@ -1236,21 +1243,22 @@ def robokassa_site_attempt_recurring_payment():
                 tx.status = 'failed'
                 tx.save(update_fields=['status'])
                 Logging.objects.create(
+                    category="payment",
                     log_level="WARNING",
-                    message=f'[CELERY] [SITE] [RoboKassa] Не OK user={user.user_id} InvId={tx.id}: {body[:500]}',
                     datetime=datetime.now(),
                     user=user,
                 )
         except Exception as e:
             failed += 1
             Logging.objects.create(
+                category="payment",
                 log_level="FATAL",
-                message=f'[CELERY] [SITE] [RoboKassa] Исключение user={user.user_id}: {e}\n{traceback.format_exc()}',
                 datetime=datetime.now(),
                 user=user,
             )
 
     Logging.objects.create(
+        category="payment",
         log_level="INFO",
         message=f'[CELERY] [SITE] [RoboKassa рекуррент] [Конец] инициировано: {success_init}, пропущено: {skipped}, ошибок: {failed}',
         datetime=datetime.now(),

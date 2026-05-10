@@ -52,6 +52,7 @@ def update_sub_status(user: TelegramUser):
         TelegramUser.objects.filter(user_id=user.user_id).update(subscription_status=True)
 
 
+
 async def send_pending_messages():
     while True:
 
@@ -625,7 +626,8 @@ async def callback_query_handlers(call):
                                                            description='Приобретение подписки',
                                                            payment_id=payment.id,
                                                            payment_system='YooKassaBot')
-                                Logging.objects.create(log_level="INFO",
+                                Logging.objects.create(category="payment",
+                                                       log_level="INFO",
                                                        message=f'[BOT] [Платёжный запрос на сумму {str(price)} р.]',
                                                        datetime=datetime.now(), user=user)
 
@@ -727,6 +729,7 @@ async def callback_query_handlers(call):
                                 redirect_url = f"{base_url}?{urlencode(params)}"
 
                                 Logging.objects.create(
+                                    category="payment",
                                     log_level="INFO",
                                     message=f'[BOT-ROBO] [Платёжный запрос на сумму {out_sum_str} р.]',
                                     datetime=datetime.now(),
@@ -832,6 +835,7 @@ async def callback_query_handlers(call):
                                     transaction.save()
 
                                 Logging.objects.create(
+                                    category="payment",
                                     log_level="INFO",
                                     message=f'[BOT-CRYPTO] [Платёжный запрос на сумму {amount_decimal} {getattr(settings, "CRYPTOBOT_ASSET_BOT", "USDT")}]',
                                     datetime=datetime.now(),
@@ -898,7 +902,8 @@ async def callback_query_handlers(call):
 
                     elif 'cancelled_sbs' in data:
                         # Подтверждение отмены подписки
-                        Logging.objects.create(log_level="INFO",
+                        Logging.objects.create(category="payment",
+                                               log_level="INFO",
                                                message=f'[BOT] [ДЕЙСТВИЕ: ОТМЕНА ПОДПИСКИ ID Платежа: {user.payment_method_id}]',
                                                datetime=datetime.now(), user=user)
                         user.payment_method_id = None

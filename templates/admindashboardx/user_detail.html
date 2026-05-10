@@ -2,7 +2,6 @@
 
 {% block title %} · Пользователь {{ user_obj.user_id }}{% endblock %}
 
-
 {% block content %}
     <div class="card admx-card mb-3">
         {% include "admindashboardx/partials/detail_header.html" with header_title="Пользователь" current_label=user_obj.user_id section_url=section_url section_label=section_label back_url=back_url %}
@@ -167,16 +166,17 @@
                 <div class="accordion-body">
                     <div class="table-responsive">
                         <table class="table table-dark table-hover align-middle mb-0 admx-table">
-                            <thead><tr><th>Время</th><th>Уровень</th><th>Сообщение</th></tr></thead>
+                            <thead><tr><th>Время</th><th>Категория</th><th>Уровень</th><th>Сообщение</th></tr></thead>
                             <tbody>
                             {% for row in all_logs %}
                                 <tr>
                                     <td>{{ row.datetime|date:"d.m.Y H:i:s" }}</td>
+                                    <td>{{ row.get_category_display }}</td>
                                     <td>{{ row.log_level }}</td>
                                     <td class="admx-message-cell">{{ row.message }}</td>
                                 </tr>
                             {% empty %}
-                                <tr><td colspan="3" class="text-center text-secondary">Нет данных</td></tr>
+                                <tr><td colspan="4" class="text-center text-secondary">Нет данных</td></tr>
                             {% endfor %}
                             </tbody>
                         </table>

@@ -292,6 +292,7 @@ class UsersListView(DashboardBaseView):
         return context
 
 
+
 class UserAnalyticsExcelExportView(LoginRequiredMixin, UserPassesTestMixin, View):
     """
     Агрегаты по всем TelegramUser (pk = id в БД).
@@ -470,6 +471,7 @@ class LogsListView(DashboardBaseView):
         logs_qs = Logging.objects.select_related("user").only(
             "id",
             "datetime",
+            "category",
             "log_level",
             "message",
             "user__user_id",
@@ -1254,6 +1256,7 @@ class UserDetailView(DashboardBaseView):
         all_logs = Logging.objects.only(
             "id",
             "datetime",
+            "category",
             "log_level",
             "message",
         ).filter(user=user_obj).order_by("-datetime")

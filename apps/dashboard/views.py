@@ -93,6 +93,7 @@ class ProfileView(LoginRequiredMixin, SuccessMessageMixin, TemplateView):
             context['mtproxy_key'] = get_active_key(tg_user)
         return context
 
+
 class MarkNotificationReadView(LoginRequiredMixin, View):
     def post(self, request, *args, **kwargs):
         tg_user = request.user.profile.telegram_user
@@ -152,6 +153,7 @@ class CancelSubscriptionView(LoginRequiredMixin, TemplateView):
         user.save()
         revoke_all_user_keys(user, reason="manual_cancel_site")
         Logging.objects.create(
+            category="web",
             log_level=" INFO",
             message=f'[WEB] [Отмена подписки]',
             datetime=datetime.now(),
@@ -201,7 +203,7 @@ class CreateNewKeyView(LoginRequiredMixin, TemplateView):
                                   port=1040, method='ss', access_url=key, protocol='outline')
 
             messages.success(request, f'Новый ключ создан!')
-            Logging.objects.create(log_level=" INFO",
+            Logging.objects.create(category="web", log_level=" INFO",
                                    message=f'[WEB] [Новый ключ создан] [outline] [{server.hosting}] [{server.country.name_for_app}]',
                                    datetime=datetime.now(), user=self.request.user.profile.telegram_user)
 
@@ -232,7 +234,7 @@ class CreateNewKeyView(LoginRequiredMixin, TemplateView):
                                   port=1040, method='vless', access_url=key, protocol='vless')
 
             messages.success(request, f'Новый ключ создан!')
-            Logging.objects.create(log_level=" INFO",
+            Logging.objects.create(category="web", log_level=" INFO",
                                    message=f'[WEB] [Новый ключ создан] [vless] [{server.hosting}] [{server.country.name_for_app}]',
                                    datetime=datetime.now(), user=self.request.user.profile.telegram_user)
 
@@ -276,6 +278,7 @@ class CreateNewKeyView(LoginRequiredMixin, TemplateView):
             )
             messages.success(request, f'Новый ключ создан!')
             Logging.objects.create(
+                category="web",
                 log_level=" INFO",
                 message=f'[WEB] [Новый ключ создан] [hysteria2] [{server.hosting}] [{server.country.name_for_app}]',
                 datetime=datetime.now(),
@@ -290,7 +293,7 @@ class UpdateSubscriptionView(LoginRequiredMixin, TemplateView):
         subscription = request.GET.get('subscription')
         telegram_user_id = request.GET.get('telegram_user_id')
         if not subscription:
-            Logging.objects.create(log_level="DANGER",
+            Logging.objects.create(category="web", log_level="DANGER",
                                    message=f'[WEB] Ошибка обновления подписки! SUB - [{subscription}] USER [{telegram_user_id}]',
                                    datetime=datetime.now(), user=self.request.user.profile.telegram_user)
             return redirect('profile')
@@ -322,13 +325,13 @@ class UpdateSubscriptionView(LoginRequiredMixin, TemplateView):
                 user.save()
                 messages.success(request,
                                  f'Поздравляем с приобретением подписки! Подписка действительна до {user.subscription_expiration}')
-                Logging.objects.create(log_level=" INFO", message=f'[WEB] [Приобретена подписка] [дни - {str(days)}]',
+                Logging.objects.create(category="web", log_level=" INFO", message=f'[WEB] [Приобретена подписка] [дни - {str(days)}]',
                                        datetime=datetime.now(), user=self.request.user.profile.telegram_user)
             else:
                 messages.error(request, f'У вас недостаточно средств на балансе для выбранной подписки 😐')
 
         else:
-            Logging.objects.create(log_level="DANGER",
+            Logging.objects.create(category="web", log_level="DANGER",
                                    message=f'[WEB] Ошибка обновления подписки DAYS - [{str(days)}] AMOUNT [{str(amount)}]',
                                    datetime=datetime.now(), user=self.request.user.profile.telegram_user)
 

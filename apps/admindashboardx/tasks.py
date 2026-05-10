@@ -7,7 +7,6 @@ from bot.main.MarzbanAPI import MarzbanAPI
 from bot.models import GlobalSettings, Logging, Server
 
 
-
 @shared_task(name="admindashboardx.initialize_server_task")
 def initialize_server_task(server_id: int):
     cloud_init = """#!/bin/bash
@@ -44,7 +43,7 @@ def initialize_server_task(server_id: int):
     echo "Script completed successfully."
         """
     server = Server.objects.get(id=server_id)
-    Logging.objects.create(log_level='DEBUG', message=f'Initializing server {server.hosting}...')
+    Logging.objects.create(category='admin', log_level='DEBUG', message=f'Initializing server {server.hosting}...')
     try:
         ssh_client = paramiko.SSHClient()
         ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
@@ -64,21 +63,21 @@ def initialize_server_task(server_id: int):
             else:
                 server.is_activated_vless = True
                 server.save()
-                Logging.objects.create(log_level='INFO', message=f'Initializing server {server.hosting}...Done')
+                Logging.objects.create(category='admin', log_level='INFO', message=f'Initializing server {server.hosting}...Done')
         except:
-            Logging.objects.create(log_level='DEBUG', message=f'Initializing server {server.hosting}...Failed')
+            Logging.objects.create(category='admin', log_level='DEBUG', message=f'Initializing server {server.hosting}...Failed')
             print(traceback.format_exc())
 
     except paramiko.AuthenticationException:
-        Logging.objects.create(log_level='ERROR', message=f'Initializing server {server.hosting}...Failed')
+        Logging.objects.create(category='admin', log_level='ERROR', message=f'Initializing server {server.hosting}...Failed')
         print("Ошибка аутентификации. Неверное имя пользователя или пароль.")
         return None
     except paramiko.SSHException as e:
-        Logging.objects.create(log_level='ERROR', message=f'Initializing server {server.hosting}...Failed')
+        Logging.objects.create(category='admin', log_level='ERROR', message=f'Initializing server {server.hosting}...Failed')
         print(f"Ошибка SSH: {e}")
         return None
     except Exception as e:
-        Logging.objects.create(log_level='ERROR', message=f'Initializing server {server.hosting}...Failed')
+        Logging.objects.create(category='admin', log_level='ERROR', message=f'Initializing server {server.hosting}...Failed')
         print(f"Произошла ошибка: {e}")
         return None
     else:

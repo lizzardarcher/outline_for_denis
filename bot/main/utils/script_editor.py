@@ -111,6 +111,7 @@ def run_invalid_payment_method_report(
         # user.save()
         counter += 1
 
+
 def delete_expired_keys():
     vpn_keys = VpnKey.objects.filter(user__subscription_status=False)
     for key in vpn_keys:
@@ -119,7 +120,8 @@ def delete_expired_keys():
             key.delete()
             print("User key deleted")
         except Exception:
-            Logging.objects.create(log_level='FATAL',
+            Logging.objects.create(category='other',
+                                   log_level='FATAL',
                                    message=f'[BOT] [Ошибка при удалении ключа:\n{traceback.format_exc()}]',
                                    datetime=timezone.now())
 if __name__ == "__main__":

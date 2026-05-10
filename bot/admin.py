@@ -556,6 +556,7 @@ class VpnKey(BaseAdmin):
     #     return False
 
 
+
 @admin.register(Server)
 class ServerAdmin(BaseAdmin):
 
@@ -654,13 +655,13 @@ class LoggingAdmin(BaseAdmin):
     get_log_level.allow_tags = True
     get_log_level.short_description = 'log_level'
 
-    list_display = ('datetime', 'user', 'message', 'get_log_level',)
+    list_display = ('datetime', 'category', 'user', 'message', 'get_log_level',)
     list_display_links = ('user', 'message',)
     search_fields = ('message', 'user__username',)
     ordering = ['-datetime']
     actions = [make_warning, make_debug, make_fatal, make_trace, make_success, make_info, delete_3_day_logs,
                delete_all_logs]
-    list_filter = [PredefinedLogKeywordFilter, 'log_level', 'datetime']
+    list_filter = [PredefinedLogKeywordFilter, 'category', 'log_level', 'datetime']
 
     def has_change_permission(self, request, obj=None):
         return False
