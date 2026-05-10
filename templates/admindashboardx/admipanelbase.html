@@ -2,6 +2,7 @@
 <!DOCTYPE html>
 <html lang="ru">
 
+
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -15,6 +16,7 @@
 <body class="admx-body">
 <div class="admx-shell">
     {% include "admindashboardx/partials/sidepanel.html" %}
+    <div class="admx-sidebar-backdrop" aria-hidden="true"></div>
 
     <div class="admx-main">
         {% include "admindashboardx/partials/navbar.html" %}
@@ -49,6 +51,43 @@
             }, 1200);
         }
     });
+</script>
+<script>
+(function () {
+    var shell = document.querySelector('.admx-shell');
+    var toggle = document.querySelector('[data-admx-sidebar-toggle]');
+    var backdrop = document.querySelector('.admx-sidebar-backdrop');
+    if (!shell || !toggle) return;
+
+    function setOpen(open) {
+        shell.classList.toggle('admx-sidebar-open', open);
+        toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+        document.body.style.overflow = open ? 'hidden' : '';
+    }
+
+    toggle.addEventListener('click', function () {
+        setOpen(!shell.classList.contains('admx-sidebar-open'));
+    });
+
+    if (backdrop) {
+        backdrop.addEventListener('click', function () {
+            setOpen(false);
+        });
+    }
+
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') setOpen(false);
+    });
+
+    var sidebar = document.getElementById('admx-sidebar');
+    if (sidebar) {
+        sidebar.querySelectorAll('a.admx-nav-link').forEach(function (a) {
+            a.addEventListener('click', function () {
+                setOpen(false);
+            });
+        });
+    }
+})();
 </script>
 {% block extrascript %}{% endblock %}
 </body>

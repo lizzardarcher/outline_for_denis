@@ -2,6 +2,7 @@
 
 {% block title %} · Аналитика доходов{% endblock %}
 
+
 {% block content %}
     <nav aria-label="breadcrumb" class="mb-3">
         <ol class="breadcrumb admx-breadcrumb mb-0">
@@ -71,10 +72,16 @@
         </div>
     </div>
 
-    {% if corr_daily_revenue_new_users is not None %}
-        <div class="alert admx-card border-secondary border-opacity-25 py-2 px-3 small mb-4">
-            Корреляция Пирсона (день): доход ↔ новые пользователи ≈ <strong>{{ corr_daily_revenue_new_users|floatformat:3 }}</strong>
-            <span class="text-secondary">— показывает совместную динамику по дням, не причинность.</span>
+    {% if revenue_insights %}
+        <div class="card admx-card mb-4">
+            <div class="card-header">Автовыводы по данным периода</div>
+            <div class="card-body py-3">
+                <ul class="small mb-0 ps-3 admx-insights-list">
+                    {% for line in revenue_insights %}
+                        <li class="mb-2">{{ line }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
         </div>
     {% endif %}
 
@@ -97,39 +104,29 @@
         </div>
     </div>
 
-    <div class="row g-3 mb-4">
-        <div class="col-12 col-lg-6">
-            <div class="card admx-card h-100">
-                <div class="card-header">Рекуррент (RoboKassa): автосписания vs прочие успешные платежи</div>
-                <div class="card-body">
-                    <p class="small text-secondary mb-2">
-                        Автосписания: платежи с заполненным <code>PreviousInvoiceID</code>.
-                        Материнские счета (флаг recurring parent): {{ rec_parents_n }} за период.
-                        Сумма автосписаний: <strong>{{ rec_revenue|floatformat:2 }} ₽</strong>.
-                    </p>
-                    <div class="admx-chart-wrap admx-chart-wrap--donut"><canvas id="admxRecurringSplit"></canvas></div>
-                </div>
-            </div>
-        </div>
-        <div class="col-12 col-lg-6">
-            <div class="card admx-card h-100">
-                <div class="card-header">Автосписания по платёжным системам</div>
-                <div class="table-responsive">
-                    <table class="table table-dark table-sm align-middle mb-0 admx-table">
-                        <thead><tr><th>Система</th><th class="text-end">Шт.</th><th class="text-end">Сумма</th></tr></thead>
-                        <tbody>
-                        {% for row in recurring_by_ps %}
-                            <tr>
-                                <td>{{ row.label }}</td>
-                                <td class="text-end">{{ row.count }}</td>
-                                <td class="text-end">{{ row.revenue|floatformat:2 }} ₽</td>
-                            </tr>
-                        {% empty %}
-                            <tr><td colspan="3" class="text-center text-secondary">Нет данных за период</td></tr>
-                        {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
+    <div class="card admx-card mb-4">
+        <div class="card-header">Автосписания по платёжным системам</div>
+        <div class="card-body">
+            <p class="small text-secondary mb-3">
+                Учитываются успешные входящие платежи: RoboKassa — с непустым <code>PreviousInvoiceID</code>;
+                ЮKassa и др. — если в описании есть «рекуррент» (в т.ч. автоплатежи из Celery).
+                За период всего: <strong>{{ autodebit_n }}</strong> шт. на <strong>{{ autodebit_revenue|floatformat:2 }} ₽</strong>.
+            </p>
+            <div class="table-responsive">
+                <table class="table table-dark table-sm align-middle mb-0 admx-table">
+                    <thead><tr><th>Система</th><th class="text-end">Шт.</th><th class="text-end">Сумма</th></tr></thead>
+                    <tbody>
+                    {% for row in recurring_by_ps %}
+                        <tr>
+                            <td>{{ row.label }}</td>
+                            <td class="text-end">{{ row.count }}</td>
+                            <td class="text-end">{{ row.revenue|floatformat:2 }} ₽</td>
+                        </tr>
+                    {% empty %}
+                        <tr><td colspan="3" class="text-center text-secondary">Нет данных за период</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>
@@ -232,7 +229,6 @@
 
     {{ chart_daily_payload|json_script:"admx-data-daily" }}
     {{ chart_ps_payload|json_script:"admx-data-ps" }}
-    {{ chart_recurring_payload|json_script:"admx-data-recurring" }}
 {% endblock %}
 
 {% block extrascript %}
@@ -245,7 +241,6 @@
 
     const daily = JSON.parse(document.getElementById('admx-data-daily').textContent);
     const psData = JSON.parse(document.getElementById('admx-data-ps').textContent);
-    const recData = JSON.parse(document.getElementById('admx-data-recurring').textContent);
 
     const ctxMix = document.getElementById('admxMixDaily');
     if (ctxMix && daily.labels && daily.labels.length) {
@@ -335,21 +330,6 @@
                     backgroundColor: psData.colors && psData.colors.length === psData.labels.length
                         ? psData.colors
                         : psData.labels.map((_, i) => ['#7c9cff','#6fd3a9','#f0ad4e','#e06666','#b794f6'][i % 5]),
-                }],
-            },
-            options: donutOpts,
-        });
-    }
-
-    const ctxRec = document.getElementById('admxRecurringSplit');
-    if (ctxRec && recData.labels && recData.values) {
-        new Chart(ctxRec, {
-            type: 'doughnut',
-            data: {
-                labels: recData.labels,
-                datasets: [{
-                    data: recData.values,
-                    backgroundColor: ['rgba(240, 173, 78, 0.85)', 'rgba(124, 156, 255, 0.55)'],
                 }],
             },
             options: donutOpts,

@@ -14,22 +14,57 @@ body.admx-body {
     min-height: 100vh;
 }
 
-
 .admx-shell {
     display: flex;
     min-height: 100vh;
+    position: relative;
 }
 
 .admx-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 1040;
     width: 270px;
+    max-width: min(270px, 88vw);
+    height: 100vh;
+    height: 100dvh;
     background: var(--admx-panel);
     border-right: 1px solid var(--admx-border);
     display: flex;
     flex-direction: column;
+    overflow-x: hidden;
+    overflow-y: auto;
+    transform: translateX(-100%);
+    transition: transform 0.28s ease;
+    box-shadow: none;
+}
+
+.admx-shell.admx-sidebar-open .admx-sidebar {
+    transform: translateX(0);
+    box-shadow: 0 0 2rem rgba(0, 0, 0, 0.35);
+}
+
+.admx-sidebar-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 1035;
+    background: rgba(15, 18, 26, 0.55);
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.28s ease, visibility 0.28s;
+    pointer-events: none;
+}
+
+.admx-shell.admx-sidebar-open .admx-sidebar-backdrop {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
 }
 
 .admx-main {
     flex: 1;
+    width: 100%;
     min-width: 0;
     display: flex;
     flex-direction: column;
@@ -305,14 +340,6 @@ body.admx-body {
 }
 
 @media (max-width: 991.98px) {
-    .admx-shell {
-        flex-direction: column;
-    }
-
-    .admx-sidebar {
-        width: 100%;
-    }
-
     .admx-table th,
     .admx-table td {
         font-size: 0.82rem;

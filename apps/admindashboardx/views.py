@@ -291,18 +291,149 @@ def _admx_pearson_corr(xs, ys):
     return cov / sqrt(var_x * var_y)
 
 
+def _admx_best_lag_corr(rev_series, usr_series, max_lag=7):
+    """Максимум |corr| между доходом и регистрациями при сдвиге 0..max_lag (доход позже на lag дней)."""
+    best_lag, best_r = 0, None
+    for lag in range(0, max_lag + 1):
+        xs, ys = (rev_series, usr_series) if lag == 0 else (rev_series[lag:], usr_series[:-lag])
+        if len(xs) < 3:
+            continue
+        r = _admx_pearson_corr(xs, ys)
+        if r is None:
+            continue
+        if best_r is None or abs(r) > abs(best_r):
+            best_r = r
+            best_lag = lag
+    return best_lag, best_r
+
+
+def _admx_autodebit_payment_q():
+    """RoboKassa: дочерний рекуррент; прочие ПС: пометка в описании (напр. ЮKassa Celery)."""
+    return (
+        Q(robokassa_recurring_previous_inv_id__isnull=False)
+        & ~Q(robokassa_recurring_previous_inv_id="")
+    ) | Q(description__icontains="рекуррент")
+
+
+def _admx_corr_strength_label(r):
+    if r is None:
+        return None
+    a = abs(r)
+    if a < 0.2:
+        return "слабая"
+    if a < 0.5:
+        return "умеренная"
+    return "сильная"
+
+
+def _admx_build_revenue_insights(
+    *,
+    series_daily,
+    rev_series,
+    usr_series,
+    corr_daily,
+    revenue_period,
+    payments_period_n,
+    autodebit_n,
+    autodebit_revenue,
+    conversion_all_pct,
+    cohort_conversion_pct,
+    new_users_period,
+    by_ps,
+    payment_related_logs_n,
+):
+    bullets = []
+
+    if corr_daily is not None:
+        strength = _admx_corr_strength_label(corr_daily)
+        bullets.append(
+            f"За выбранное окно связь «доход ↔ новые пользователи» по дням {strength or '—'} "
+            f"(корреляция Пирсона ≈ {corr_daily:.3f}); это не доказывает причинность."
+        )
+
+    max_lag = min(7, max(0, len(rev_series) - 3))
+    lag, lag_r = _admx_best_lag_corr(rev_series, usr_series, max_lag=max_lag)
+    if lag_r is not None and lag > 0 and abs(lag_r) >= 0.25:
+        bullets.append(
+            f"При сдвиге на {lag} дн. (доход позже регистраций) корреляция доходит до ≈ {lag_r:.3f} — возможна отложенная оплата после регистрации."
+        )
+
+    n_days = len(series_daily)
+    if n_days >= 14:
+        mid = n_days // 2
+        r1 = sum(series_daily[i]["revenue"] for i in range(mid))
+        r2 = sum(series_daily[i]["revenue"] for i in range(mid, n_days))
+        if r1 > 0:
+            ch = (r2 - r1) / r1 * 100
+            half1 = series_daily[0]["date"]
+            half2 = series_daily[mid]["date"]
+            bullets.append(
+                f"Доход: вторая половина периода ({half2} …) к первой ({half1} …) — изменение ≈ {ch:+.1f}% по сумме дневных поступлений."
+            )
+        u1 = sum(series_daily[i]["new_users"] for i in range(mid))
+        u2 = sum(series_daily[i]["new_users"] for i in range(mid, n_days))
+        if u1 or u2:
+            bullets.append(f"Новые пользователи: первая половина {int(u1)}, вторая {int(u2)}.")
+
+    if len(rev_series) >= 14:
+        tail = 7
+        a = sum(rev_series[-tail:]) / tail
+        b = sum(rev_series[-2 * tail : -tail]) / tail
+        if b > 0:
+            bullets.append(
+                f"Средний дневной доход: последние {tail} дн. ≈ {a:.0f} ₽/день, предыдущие {tail} дн. ≈ {b:.0f} ₽/день ({((a - b) / b * 100):+.1f}%)."
+            )
+
+    if revenue_period > 0 and autodebit_n > 0:
+        share = autodebit_revenue / revenue_period * 100
+        bullets.append(
+            f"Доля автосписаний в доходе периода ≈ {share:.1f}% ({autodebit_n} из {payments_period_n} успешных платежей)."
+        )
+
+    if by_ps and revenue_period > 0:
+        top = by_ps[0]
+        share_top = top["revenue"] / revenue_period * 100
+        if share_top >= 45:
+            bullets.append(f"Концентрация: «{top['label']}» даёт ≈ {share_top:.1f}% успешного дохода за период.")
+
+    delta = float(cohort_conversion_pct - conversion_all_pct)
+    if new_users_period > 0 and abs(delta) >= 8:
+        if delta > 0:
+            bullets.append(
+                "Когорта текущего окна конвертируется заметно выше среднего по базе — возможен приток качественного трафика или акции."
+            )
+        else:
+            bullets.append(
+                "Когорта окна конвертируется ниже среднего по базе — имеет смысл проверить источники трафика и онбординг."
+            )
+
+    if payment_related_logs_n >= 15:
+        bullets.append(
+            f"Много предупреждений/ошибок по платежам в логах за период ({payment_related_logs_n}) — загляните в раздел логов и таблицу ниже."
+        )
+    elif payment_related_logs_n >= 5:
+        bullets.append(f"В логах за период {payment_related_logs_n} записей WARNING/FATAL по категории «Платежи».")
+
+    if not bullets:
+        bullets.append(
+            "Недостаточно данных или выраженных паттернов для коротких выводов — расширьте окно дней или проверьте разрезы по ПС."
+        )
+
+    return bullets[:12]
+
+
 def _admx_payment_system_labels():
     return dict(Transaction._meta.get_field("payment_system").choices)
 
 
 class RevenueAnalyticsView(DashboardBaseView):
-    """Доходы, пользователи, конверсия, рекуррент, платёжные системы, ошибки — по скользящему окну дней."""
+    """Доходы, пользователи, конверсия, автосписания (несколько ПС), платёжные системы, ошибки — по окну дней."""
 
     template_name = "admindashboardx/revenue_analytics.html"
     page_title = "AdminDashboardX · Аналитика доходов"
     page_key = "revenue_analytics"
 
-    _INCOMING_OK = (Q(paid=True) | Q(status="succeeded")) & ~Q(side="Вывод средств")
+    _INCOMING_OK = (Q(paid=True) | Q(status="succeeded"))
 
     def dispatch(self, request, *args, **kwargs):
         if self._is_support():
@@ -339,6 +470,7 @@ class RevenueAnalyticsView(DashboardBaseView):
             .annotate(revenue=Sum("amount"), payments_n=Count("id"))
         )
         pay_map = {}
+
         for row in agg_pay_by_day:
             pd = row["period"]
             dkey = pd.date() if hasattr(pd, "date") else pd
@@ -453,15 +585,12 @@ class RevenueAnalyticsView(DashboardBaseView):
             ps_chart_colors.append(palette[pi % len(palette)])
             pi += 1
 
-        recurring_children_q = incoming_base.filter(
-            robokassa_recurring_previous_inv_id__isnull=False
-        ).exclude(robokassa_recurring_previous_inv_id="")
-        recurring_parents_q = incoming_base.filter(robokassa_is_recurring_parent=True)
-        rec_children_n = recurring_children_q.count()
-        rec_parents_n = recurring_parents_q.count()
-        rec_revenue = recurring_children_q.aggregate(t=Sum("amount")).get("t") or Decimal("0")
+        autodebit_q = _admx_autodebit_payment_q()
+        autodebit_qs = incoming_base.filter(autodebit_q)
+        autodebit_n = autodebit_qs.count()
+        autodebit_revenue = autodebit_qs.aggregate(t=Sum("amount")).get("t") or Decimal("0")
         recurring_by_ps = []
-        for row in recurring_children_q.values("payment_system").annotate(n=Count("id"), rev=Sum("amount")).order_by("-rev"):
+        for row in autodebit_qs.values("payment_system").annotate(n=Count("id"), rev=Sum("amount")).order_by("-rev"):
             recurring_by_ps.append(
                 {
                     "label": ps_display(row["payment_system"]),
@@ -470,7 +599,6 @@ class RevenueAnalyticsView(DashboardBaseView):
                 }
             )
 
-        one_off_n = payments_period_n - rec_children_n
         cat_labels = dict(Logging._meta.get_field("category").choices)
         log_issues = []
         for row in (
@@ -494,6 +622,22 @@ class RevenueAnalyticsView(DashboardBaseView):
             log_level__in=("WARNING", "FATAL"),
             category="payment",
         ).count()
+
+        revenue_insights = _admx_build_revenue_insights(
+            series_daily=series_daily,
+            rev_series=rev_series,
+            usr_series=usr_series,
+            corr_daily=corr_daily,
+            revenue_period=revenue_period,
+            payments_period_n=payments_period_n,
+            autodebit_n=autodebit_n,
+            autodebit_revenue=autodebit_revenue,
+            conversion_all_pct=conversion_all_pct,
+            cohort_conversion_pct=cohort_conversion_pct,
+            new_users_period=new_users_period,
+            by_ps=by_ps,
+            payment_related_logs_n=payment_related_logs_n,
+        )
 
         income_row = IncomeInfo.objects.order_by("-pk").first()
         income_snapshot = income_row.total_amount if income_row and income_row.total_amount is not None else Decimal("0")
@@ -527,10 +671,6 @@ class RevenueAnalyticsView(DashboardBaseView):
                     "values": [x["value"] for x in rev_other_chart],
                     "colors": ps_chart_colors,
                 },
-                "chart_recurring_payload": {
-                    "labels": ["Автосписания (рекуррент)", "Прочие успешные платежи"],
-                    "values": [float(rec_children_n), float(max(0, one_off_n))],
-                },
                 "revenue_period": revenue_period,
                 "payments_period_n": payments_period_n,
                 "new_users_period": new_users_period,
@@ -541,12 +681,11 @@ class RevenueAnalyticsView(DashboardBaseView):
                 "paid_among_new": paid_among_new,
                 "payers_period": payers_period,
                 "arpu_period": arpu_period,
-                "corr_daily_revenue_new_users": corr_daily,
                 "by_payment_system": by_ps,
-                "rec_children_n": rec_children_n,
-                "rec_parents_n": rec_parents_n,
-                "rec_revenue": rec_revenue,
+                "autodebit_n": autodebit_n,
+                "autodebit_revenue": autodebit_revenue,
                 "recurring_by_ps": recurring_by_ps,
+                "revenue_insights": revenue_insights,
                 "log_issues": log_issues,
                 "payment_related_logs_n": payment_related_logs_n,
                 "income_snapshot": income_snapshot,
