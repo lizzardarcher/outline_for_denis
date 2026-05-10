@@ -1,122 +1,157 @@
-<img src="{% if request.user.profile.telegram_user.photo_url %}{{ request.user.profile.telegram_user.photo_url }}
-              {% else %}https://bootdey.com/img/Content/avatar/avatar7.png
-              {% endif %}"
-     alt="User Avatar" class="img-fluid rounded-circle mb-3" style="width: 100px; height: 100px;">
-<p>
-    <i class="fa fa-user"></i>
-    {% if request.user.profile.telegram_user.first_name %}
-        {{ request.user.profile.telegram_user.first_name }}<br>
-    {% endif %}
-    {% if request.user.profile.telegram_user.last_name %}
-        {{ request.user.profile.telegram_user.last_name }}<br>
-    {% endif %}
-    <i class="fa fa-id-badge"></i> ID: {{ request.user.profile.telegram_user.user_id }}<br>
-    {% if request.user.profile.telegram_user.username %}
-        <i class="fa fa-id-card"></i>
-        {% if '@' in request.user.profile.telegram_user.username %}
-            <a href="">{{ request.user.profile.telegram_user.username }}</a><br>
-        {% else %}
-            <a href="https://t.me/{{ request.user.profile.telegram_user.username }}" target="_blank">
-                @{{ request.user.profile.telegram_user.username }}</a><br>
+<h2 class="h5 font-weight-bold mb-3 dv-panel-title" style="color: #13056e;">
+    <i class="fa fa-user mr-2" aria-hidden="true"></i>Профиль
+</h2>
+<div class="row">
+    <div class="col-md-4 text-center text-md-left mb-3 mb-md-0">
+        <img src="{% if request.user.profile.telegram_user.photo_url %}{{ request.user.profile.telegram_user.photo_url }}{% else %}https://bootdey.com/img/Content/avatar/avatar7.png{% endif %}"
+             alt="Аватар пользователя"
+             class="img-fluid rounded-circle mb-2"
+             style="width: 100px; height: 100px; object-fit: cover;">
+    </div>
+    <div class="col-md-8">
+        <p class="mb-2">
+            {% if request.user.profile.telegram_user.first_name %}
+                <span class="font-weight-bold">{{ request.user.profile.telegram_user.first_name }}</span>
+            {% endif %}
+            {% if request.user.profile.telegram_user.last_name %}
+                <span class="font-weight-bold">{{ request.user.profile.telegram_user.last_name }}</span>
+            {% endif %}
+        </p>
+        <p class="small mb-1">
+            <i class="fa fa-id-badge mr-1" aria-hidden="true"></i>
+            Telegram ID: <span class="text-monospace">{{ request.user.profile.telegram_user.user_id }}</span>
+        </p>
+        {% if request.user.profile.telegram_user.username %}
+            <p class="small mb-2">
+                <i class="fa fa-id-card mr-1" aria-hidden="true"></i>
+                {% if '@' in request.user.profile.telegram_user.username %}
+                    {{ request.user.profile.telegram_user.username }}
+                {% else %}
+                    <a href="https://t.me/{{ request.user.profile.telegram_user.username }}" target="_blank" rel="noopener noreferrer">
+                        @{{ request.user.profile.telegram_user.username }}
+                    </a>
+                {% endif %}
+            </p>
         {% endif %}
+        <button type="button" class="btn btn-outline-secondary btn-sm mt-1" data-toggle="modal"
+                data-target="#changePasswordModal">
+            <i class="fa fa-lock mr-1" aria-hidden="true"></i>Сменить пароль
+        </button>
+    </div>
+</div>
+
+<!-- Смена пароля (модальное окно) -->
+<div class="modal fade" id="changePasswordModal" tabindex="-1" role="dialog"
+     aria-labelledby="changePasswordModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content" style="border-radius: 12px;">
+            <div class="modal-header py-2 border-0">
+                <h5 class="modal-title" id="changePasswordModalLabel" style="color: #13056e;">Новый пароль</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Закрыть">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <form id="dashboardPasswordChangeForm" method="post" action="{% url 'dashboard_password_change' %}">
+                {% csrf_token %}
+                <div class="modal-body">
+                    {% if dashboard_password_form.non_field_errors %}
+                        <div class="alert alert-danger small py-2 mb-2">{{ dashboard_password_form.non_field_errors }}</div>
+                    {% endif %}
+                    <div class="form-group mb-2">
+                        <label class="small mb-0 font-weight-bold" for="{{ dashboard_password_form.new_password1.id_for_label }}">
+                            {{ dashboard_password_form.new_password1.label }}
+                        </label>
+                        {{ dashboard_password_form.new_password1 }}
+                        {% if dashboard_password_form.new_password1.errors %}
+                            <div class="text-danger small">{{ dashboard_password_form.new_password1.errors }}</div>
+                        {% endif %}
+                    </div>
+                    <div class="form-group mb-0">
+                        <label class="small mb-0 font-weight-bold" for="{{ dashboard_password_form.new_password2.id_for_label }}">
+                            {{ dashboard_password_form.new_password2.label }}
+                        </label>
+                        {{ dashboard_password_form.new_password2 }}
+                        {% if dashboard_password_form.new_password2.errors %}
+                            <div class="text-danger small">{{ dashboard_password_form.new_password2.errors }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="modal-footer py-2 border-0">
+                    <button type="button" class="btn btn-secondary btn-sm" data-dismiss="modal">Отмена</button>
+                    <button type="submit" class="btn btn-primary btn-sm">Сохранить</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<hr class="my-4">
+
+<div class="mb-2">
+    <p class="small text-muted mb-1">В сервисе с</p>
+    <p class="mb-0">{{ request.user.profile.telegram_user.join_date|default:"—" }}</p>
+</div>
+
+<div class="mb-2">
+    <p class="small text-muted mb-1">Подписка до</p>
+    <p class="mb-1">
+        {{ request.user.profile.telegram_user.subscription_expiration|default:"—" }}
+        {% if request.user.profile.telegram_user.subscription_status %}
+            <span class="badge badge-success ml-1">Активна</span>
+        {% else %}
+            <span class="badge badge-warning ml-1">Неактивна</span>
+        {% endif %}
+    </p>
+    {% if request.user.profile.telegram_user.subscription_status and request.user.profile.telegram_user.subscription_expiration %}
+        <p class="small text-muted mb-0" aria-live="polite">
+            До окончания подписки:
+            <strong>{{ request.user.profile.telegram_user.subscription_expiration|timeuntil }}</strong>
+        </p>
     {% endif %}
-    <button type="button" class="btn btn-outline-secondary btn-sm mt-1" data-toggle="modal"
-            data-target="#changePasswordModal">
-        Сменить пароль
+</div>
+
+<div class="mb-3">
+    <p class="small text-muted mb-1">Доход по реферальной программе</p>
+    <p class="mb-0">
+        <span class="badge badge-secondary">
+            {% if request.user.profile.telegram_user.income %}{{ request.user.profile.telegram_user.income }}{% else %}0.00{% endif %} ₽
+        </span>
+    </p>
+</div>
+
+{% if request.user.profile.telegram_user.payment_method_id or request.user.profile.telegram_user.robokassa_recurring_parent_inv_id %}
+    <p class="small mb-2">
+        <strong>Платёжный метод подтверждён</strong>
+        <i class="fa fa-check text-success ml-1" aria-hidden="true" title="Подтверждён"></i>
+    </p>
+    <button type="button" class="btn btn-outline-danger btn-sm" data-toggle="modal"
+            data-target="#cancelSubscriptionModal">
+        Отказаться от подписки
     </button>
-    <br>
-</p>
 
-
-    <!-- Смена пароля (модальное окно) -->
-    <div class="modal fade" id="changePasswordModal" tabindex="-1" role="dialog"
-         aria-labelledby="changePasswordModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered" role="document">
-            <div class="modal-content">
-                <div class="modal-header py-2">
-                    <h5 class="modal-title" id="changePasswordModalLabel">Новый пароль</h5>
-                    <button type="button" class="btn" data-dismiss="modal" aria-label="Закрыть">
+    <div class="modal fade" id="cancelSubscriptionModal" tabindex="-1" role="dialog"
+         aria-labelledby="cancelSubscriptionModalLabel" aria-hidden="true">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content" style="border-radius: 12px;">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="cancelSubscriptionModalLabel">Подтверждение отмены подписки</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Закрыть">
                         <span aria-hidden="true">&times;</span>
                     </button>
                 </div>
-                <form id="dashboardPasswordChangeForm" method="post" action="{% url 'dashboard_password_change' %}">
-                    {% csrf_token %}
-                    <div class="modal-body">
-                        {% if dashboard_password_form.non_field_errors %}
-                            <div class="alert alert-danger small py-2 mb-2">{{ dashboard_password_form.non_field_errors }}</div>
-                        {% endif %}
-                        <div class="form-group mb-2">
-                            <label class="small mb-0" for="{{ dashboard_password_form.new_password1.id_for_label }}">
-                                {{ dashboard_password_form.new_password1.label }}
-                            </label>
-                            {{ dashboard_password_form.new_password1 }}
-                            {% if dashboard_password_form.new_password1.errors %}
-                                <div class="text-danger small">{{ dashboard_password_form.new_password1.errors }}</div>
-                            {% endif %}
-                        </div>
-                        <div class="form-group mb-0">
-                            <label class="small mb-0" for="{{ dashboard_password_form.new_password2.id_for_label }}">
-                                {{ dashboard_password_form.new_password2.label }}
-                            </label>
-                            {{ dashboard_password_form.new_password2 }}
-                            {% if dashboard_password_form.new_password2.errors %}
-                                <div class="text-danger small">{{ dashboard_password_form.new_password2.errors }}</div>
-                            {% endif %}
-                        </div>
-                    </div>
-                    <div class="modal-footer py-2">
-                        <button type="button" class="btn btn-secondary btn-sm" data-dismiss="modal">Отмена</button>
-                        <button type="submit" class="btn btn-primary btn-sm">Сохранить</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-<hr>
-<div>
-
-    <p><strong>Активен с :</strong> <span class="">{{ request.user.profile.telegram_user.join_date }}</span></p>
-    <p><strong>Подписка до:</strong> {{ request.user.profile.telegram_user.subscription_expiration }}
-        {% if request.user.profile.telegram_user.subscription_status %}
-            <span class="badge bg-success">Активна</span>
-        {% else %}
-            <span class="badge bg-warning">Неактивна</span>
-        {% endif %}
-    </p>
-    <p><strong>Доход от реферальной программы:</strong> <span
-            class="badge bg-secondary">{% if request.user.profile.telegram_user.income %}
-        {{ request.user.profile.telegram_user.income }}{% else %}0.00{% endif %} ₽</span></p>
-    {% if request.user.profile.telegram_user.payment_method_id or request.user.profile.telegram_user.robokassa_recurring_parent_inv_id %}
-        <p><strong>Платёжный метод подтверждён: <i class="fa fa-check bg-light rounded text-success p-1"></i></strong>
-        </p>
-        <p>
-            <button type="button" class="btn btn-outline-danger" data-toggle="modal"
-                    data-target="#cancelSubscriptionModal">
-                Отказаться от подписки
-            </button>
-        </p>
-
-        <!-- Modal -->
-        <div class="modal fade" id="cancelSubscriptionModal" tabindex="-1" role="dialog"
-             aria-labelledby="cancelSubscriptionModalLabel" aria-hidden="true">
-            <div class="modal-dialog" role="document">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title" id="cancelSubscriptionModalLabel">Подтверждение отмены подписки</h5>
-                    </div>
-                    <div class="modal-body">
-                        <p>Вы уверены, что хотите отказаться от подписки? Это действие необратимо.
-                            Отменив имеющуюся подписку вы можете продолжать пользоваться сервисом до момента окончания
-                            оплаченной подписки. Автоматическое списание средств при отказе от подписки не производится.</p>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary btn-sm" data-dismiss="modal">Отмена</button>
-                        <a class="btn btn-danger btn-sm"
-                           href="{% url 'cancel_subscription' request.user.profile.telegram_user.user_id %}">Подтвердить
-                            отмену</a>
-                    </div>
+                <div class="modal-body">
+                    <p class="small mb-0">
+                        Вы уверены, что хотите отказаться от подписки? Это действие необратимо.
+                        Отменив имеющуюся подписку вы можете продолжать пользоваться сервисом до момента окончания
+                        оплаченной подписки. Автоматическое списание средств при отказе от подписки не производится.
+                    </p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary btn-sm" data-dismiss="modal">Отмена</button>
+                    <a class="btn btn-danger btn-sm"
+                       href="{% url 'cancel_subscription' request.user.profile.telegram_user.user_id %}">Подтвердить отмену</a>
                 </div>
             </div>
         </div>
-    {% endif %}
-</div>
+    </div>
+{% endif %}

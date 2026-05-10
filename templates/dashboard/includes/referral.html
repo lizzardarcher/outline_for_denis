@@ -1,45 +1,49 @@
-    <div class="card-header">
-        <h3 class="card-title mb-0"><i class="fa fa-share-square me-2"></i> Реферальная программа</h3>
-    </div>
+<h2 class="h5 font-weight-bold mb-3 dv-panel-title" style="color: #13056e;">
+    <i class="fa fa-share-alt mr-2" aria-hidden="true"></i>Реферальная программа
+</h2>
+
+<div class="card border-0 shadow-none" style="background: #fafbfc; border-radius: 10px;">
     <div class="card-body">
-      <h5 class="card-text"><i class="fa fa-link me-2"></i>Твоя реферальная ссылка:</h5>
+      <h3 class="h6 font-weight-bold"><i class="fa fa-link mr-2" aria-hidden="true"></i>Ваша реферальная ссылка</h3>
         <div class="input-group mb-3">
-            <input type="text" class="form-control link-primary bg-success-subtle rounded" id="referralLink"
+            <input type="text" class="form-control bg-white rounded" id="referralLink"
                    value="https://t.me/xDomvpn_Bot?start={{ request.user.id }}" readonly style="cursor: pointer" aria-describedby="copyBtn">
+            <div class="input-group-append">
             <button class="btn btn-outline-secondary" type="button" id="copyBtn"
                      onclick="copyToClipboardRef('https://t.me/xDomvpn_Bot?start={{ request.user.id }}')">
-                <i class="fa fa-copy"></i> Скопировать</button>
+                <i class="fa fa-copy" aria-hidden="true"></i> Скопировать</button>
+            </div>
         </div>
-        <p class="card-text mb-3">
-            <i class="fa fa-share me-2"></i> Рекомендуйте наш DomVPN сервис своим друзьям, чтобы заработать, а нам развивать проект.
+        <p class="small mb-3">
+            <i class="fa fa-share mr-2" aria-hidden="true"></i> Рекомендуйте DomVPN друзьям — вам бонус, нам развитие сервиса.
         </p>
-         <p class="card-text mb-3">
-           <i class="fa fa-money me-2"></i> Вы получите от {{ ref_1 }} до {{ ref_5 }}% с каждой покупки по нашей реферальной программе в зависимости от уровня реферала.
+         <p class="small mb-3">
+           <i class="fa fa-money mr-2" aria-hidden="true"></i> От <strong>{{ per_1 }}%</strong> до <strong>{{ per_5 }}%</strong> с покупок по программе в зависимости от уровня реферала.
          </p>
-        <div class="card border-secondary mb-3">
-            <div class="card-body">
-                <ul class="list-unstyled">
-                    <li class="mb-1">
-                      <i class="fa fa-trophy me-2"></i> Реферальная программа
+        <div class="card border mb-3" style="border-radius: 10px;">
+            <div class="card-body small">
+                <ul class="list-unstyled mb-0">
+                    <li class="mb-2 font-weight-bold">
+                      <i class="fa fa-trophy mr-2" aria-hidden="true"></i> Статистика
                     </li>
-                    <li class="mb-1 ms-3">
-                      <i class="fa fa-level-down me-2"></i>Рефералы 1 ур: <span class="badge bg-primary">{{ inv_1_lvl }}</span> (<span class="badge bg-secondary">{{ per_1 }}%</span>)
+                    <li class="mb-1 ml-3">
+                      <i class="fa fa-level-down mr-2" aria-hidden="true"></i>Рефералы 1 ур.: <span class="badge text-dark badge-primary">{{ inv_1_lvl }}</span> (<span class="badge text-dark badge-secondary">{{ per_1 }}%</span>)
                     </li>
-                   <li class="mb-1 ms-3">
-                       <i class="fa fa-level-down me-2"></i>Рефералы 2 ур: <span class="badge bg-primary">{{ inv_2_lvl }}</span> (<span class="badge bg-secondary">{{ per_2 }}%</span>)
+                   <li class="mb-1 ml-3">
+                       <i class="fa fa-level-down mr-2" aria-hidden="true"></i>Рефералы 2 ур.: <span class="badge text-dark badge-primary">{{ inv_2_lvl }}</span> (<span class="badge text-dark badge-secondary">{{ per_2 }}%</span>)
                    </li>
-                    <li class="mb-1 ms-3">
-                        <i class="fa fa-level-down me-2"></i>Рефералы 3 ур: <span class="badge bg-primary">{{ inv_3_lvl }}</span> (<span class="badge bg-secondary">{{ per_3 }}%</span>)
+                    <li class="mb-1 ml-3">
+                        <i class="fa fa-level-down mr-2" aria-hidden="true"></i>Рефералы 3 ур.: <span class="badge text-dark badge-primary">{{ inv_3_lvl }}</span> (<span class="badge text-dark badge-secondary">{{ per_3 }}%</span>)
                     </li>
-                    <li class="mb-1 ms-3">
-                        <i class="fa fa-level-down me-2"></i>Рефералы 4 ур: <span class="badge bg-primary">{{ inv_4_lvl }}</span> (<span class="badge bg-secondary">{{ per_4 }}%</span>)
+                    <li class="mb-1 ml-3">
+                        <i class="fa fa-level-down mr-2" aria-hidden="true"></i>Рефералы 4 ур.: <span class="badge text-dark badge-primary">{{ inv_4_lvl }}</span> (<span class="badge text-dark badge-secondary">{{ per_4 }}%</span>)
                     </li>
-                    <li class="mb-1 ms-3">
-                      <i class="fa fa-level-down me-2"></i>Рефералы 5 ур: <span class="badge bg-primary">{{ inv_5_lvl }}</span> (<span class="badge bg-secondary">{{ per_5 }}%</span>)
+                    <li class="mb-1 ml-3">
+                      <i class="fa fa-level-down mr-2" aria-hidden="true"></i>Рефералы 5 ур.: <span class="badge text-dark badge-primary">{{ inv_5_lvl }}</span> (<span class="badge text-dark badge-secondary">{{ per_5 }}%</span>)
                     </li>
-                    <li class="mb-1 ms-3">
-                      <i class="fa fa-wallet me-2"></i> Заработано:
-                      <span class="fw-bold">
+                    <li class="mb-0 ml-3 pt-2 border-top">
+                      <i class="fa fa-wallet mr-2" aria-hidden="true"></i> Заработано:
+                      <span class="font-weight-bold">
                         {% if request.user.profile.telegram_user.income %}
                           {{ request.user.profile.telegram_user.income }}
                          {% else %}
@@ -50,8 +54,9 @@
                  </ul>
             </div>
         </div>
-        <p class="card-text">Вы можете вывести денежные средства по запросу в нашем ТГ боте</p>
+        <p class="small text-muted mb-0">Вывод средств — по запросу в Telegram-боте.</p>
    </div>
+</div>
 
 <script>
     function copyToClipboardRef(text) {
@@ -59,13 +64,11 @@
             .then(() => {
                 const referralLinkInput = document.getElementById('referralLink');
                 const copyBtn = document.getElementById('copyBtn');
-                referralLinkInput.classList.remove('bg-success-subtle', 'link-primary');
                 referralLinkInput.value = "Скопировано!";
-                copyBtn.innerHTML = '<i class="fa fa-check"></i> Скопировано!';
+                copyBtn.innerHTML = '<i class="fa fa-check" aria-hidden="true"></i> Скопировано!';
                 setTimeout(() => {
                     referralLinkInput.value = text;
-                    referralLinkInput.classList.add('bg-success-subtle','link-primary');
-                    copyBtn.innerHTML = '<i class="fa fa-copy"></i> Скопировать';
+                    copyBtn.innerHTML = '<i class="fa fa-copy" aria-hidden="true"></i> Скопировать';
                 }, 2000);
             })
             .catch(err => {

@@ -1,24 +1,26 @@
-<h3><i class="fa fa-credit-card"></i> Платежи</h3>
-<ul class="list-unstyled">
+<h2 class="h5 font-weight-bold mb-3 dv-panel-title" style="color: #13056e;">
+    <i class="fa fa-credit-card mr-2" aria-hidden="true"></i>Платежи
+</h2>
+<ul class="list-unstyled mb-0">
     {% for transaction in transactions %}
-        <li class="m-2 border rounded p-2 d-flex align-items-center justify-content-between">
-            <div>
-                <span class="text-muted small">{{ transaction.timestamp }}</span>
-                <span class="fw-bold ms-1">{{ transaction.amount }} {{ transaction.currency }}</span>
+        <li class="mb-2 p-3 rounded border-0" style="background: #fafbfc; border-radius: 10px !important;">
+            <div class="d-flex align-items-center justify-content-between flex-wrap">
+                <div>
+                    <span class="text-muted small d-block">{{ transaction.timestamp }}</span>
+                    <span class="font-weight-bold">{{ transaction.amount }} {{ transaction.currency }}</span>
+                </div>
+                {% with status=transaction.status %}
+                    <span class="badge {% if status == 'succeeded' %}badge-success{% elif status == 'pending' %}badge-warning{% elif status == 'canceled' %}badge-secondary{% else %}badge-secondary{% endif %}">
+                        {{ status }}
+                    </span>
+                {% endwith %}
             </div>
-
-            {% with status=transaction.status %}
-                <span class="badge
-                    {% if status == 'succeeded' %} bg-success
-                    {% elif status == 'pending' %} bg-warning
-                    {% elif status == 'canceled' %} bg-secondary
-                    {% else %} bg-secondary
-                    {% endif %}
-                    ">{{ status }}
-                </span>
-            {% endwith %}
         </li>
     {% empty %}
-        <li class="text-muted text-center">--- Нет транзакций ---</li>
+        <li class="text-center text-muted py-4 rounded" style="background: #fafbfc;">
+            <i class="fa fa-inbox d-block mb-2" style="opacity: .45;" aria-hidden="true"></i>
+            Пока нет платежей.
+        </li>
     {% endfor %}
 </ul>
+

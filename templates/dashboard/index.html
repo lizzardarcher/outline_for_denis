@@ -3,152 +3,249 @@
 
 {% block title %}Личный кабинет DomVPN{% endblock title %}
 
-
 {% block content %}
-    <div class="hero_area">
+    <div class="hero_area dashboard-lk">
         <div class="bg-dark">
             {% include 'home/sections/header.html' %}
         </div>
 
-        <div class="container-fluid">
+        <div class="container-fluid dashboard-lk-container">
             <div class="row">
+                <a href="#dashboard-main" class="sr-only sr-only-focusable d-inline-block dashboard-lk-skip">
+                    Перейти к содержимому личного кабинета
+                </a>
 
-                <!-- Боковая панель (скрыта на мобильных) -->
-                <nav id="sidebar" class="col-md-3 col-lg-2 d-md-block bg-light sidebar mt-5">
+                <!-- Боковая панель (desktop) -->
+                <nav id="sidebar"
+                     class="col-md-3 col-lg-2 d-none d-md-block bg-light sidebar mt-4 dashboard-lk-sidebar"
+                     aria-label="Разделы личного кабинета">
                     <div class="position-sticky pt-3">
-                        <ul class="nav flex-column">
-                            <li class="nav-item">
-                                <a class="nav-link active" href="#" data-target="main-info">
-                                    Ключи
+                        <ul class="nav flex-column" role="tablist" aria-orientation="vertical">
+                            <li class="nav-item" role="none">
+                                <a class="nav-link active dashboard-lk-tab"
+                                   href="{% url 'profile' %}?section=main-info"
+                                   data-target="main-info"
+                                   id="tab-main-info"
+                                   role="tab"
+                                   aria-selected="true"
+                                   aria-controls="main-info"
+                                   tabindex="0">
+                                    <i class="fa fa-key fa-fw mr-2" aria-hidden="true"></i>Ключи
                                 </a>
                             </li>
-                            <li class="nav-item">
-                                <a class="nav-link" href="#" data-target="user-info">
-                                    Профиль
+                            <li class="nav-item" role="none">
+                                <a class="nav-link dashboard-lk-tab"
+                                   href="{% url 'profile' %}?section=user-info"
+                                   data-target="user-info"
+                                   id="tab-user-info"
+                                   role="tab"
+                                   aria-selected="false"
+                                   aria-controls="user-info"
+                                   tabindex="-1">
+                                    <i class="fa fa-user fa-fw mr-2" aria-hidden="true"></i>Профиль
                                 </a>
                             </li>
-                            <li class="nav-item">
-                                <a class="nav-link" href="#" data-target="servers">
-                                    Серверы
+                            <li class="nav-item" role="none">
+                                <a class="nav-link dashboard-lk-tab"
+                                   href="{% url 'profile' %}?section=servers"
+                                   data-target="servers"
+                                   id="tab-servers"
+                                   role="tab"
+                                   aria-selected="false"
+                                   aria-controls="servers"
+                                   tabindex="-1">
+                                    <i class="fa fa-server fa-fw mr-2" aria-hidden="true"></i>Серверы
                                 </a>
                             </li>
-                            <li class="nav-item">
-                                <a class="nav-link" href="#" data-target="referral">
-                                    Реферальная программа
+                            <li class="nav-item" role="none">
+                                <a class="nav-link dashboard-lk-tab"
+                                   href="{% url 'profile' %}?section=referral"
+                                   data-target="referral"
+                                   id="tab-referral"
+                                   role="tab"
+                                   aria-selected="false"
+                                   aria-controls="referral"
+                                   tabindex="-1">
+                                    <i class="fa fa-share-alt fa-fw mr-2" aria-hidden="true"></i>Реферальная программа
                                 </a>
                             </li>
-                            <li class="nav-item">
-                                <a class="nav-link" href="#" data-target="bot-info">
-                                    Наш телеграм
+                            <li class="nav-item" role="none">
+                                <a class="nav-link dashboard-lk-tab"
+                                   href="{% url 'profile' %}?section=bot-info"
+                                   data-target="bot-info"
+                                   id="tab-bot-info"
+                                   role="tab"
+                                   aria-selected="false"
+                                   aria-controls="bot-info"
+                                   tabindex="-1">
+                                    <i class="fa fa-telegram fa-fw mr-2" aria-hidden="true"></i>Наш Telegram
                                 </a>
                             </li>
-                            <li class="nav-item">
-                                <a class="nav-link" href="#" data-target="transactions">
-                                    Платежи
+                            <li class="nav-item" role="none">
+                                <a class="nav-link dashboard-lk-tab"
+                                   href="{% url 'profile' %}?section=transactions"
+                                   data-target="transactions"
+                                   id="tab-transactions"
+                                   role="tab"
+                                   aria-selected="false"
+                                   aria-controls="transactions"
+                                   tabindex="-1">
+                                    <i class="fa fa-credit-card fa-fw mr-2" aria-hidden="true"></i>Платежи
                                 </a>
                             </li>
-                            <li class="nav-item">
-                                <a class="nav-link d-flex align-items-center justify-content-between" href="#" data-target="notifications">
-                                    <span>Уведомления</span>
+                            <li class="nav-item" role="none">
+                                <a class="nav-link d-flex align-items-center justify-content-between dashboard-lk-tab"
+                                   href="{% url 'profile' %}?section=notifications"
+                                   data-target="notifications"
+                                   id="tab-notifications"
+                                   role="tab"
+                                   aria-selected="false"
+                                   aria-controls="notifications"
+                                   tabindex="-1">
+                                    <span><i class="fa fa-bell fa-fw mr-2" aria-hidden="true"></i>Уведомления</span>
                                     {% if unread_notifications_count > 0 %}
-                                        <span class="notify-pill-wrap">
+                                        <span class="notify-pill-wrap" aria-label="Непрочитанных: {{ unread_notifications_count }}">
                                             <span class="notify-pill">{{ unread_notifications_count }}</span>
-                                            <span class="notify-dot"></span>
+                                            <span class="notify-dot" aria-hidden="true"></span>
                                         </span>
                                     {% endif %}
                                 </a>
                             </li>
-{#                            {% if show_mtproxy %}#}
-{#                                <li class="nav-item">#}
-{#                                    <a class="nav-link" href="#" data-target="tg-proxy">#}
-{#                                        TG Proxy#}
-{#                                    </a>#}
-{#                                </li>#}
-{#                            {% endif %}#}
-                            <li class="nav-item">
-                                <a class="nav-link" href="#" data-target="instruction">
-                                    Инструкция
+                            {% if show_mtproxy %}
+                                <li class="nav-item" role="none">
+                                    <a class="nav-link dashboard-lk-tab"
+                                       href="{% url 'profile' %}?section=tg-proxy"
+                                       data-target="tg-proxy"
+                                       id="tab-tg-proxy"
+                                       role="tab"
+                                       aria-selected="false"
+                                       aria-controls="tg-proxy"
+                                       tabindex="-1">
+                                        <i class="fa fa-random fa-fw mr-2" aria-hidden="true"></i>TG Proxy
+                                    </a>
+                                </li>
+                            {% endif %}
+                            <li class="nav-item" role="none">
+                                <a class="nav-link dashboard-lk-tab"
+                                   href="{% url 'profile' %}?section=instruction"
+                                   data-target="instruction"
+                                   id="tab-instruction"
+                                   role="tab"
+                                   aria-selected="false"
+                                   aria-controls="instruction"
+                                   tabindex="-1">
+                                    <i class="fa fa-book fa-fw mr-2" aria-hidden="true"></i>Инструкция
                                 </a>
                             </li>
-                            <li class="nav-item">
-                                <a class="nav-link" href="#" data-target="faq">
-                                    Faq
+                            <li class="nav-item" role="none">
+                                <a class="nav-link dashboard-lk-tab"
+                                   href="{% url 'profile' %}?section=faq"
+                                   data-target="faq"
+                                   id="tab-faq"
+                                   role="tab"
+                                   aria-selected="false"
+                                   aria-controls="faq"
+                                   tabindex="-1">
+                                    <i class="fa fa-question-circle fa-fw mr-2" aria-hidden="true"></i>FAQ
                                 </a>
                             </li>
                         </ul>
                     </div>
                 </nav>
 
-                <!-- Основной контент -->
+                <main id="dashboard-main"
+                      class="col-12 col-md-9 ms-sm-auto col-lg-10 px-md-4 mt-3 mt-md-4 dashboard-lk-main"
+                      role="main"
+                      aria-label="Содержимое личного кабинета">
 
-                <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 mt-5">
-                    {% if latest_unread_notification %}
-                        <div class="col-sm-12 col-6">
-                            <div class="mt-5 alert alert-warning border border-danger-subtle text-dark" role="alert">
-                                <div class="d-flex justify-content-between align-items-start gap-3">
-                                    <div>
-                                        <div class="fw-semibold">{{ latest_unread_notification.title }}</div>
-                                        <div class="small text-muted mb-2">{{ latest_unread_notification.created_at|date:"d.m.Y H:i" }}</div>
-                                        <div>{{ latest_unread_notification.message|linebreaksbr }}</div>
+                    <div class="d-md-none dv-mobile-nav mb-3">
+                        <label for="dv-section-select" class="mb-1 small font-weight-bold text-muted">Раздел</label>
+                        <select id="dv-section-select" class="form-control form-control-sm" aria-label="Перейти к разделу личного кабинета">
+                            <option value="main-info">Ключи и подписка</option>
+                            <option value="user-info">Профиль</option>
+                            <option value="servers">Доступные локации</option>
+                            <option value="referral">Реферальная программа</option>
+                            <option value="bot-info">Наш Telegram</option>
+                            <option value="transactions">Платежи</option>
+                            <option value="notifications">Уведомления</option>
+                            {% if show_mtproxy %}
+                                <option value="tg-proxy">TG Proxy</option>
+                            {% endif %}
+                            <option value="instruction">Инструкция</option>
+                            <option value="faq">FAQ</option>
+                        </select>
+                    </div>
+
+                    <div class="dv-page-heading mb-3 mb-md-4 d-none d-md-block">
+                        <h1 class="h4 mb-0 font-weight-bold" style="color: #13056e;">Личный кабинет DomVPN</h1>
+                        <p class="small text-muted mb-0 mt-1">Ключи, подписка и настройки аккаунта</p>
+                    </div>
+
+                    <div id="dashboard-alerts" class="mb-3" aria-live="polite" aria-relevant="additions">
+                        {% if latest_unread_notification %}
+                            <div class="col-12 px-0">
+                                <div class="alert alert-warning border border-danger-subtle text-dark" role="alert">
+                                    <div class="d-flex justify-content-between align-items-start flex-wrap">
+                                        <div>
+                                            <div class="font-weight-bold">{{ latest_unread_notification.title }}</div>
+                                            <div class="small text-muted mb-2">{{ latest_unread_notification.created_at|date:"d.m.Y H:i" }}</div>
+                                            <div>{{ latest_unread_notification.message|linebreaksbr }}</div>
+                                        </div>
+                                        <form method="post"
+                                              action="{% url 'mark_notification_read' notification_id=latest_unread_notification.id %}">
+                                            {% csrf_token %}
+                                            <button type="submit" class="btn btn-sm btn-outline-danger">Прочитано</button>
+                                        </form>
                                     </div>
-                                    <form method="post"
-                                          action="{% url 'mark_notification_read' notification_id=latest_unread_notification.id %}">
-                                        {% csrf_token %}
-                                        <button type="submit" class="btn btn-sm btn-outline-danger">Прочитано</button>
-                                    </form>
                                 </div>
                             </div>
-                        </div>
-                    {% endif %}
+                        {% endif %}
 
-                    {% if messages %}
-                        <div class="col-sm-12 col-6">
-                            {% for message in messages %}
-                                <div class="mt-5 alert {% if message.tags == 'error' %}alert-danger{% elif message.tags == 'success' %}alert-success{% endif %} alert-dismissible text-dark"
-                                     role="alert">
-                                    {{ message|safe }}
-                                    <button type="button" class="btn-close text-lg py-3 opacity-10"
-                                            data-bs-dismiss="alert"
-                                            aria-label="Close">
-                                    </button>
-                                </div>
-                            {% endfor %}
-                        </div>
-                    {% endif %}
-
-                    <div class="mt-5 bg-light p-2 rounded mb-2 ">
-                        <h1 class="h2">Личный кабинет DomVPN</h1>
+                        {% if messages %}
+                            <div class="col-12 px-0">
+                                {% for message in messages %}
+                                    <div class="alert {% if message.tags == 'error' %}alert-danger{% elif message.tags == 'success' %}alert-success{% elif message.tags == 'warning' %}alert-warning{% else %}alert-info{% endif %} alert-dismissible text-dark mb-2"
+                                         role="alert">
+                                        {{ message|safe }}
+                                        <button type="button" class="close pl-2" data-dismiss="alert" aria-label="Закрыть">
+                                            <span aria-hidden="true">&times;</span>
+                                        </button>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
                     </div>
-                    <div id="user-info" class="content-section">
+
+                    <div id="user-info" class="content-section dv-panel-section" tabindex="-1">
                         {% include 'dashboard/includes/user-info.html' %}
                     </div>
-                    <div id="main-info" class="content-section">
+                    <div id="main-info" class="content-section dv-panel-section" tabindex="-1">
                         {% include 'dashboard/includes/main-info.html' %}
                     </div>
-                    <div id="servers" class="content-section">
+                    <div id="servers" class="content-section dv-panel-section" tabindex="-1">
                         {% include 'dashboard/includes/servers.html' %}
                     </div>
-                    <div id="referral" class="content-section">
+                    <div id="referral" class="content-section dv-panel-section" tabindex="-1">
                         {% include 'dashboard/includes/referral.html' %}
                     </div>
-                    <div id="transactions" class="content-section">
+                    <div id="transactions" class="content-section dv-panel-section" tabindex="-1">
                         {% include 'dashboard/includes/transactions.html' %}
                     </div>
-                    <div id="notifications" class="content-section">
+                    <div id="notifications" class="content-section dv-panel-section" tabindex="-1">
                         {% include 'dashboard/includes/notifications.html' %}
                     </div>
                     {% if show_mtproxy %}
-                        <div id="tg-proxy" class="content-section">
+                        <div id="tg-proxy" class="content-section dv-panel-section" tabindex="-1">
                             {% include 'dashboard/includes/tg-proxy.html' %}
                         </div>
                     {% endif %}
-                    <div id="bot-info" class="content-section">
+                    <div id="bot-info" class="content-section dv-panel-section" tabindex="-1">
                         {% include 'dashboard/includes/bot-info.html' %}
                     </div>
-                    <div id="instruction" class="content-section">
+                    <div id="instruction" class="content-section dv-panel-section" tabindex="-1">
                         {% include 'home/instruction.html' %}
                     </div>
-                    <div id="faq" class="content-section">
+                    <div id="faq" class="content-section dv-panel-section" tabindex="-1">
                         {% include 'home/sections/faq.html' %}
                     </div>
                 </main>
@@ -159,75 +256,148 @@
     {% block extrascript %}
         <script>
             document.addEventListener('DOMContentLoaded', function () {
-                const navLinks = document.querySelectorAll('#sidebar .nav-link');
+                const navLinks = document.querySelectorAll('.dashboard-lk-tab');
                 const contentSections = document.querySelectorAll('.content-section');
-                const sidebar = document.getElementById('sidebar');
+                const mobileSelect = document.getElementById('dv-section-select');
+                const requestedSection = "{{ open_section|default:'' }}";
 
                 function setActiveLink(link) {
-                    navLinks.forEach(navLink => {
+                    navLinks.forEach(function (navLink) {
                         navLink.classList.remove('active');
+                        navLink.setAttribute('aria-selected', 'false');
+                        navLink.setAttribute('tabindex', '-1');
                     });
                     link.classList.add('active');
+                    link.setAttribute('aria-selected', 'true');
+                    link.setAttribute('tabindex', '0');
                 }
 
-                function showSection(targetId) {
-                    contentSections.forEach(section => {
-                        section.style.display = 'none';
-                    });
-
-                    const targetSection = document.getElementById(targetId);
-                    if (targetSection) {
-                        targetSection.style.display = 'block';
+                function showSection(targetId, opts) {
+                    opts = opts || {};
+                    const desktop = window.matchMedia('(min-width: 768px)').matches;
+                    if (desktop) {
+                        contentSections.forEach(function (section) {
+                            section.style.display = 'none';
+                        });
+                        const targetSection = document.getElementById(targetId);
+                        if (targetSection) {
+                            targetSection.style.display = 'block';
+                        }
+                    } else {
+                        const targetSection = document.getElementById(targetId);
+                        if (targetSection && opts.scroll !== false) {
+                            targetSection.scrollIntoView({behavior: 'smooth', block: 'start'});
+                        }
+                    }
+                    if (opts.focus !== false && desktop) {
+                        const panel = document.getElementById(targetId);
+                        if (panel) {
+                            const ph = panel.querySelector('h2, h3, .dv-panel-title');
+                            if (ph) {
+                                ph.setAttribute('tabindex', '-1');
+                                ph.focus({preventScroll: true});
+                            } else {
+                                panel.focus({preventScroll: true});
+                            }
+                        }
+                    }
+                    if (mobileSelect) {
+                        mobileSelect.value = targetId;
                     }
                 }
 
-
-                //Обработчик навигации
-                navLinks.forEach(link => {
+                navLinks.forEach(function (link) {
                     link.addEventListener('click', function (event) {
-                        event.preventDefault();
                         const targetId = this.dataset.target;
-                        if (window.innerWidth >= 768) {
+                        const isPrimaryClick = event.button === 0 && !event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey;
+                        if (window.innerWidth >= 768 && isPrimaryClick) {
+                            event.preventDefault();
                             showSection(targetId);
                             setActiveLink(this);
+                            if (window.history && window.history.replaceState) {
+                                var u = new URL(window.location.href);
+                                u.searchParams.set('section', targetId);
+                                window.history.replaceState({}, '', u);
+                            }
+                        }
+                    });
+                    link.addEventListener('keydown', function (event) {
+                        if (event.key !== 'Enter' && event.key !== ' ') {
+                            return;
+                        }
+                        event.preventDefault();
+                        if (window.innerWidth >= 768) {
+                            var targetId = this.dataset.target;
+                            showSection(targetId);
+                            setActiveLink(this);
+                            if (window.history && window.history.replaceState) {
+                                var u = new URL(window.location.href);
+                                u.searchParams.set('section', targetId);
+                                window.history.replaceState({}, '', u);
+                            }
                         }
                     });
                 });
 
-                //Скрываем все секции кроме main-info если ширина экрана больше 768px
                 if (window.innerWidth >= 768) {
-                    contentSections.forEach(section => {
+                    contentSections.forEach(function (section) {
                         if (section.id !== 'main-info') {
                             section.style.display = 'none';
+                        } else {
+                            section.style.display = 'block';
                         }
                     });
                 }
 
-
-                if (navLinks.length > 0) {
-                    setActiveLink(document.querySelector('[data-target="main-info"]'));
-                }
-
-                const requestedSection = "{{ open_section|default:'' }}";
+                var startSection = requestedSection;
+                var startLink;
                 if (requestedSection && window.innerWidth >= 768) {
-                    const desiredLink = document.querySelector('[data-target="' + requestedSection + '"]');
-                    if (desiredLink) {
-                        showSection(requestedSection);
-                        setActiveLink(desiredLink);
-                    }
+                    startLink = document.querySelector('[data-target="' + requestedSection + '"]');
+                }
+                if (!startLink || !requestedSection) {
+                    startSection = 'main-info';
+                    startLink = document.querySelector('[data-target="main-info"]');
                 }
 
-                //Скрыть боковую панель на мобильных устройствах
-                if (window.innerWidth < 768) {
-                    sidebar.style.display = 'none';
+                if (window.innerWidth >= 768 && startLink && startSection) {
+                    showSection(startSection, {focus: false});
+                    setActiveLink(startLink);
+                }
+
+                if (requestedSection && window.innerWidth < 768) {
+                    if (mobileSelect) {
+                        mobileSelect.value = requestedSection;
+                    }
+                    setTimeout(function () {
+                        var el = document.getElementById(requestedSection);
+                        if (el) {
+                            el.scrollIntoView({behavior: 'auto', block: 'start'});
+                        }
+                    }, 100);
+                } else if (mobileSelect && !requestedSection) {
+                    mobileSelect.value = 'main-info';
+                }
+
+                if (mobileSelect) {
+                    mobileSelect.addEventListener('change', function () {
+                        showSection(this.value, {focus: false});
+                    });
                 }
 
                 {% if open_password_change_modal %}
                 if (window.innerWidth >= 768) {
-                    showSection('user-info');
+                    showSection('user-info', {focus: false});
                     var pwLink = document.querySelector('[data-target="user-info"]');
                     if (pwLink) {
                         setActiveLink(pwLink);
+                    }
+                } else {
+                    var ui = document.getElementById('user-info');
+                    if (ui) {
+                        ui.scrollIntoView({behavior: 'smooth', block: 'start'});
+                    }
+                    if (mobileSelect) {
+                        mobileSelect.value = 'user-info';
                     }
                 }
                 if (typeof $ !== 'undefined' && $('#changePasswordModal').length) {
@@ -241,44 +411,80 @@
 
 {% block extrastyle %}
     <style>
-        .sidebar {
+        .dashboard-lk {
+            --dv-accent: #13056e;
+            --dv-radius: 12px;
+        }
+
+        .dashboard-lk-skip {
+            position: absolute;
+            left: 0.5rem;
+            top: 0.5rem;
+            z-index: 1100;
+            padding: 0.35rem 0.75rem;
+            background: #fff;
+            border: 1px solid #13056e;
+            border-radius: 6px;
+        }
+
+        .dashboard-lk-container {
+            position: relative;
+        }
+
+        .dashboard-lk-sidebar.sidebar {
             position: fixed;
             top: 0;
             bottom: 0;
             left: 0;
-            z-index: 100; /* Behind the navbar */
-            padding: 48px 0 0; /* Height of navbar */
-            box-shadow: inset -1px 0 0 rgba(0, 0, 0, .1);
+            z-index: 100;
+            padding: 48px 0 0;
+            box-shadow: inset -1px 0 0 rgba(0, 0, 0, .08);
         }
 
-        .sidebar .nav-link {
+        .dashboard-lk-sidebar .nav-link {
             font-weight: 500;
             color: #333;
+            border-radius: 8px;
+            margin-right: 0.35rem;
         }
 
-        .sidebar .nav-link.active {
-            color: #007bff;
+        .dashboard-lk-sidebar .nav-link:focus {
+            outline: 2px solid #13056e;
+            outline-offset: 2px;
         }
 
-        .sidebar-heading {
-            font-size: .75rem;
-            text-transform: uppercase;
+        .dashboard-lk-sidebar .nav-link.active {
+            color: var(--dv-accent);
+            background: rgba(19, 5, 110, 0.08);
+            font-weight: 600;
         }
 
-        .content-section {
-            padding: 20px;
+        .dashboard-lk-main > .dv-panel-section {
+            padding: 1.25rem 1.35rem;
             background-color: #fff;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            margin-bottom: 2rem;
+            border: none;
+            border-radius: var(--dv-radius);
+            box-shadow: 0 4px 24px rgba(19, 5, 110, 0.07);
+            margin-bottom: 1.5rem;
         }
 
-        .sidebar .nav-link {
-            padding: 0.5rem 1rem; /* Adjust padding for better appearance */
+        .dashboard-lk-main > .content-section#main-info {
+            padding: 0;
+            box-shadow: none;
+            background: transparent;
+            border: none;
         }
 
-        .sidebar .nav-item {
-            margin-bottom: 0.25rem; /* Add some spacing between items */
+        .dashboard-lk-main > .content-section#main-info .dv-main-info {
+            margin-bottom: 0 !important;
+        }
+
+        .dashboard-lk-sidebar .nav-item {
+            margin-bottom: 0.25rem;
+        }
+
+        .dv-mobile-nav .form-control {
+            border-radius: 8px;
         }
 
         .notify-pill-wrap {
@@ -330,20 +536,19 @@
             }
         }
 
-        /* Для маленьких экранов, скрыть боковую панель */
         @media (max-width: 767.98px) {
-            .sidebar {
-                display: none;
+            .dashboard-lk-sidebar {
+                display: none !important;
             }
 
-            .main {
-                padding-left: 0;
-            }
-
-            .content-section {
+            .dashboard-lk-main > .dv-panel-section,
+            .dashboard-lk-main > .content-section#main-info {
                 display: block !important;
             }
 
+            .dashboard-lk-main > .content-section#main-info {
+                padding: 0;
+            }
         }
     </style>
 {% endblock extrastyle %}

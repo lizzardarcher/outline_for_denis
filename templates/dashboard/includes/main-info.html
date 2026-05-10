@@ -286,7 +286,6 @@
         </div>
     </div>
 </div>
-
 <div class="modal fade" id="change_key" tabindex="-1" role="dialog"
      aria-labelledby="change_keyLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered" role="document">
@@ -309,11 +308,18 @@
                     </div>
                     <div class="form-group mb-0">
                         <label for="protocol" class="font-weight-bold">Протокол</label>
-                        <select class="form-control" id="protocol" name="protocol" style="border-radius: 8px;">
+                        <select class="form-control" id="protocol" name="protocol" style="border-radius: 8px;"
+                                aria-describedby="protocol-hint">
                             <option value="outline">Outline</option>
                             <option value="vless">VLESS</option>
                             <option value="hysteria2">Hysteria2</option>
                         </select>
+                        <p id="protocol-hint" class="small text-muted mt-2 mb-0">
+                            <strong>Outline / VLESS</strong> — обычные клиенты из раздела
+                            «<a href="{% url 'outline_links' %}">Приложения для подключения</a>».
+                            <strong>Hysteria2</strong> — нужен клиент с поддержкой QUIC (например NekoBox, sing-box);
+                            ссылки на клиенты — на той же странице, блок Hysteria&nbsp;2.
+                        </p>
                     </div>
                     <div class="modal-footer border-0 px-0 pb-1 pt-3">
                         <button type="button" class="btn btn-light border" data-dismiss="modal">Отмена</button>
