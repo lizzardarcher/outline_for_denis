@@ -8,8 +8,8 @@ from bot.models import TelegramUser
 
 
 def can_use_mtproxy(user: TelegramUser) -> bool:
-    return bool(user and (user.username or "").strip().lower() == "megafoll")
-
+    """TG (MTProto) proxy: временно скрыто для всех (сайт и бот)."""
+    return False
 
 def get_active_key(user: TelegramUser):
     return ProxyAccessKey.objects.filter(user=user, status=ProxyAccessKey.STATUS_ACTIVE).select_related("node").first()

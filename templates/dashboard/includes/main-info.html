@@ -302,6 +302,7 @@
                         <label for="country" class="font-weight-bold">Страна</label>
                         <select class="form-control" id="country" name="country" style="border-radius: 8px;">
                             {% for country in countries %}
+
                                 <option value="{{ country.name }}">{{ country.name_for_app }}</option>
                             {% endfor %}
                         </select>
@@ -311,9 +312,7 @@
                         <select class="form-control" id="protocol" name="protocol" style="border-radius: 8px;">
                             <option value="outline">Outline</option>
                             <option value="vless">VLESS</option>
-                            {% if show_hysteria2_protocol %}
-                                <option value="hysteria2">Hysteria2</option>
-                            {% endif %}
+                            <option value="hysteria2">Hysteria2</option>
                         </select>
                     </div>
                     <div class="modal-footer border-0 px-0 pb-1 pt-3">

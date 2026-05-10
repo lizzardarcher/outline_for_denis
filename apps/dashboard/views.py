@@ -80,6 +80,7 @@ class ProfileView(LoginRequiredMixin, SuccessMessageMixin, TemplateView):
             context['per_4'] = ReferralSettings.objects.get(pk=1).level_4_percentage
             context['per_5'] = ReferralSettings.objects.get(pk=1).level_5_percentage
 
+
         context['transactions'] = Transaction.objects.filter(user=tg_user).order_by('-timestamp')
         context['dashboard_password_form'] = DashboardPasswordChangeForm(self.request.user)
         context['notifications'] = notifications_with_state
@@ -88,7 +89,6 @@ class ProfileView(LoginRequiredMixin, SuccessMessageMixin, TemplateView):
         context['latest_unread_notification'] = unread_notifications[0] if unread_notifications else None
         context['open_section'] = (self.request.GET.get('section') or '').strip()
         context['show_mtproxy'] = can_use_mtproxy(tg_user)
-        context['show_hysteria2_protocol'] = (tg_user.username or '').strip().lower() == 'megafoll'
         if context['show_mtproxy']:
             context['mtproxy_key'] = get_active_key(tg_user)
         return context
@@ -238,10 +238,6 @@ class CreateNewKeyView(LoginRequiredMixin, TemplateView):
 
 
         elif protocol == 'hysteria2':
-            if (user.username or '').strip().lower() != 'megafoll':
-                messages.error(request, 'Протокол Hysteria2 недоступен.')
-                return redirect('profile')
-
             server = Server.objects.filter(
                 is_active=True,
                 is_c3celeryty_activated=True,

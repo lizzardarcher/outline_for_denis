@@ -117,7 +117,6 @@ def _generate_and_set_site_password(django_user: User) -> str:
     django_user.save()
     return password
 
-
 @bot.message_handler(commands=['getlogin'])
 async def getlogin(message):
     """
@@ -571,13 +570,6 @@ async def callback_query_handlers(call):
                                                    reply_markup=markup.get_subscription())
 
                     elif 'hysteria2' in data:
-                        if (user.username or "").strip().lower() != "megafoll":
-                            await bot.send_message(
-                                call.message.chat.id,
-                                "Протокол Hysteria2 недоступен.",
-                                reply_markup=markup.choose_protocol(user=user),
-                            )
-                            return
                         if user.subscription_status:
                             country = return_matches(country_list, data[-1])[0]
                             if country:
@@ -616,13 +608,6 @@ async def callback_query_handlers(call):
                                            reply_markup=markup.get_avail_location('vless'))
 
                 elif 'protocol_hysteria2' in data:
-                    if (user.username or "").strip().lower() != "megafoll":
-                        await bot.send_message(
-                            call.message.chat.id,
-                            "Протокол Hysteria2 недоступен.",
-                            reply_markup=markup.choose_protocol(user=user),
-                        )
-                        return
                     await bot.send_message(call.message.chat.id, msg.avail_location_choice,
                                            reply_markup=markup.get_avail_location('hysteria2'))
 
@@ -630,13 +615,6 @@ async def callback_query_handlers(call):
 
                     if 'get_new_key' in call.data or 'swap_key' in call.data:
                         protocol = call.data.split(':')[1]
-                        if protocol == "hysteria2" and (user.username or "").strip().lower() != "megafoll":
-                            await bot.send_message(
-                                call.message.chat.id,
-                                "Протокол Hysteria2 недоступен.",
-                                reply_markup=markup.choose_protocol(user=user),
-                            )
-                            return
                         if user.subscription_status:
                             try:
                                 country = call.data.split('_')[-1]

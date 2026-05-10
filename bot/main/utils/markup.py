@@ -39,13 +39,11 @@ def start(user: TelegramUser = None):
     return markup
 
 
-
 def choose_protocol(user: TelegramUser = None):
     markup = InlineKeyboardMarkup()
     markup.add(InlineKeyboardButton(text=f'🚀 VLESS', callback_data=f'protocol_vless'))
     markup.add(InlineKeyboardButton(text=f'🔑 OUTLINE', callback_data=f'protocol_outline'))
-    if user and (user.username or "").strip().lower() == "megafoll":
-        markup.add(InlineKeyboardButton(text="⚡ Hysteria2", callback_data="protocol_hysteria2"))
+    markup.add(InlineKeyboardButton(text="⚡ Hysteria2", callback_data="protocol_hysteria2"))
     markup.add(btn_back)
     return markup
 
@@ -162,8 +160,6 @@ def my_profile(user: TelegramUser):
     markup.row(btn4)
     markup.row(btn5)
     markup.row(btn6)
-    if (user.username or "").strip().lower() == "megafoll":
-        markup.row(InlineKeyboardButton(text='🛰 TG Proxy', callback_data='tgproxy:show'))
     markup.row(btn7)
     markup.row(btn_back)
     return markup
