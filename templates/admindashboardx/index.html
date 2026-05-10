@@ -2,127 +2,293 @@
 
 {% block title %} · Главная{% endblock %}
 
+
 {% block content %}
     <div class="row g-3 mb-4">
-        <div class="col-12 col-md-6 col-xl-3">
+        <div class="col-12 col-xl-4">
             <div class="card admx-card h-100">
                 <div class="card-body">
-                    <div class="admx-kpi-title">Всего пользователей</div>
-                    <div class="admx-kpi-value">{{ kpi_users_total }}</div>
-                    <div class="admx-kpi-foot">Активных: {{ kpi_users_active }}</div>
+                    <div class="d-flex align-items-start justify-content-between gap-2 mb-2">
+                        <div class="admx-kpi-title mb-0">Доход проекта</div>
+                        <i class="bi bi-graph-up-arrow text-secondary fs-5"></i>
+                    </div>
+                    <div class="admx-kpi-value">{{ revenue_project_total|floatformat:2 }} <span class="fs-6 fw-normal text-secondary">RUB</span></div>
+                    <div class="admx-kpi-foot mb-3">Сводное значение (IncomeInfo)</div>
+                    <ul class="list-unstyled small mb-0 admx-stat-breakdown">
+                        <li class="d-flex justify-content-between py-1 border-top border-secondary border-opacity-25">
+                            <span class="text-secondary">За год ({{ stats_date.year }})</span>
+                            <span class="fw-semibold">{{ revenue_year|floatformat:2 }} ₽</span>
+                        </li>
+                        <li class="d-flex justify-content-between py-1 border-top border-secondary border-opacity-25">
+                            <span class="text-secondary">За месяц</span>
+                            <span class="fw-semibold">{{ revenue_month|floatformat:2 }} ₽</span>
+                        </li>
+                        <li class="d-flex justify-content-between py-1 border-top border-secondary border-opacity-25">
+                            <span class="text-secondary">Сегодня</span>
+                            <span class="fw-semibold">{{ revenue_day|floatformat:2 }} ₽</span>
+                        </li>
+                    </ul>
+                    <div class="admx-kpi-foot mt-2 small">Периоды: сумма успешных платежей (без выводов)</div>
+                    {% if not is_support %}
+                        <a href="{% url 'admindashboardx:revenue_analytics' %}" class="btn btn-sm btn-outline-light w-100 mt-3">
+                            <i class="bi bi-bar-chart-line me-1"></i> Аналитика доходов
+                        </a>
+                    {% endif %}
                 </div>
             </div>
         </div>
-        <div class="col-12 col-md-6 col-xl-3">
+        <div class="col-12 col-xl-4">
             <div class="card admx-card h-100">
                 <div class="card-body">
-                    <div class="admx-kpi-title">Новые пользователи</div>
-                    <div class="admx-kpi-value">{{ kpi_users_new }}</div>
-                    <div class="admx-kpi-foot">За {{ period_days }} дней</div>
+                    <div class="d-flex align-items-start justify-content-between gap-2 mb-2">
+                        <div class="admx-kpi-title mb-0">Пользователи</div>
+                        <i class="bi bi-people-fill text-secondary fs-5"></i>
+                    </div>
+                    <div class="admx-kpi-value">{{ users_total }}</div>
+                    <div class="admx-kpi-foot mb-3">Всего в базе</div>
+                    <ul class="list-unstyled small mb-0 admx-stat-breakdown">
+                        <li class="d-flex justify-content-between py-1 border-top border-secondary border-opacity-25">
+                            <span class="text-secondary">Новых за месяц</span>
+                            <span class="fw-semibold">{{ users_month }}</span>
+                        </li>
+                        <li class="d-flex justify-content-between py-1 border-top border-secondary border-opacity-25">
+                            <span class="text-secondary">Новых за день</span>
+                            <span class="fw-semibold">{{ users_day }}</span>
+                        </li>
+                    </ul>
+                    <div class="admx-kpi-foot mt-2 small">По дате регистрации (join_date)</div>
                 </div>
             </div>
         </div>
-        <div class="col-12 col-md-6 col-xl-3">
+        <div class="col-12 col-xl-4">
             <div class="card admx-card h-100">
                 <div class="card-body">
-                    <div class="admx-kpi-title">Успешные транзакции</div>
-                    <div class="admx-kpi-value">{{ kpi_success_tx_count }}</div>
-                    <div class="admx-kpi-foot">Сумма: {{ kpi_success_tx_sum }} RUB</div>
-                </div>
-            </div>
-        </div>
-
-        <div class="col-12 col-md-6 col-xl-3">
-            <div class="card admx-card h-100">
-                <div class="card-body">
-                    <div class="admx-kpi-title">Ошибка/предупреждения</div>
-                    <div class="admx-kpi-value">{{ kpi_error_logs }}</div>
-                    <div class="admx-kpi-foot">Log levels: WARNING, FATAL</div>
+                    <div class="d-flex align-items-start justify-content-between gap-2 mb-2">
+                        <div class="admx-kpi-title mb-0">Транзакции и списания</div>
+                        <i class="bi bi-arrow-left-right text-secondary fs-5"></i>
+                    </div>
+                    <div class="mb-3">
+                        <div class="small text-secondary mb-1">Транзакции (записей)</div>
+                        <ul class="list-unstyled small mb-0 admx-stat-breakdown">
+                            <li class="d-flex justify-content-between py-1 border-top border-secondary border-opacity-25">
+                                <span class="text-secondary">Всего</span>
+                                <span class="fw-semibold">{{ tx_count_total }}</span>
+                            </li>
+                            <li class="d-flex justify-content-between py-1 border-top border-secondary border-opacity-25">
+                                <span class="text-secondary">За месяц</span>
+                                <span class="fw-semibold">{{ tx_count_month }}</span>
+                            </li>
+                            <li class="d-flex justify-content-between py-1 border-top border-secondary border-opacity-25">
+                                <span class="text-secondary">За день</span>
+                                <span class="fw-semibold">{{ tx_count_day }}</span>
+                            </li>
+                        </ul>
+                    </div>
+                    <div>
+                        <div class="small text-secondary mb-1">Списания (заявки на вывод)</div>
+                        <ul class="list-unstyled small mb-0 admx-stat-breakdown">
+                            <li class="d-flex justify-content-between py-1 border-top border-secondary border-opacity-25">
+                                <span class="text-secondary">Всего</span>
+                                <span class="fw-semibold">{{ wd_count_total }}</span>
+                            </li>
+                            <li class="d-flex justify-content-between py-1 border-top border-secondary border-opacity-25">
+                                <span class="text-secondary">За месяц</span>
+                                <span class="fw-semibold">{{ wd_count_month }}</span>
+                            </li>
+                            <li class="d-flex justify-content-between py-1 border-top border-secondary border-opacity-25">
+                                <span class="text-secondary">За день</span>
+                                <span class="fw-semibold">{{ wd_count_day }}</span>
+                            </li>
+                        </ul>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <div class="row g-3 mb-4">
-        <div class="col-12">
-            <div class="card admx-card">
-                <div class="card-header">Быстрые переходы</div>
-                <div class="card-body d-flex flex-wrap gap-2">
-                    <a class="btn btn-outline-light btn-sm" href="{% url 'admindashboardx:users' %}">Пользователи</a>
-                    <a class="btn btn-outline-light btn-sm" href="{% url 'admindashboardx:transactions' %}">Платежи</a>
-                    <a class="btn btn-outline-light btn-sm" href="{% url 'admindashboardx:logs' %}">Логи</a>
+    <div class="mb-3 admx-kpi-title">Разделы</div>
+    <div class="row row-cols-1 row-cols-sm-2 row-cols-lg-3 row-cols-xxl-5 g-3 mb-4">
+        <div class="col">
+            <div class="card admx-card admx-hub-card h-100" role="button" tabindex="0" data-bs-toggle="modal" data-bs-target="#admxModalUsers">
+                <div class="card-body text-center py-4">
+                    <i class="bi bi-people-fill fs-2 text-primary-emphasis d-block mb-2"></i>
+                    <div class="fw-semibold">Пользователи</div>
+                    <div class="small text-secondary mt-1">Список и отчёты</div>
+                </div>
+            </div>
+        </div>
+        {% if not is_support %}
+            <div class="col">
+                <div class="card admx-card admx-hub-card h-100" role="button" tabindex="0" data-bs-toggle="modal" data-bs-target="#admxModalServers">
+                    <div class="card-body text-center py-4">
+                        <i class="bi bi-hdd-network-fill fs-2 text-primary-emphasis d-block mb-2"></i>
+                        <div class="fw-semibold">Серверы</div>
+                        <div class="small text-secondary mt-1">Инфраструктура</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col">
+                <div class="card admx-card admx-hub-card h-100" role="button" tabindex="0" data-bs-toggle="modal" data-bs-target="#admxModalNotifications">
+                    <div class="card-body text-center py-4">
+                        <i class="bi bi-bell-fill fs-2 text-primary-emphasis d-block mb-2"></i>
+                        <div class="fw-semibold">Уведомления</div>
+                        <div class="small text-secondary mt-1">Сайт и Telegram</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col">
+                <div class="card admx-card admx-hub-card h-100" role="button" tabindex="0" data-bs-toggle="modal" data-bs-target="#admxModalSettings">
+                    <div class="card-body text-center py-4">
+                        <i class="bi bi-sliders fs-2 text-primary-emphasis d-block mb-2"></i>
+                        <div class="fw-semibold">Настройки</div>
+                        <div class="small text-secondary mt-1">Цены, доходы, бот</div>
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+        <div class="col">
+            <div class="card admx-card admx-hub-card h-100" role="button" tabindex="0" data-bs-toggle="modal" data-bs-target="#admxModalLogs">
+                <div class="card-body text-center py-4">
+                    <i class="bi bi-journal-text fs-2 text-primary-emphasis d-block mb-2"></i>
+                    <div class="fw-semibold">Логи</div>
+                    <div class="small text-secondary mt-1">Системные события</div>
                 </div>
             </div>
         </div>
     </div>
 
-    <div class="row g-3">
-        <div class="col-12 col-xl-6">
-            <div class="card admx-card">
-                <div class="card-header">Последние ошибки</div>
-                <div class="table-responsive">
-                    <table class="table table-dark table-hover align-middle mb-0 admx-table">
-                        <thead>
-                        <tr>
-                            <th>Время</th>
-                            <th>Категория</th>
-                            <th>Уровень</th>
-                            <th>Пользователь</th>
-                            <th>Сообщение</th>
-                        </tr>
-                        </thead>
-                        <tbody>
-                        {% for row in recent_error_logs %}
-                            <tr>
-                                <td>{{ row.datetime|date:"d.m.Y H:i" }}</td>
-                                <td>{{ row.get_category_display }}</td>
-                                <td>{{ row.log_level }}</td>
-                                <td>{% if row.user %}{{ row.user.user_id }}{% else %}—{% endif %}</td>
-                                <td class="admx-message-cell">{{ row.message }}</td>
-                            </tr>
-                        {% empty %}
-                            <tr>
-                                <td colspan="5" class="text-center text-secondary">Нет данных</td>
-                            </tr>
-                        {% endfor %}
-                        </tbody>
-                    </table>
+    <div class="modal fade" id="admxModalUsers" tabindex="-1" aria-labelledby="admxModalUsersLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content admx-modal-content">
+                <div class="modal-header border-secondary border-opacity-25">
+                    <h5 class="modal-title" id="admxModalUsersLabel">Пользователи</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="d-grid gap-2">
+                        <a class="btn btn-outline-light text-start" href="{% url 'admindashboardx:users' %}">
+                            <i class="bi bi-list-ul me-2"></i>Список пользователей
+                        </a>
+                        {% if user.is_superuser %}
+                            <a class="btn btn-outline-light text-start" href="{% url 'admindashboardx:users_analytics_export_xlsx' %}">
+                                <i class="bi bi-file-earmark-spreadsheet me-2"></i>Экспорт аналитики (Excel)
+                            </a>
+                        {% endif %}
+                        {% if not is_support %}
+                            <a class="btn btn-outline-light text-start" href="{% url 'admindashboardx:telegram_users_crud' %}">
+                                <i class="bi bi-person-vcard me-2"></i>TelegramUser CRUD
+                            </a>
+                            <a class="btn btn-outline-light text-start" href="{% url 'admindashboardx:user_profile_crud' %}">
+                                <i class="bi bi-person-badge me-2"></i>UserProfile CRUD
+                            </a>
+                        {% endif %}
+                    </div>
                 </div>
             </div>
         </div>
-        <div class="col-12 col-xl-6">
-            <div class="card admx-card">
-                <div class="card-header">Последние failed/canceled транзакции</div>
-                <div class="table-responsive">
-                    <table class="table table-dark table-hover align-middle mb-0 admx-table">
-                        <thead>
-                        <tr>
-                            <th>Время</th>
-                            <th>Пользователь</th>
-                            <th>Сумма</th>
-                            <th>ПС</th>
-                            <th>Статус</th>
-                        </tr>
-                        </thead>
-                        <tbody>
-                        {% for tx in recent_failed_tx %}
-                            <tr>
-                                <td>{{ tx.timestamp|date:"d.m.Y H:i" }}</td>
-                                <td>{% if tx.user %}{{ tx.user.user_id }}{% else %}—{% endif %}</td>
-                                <td>{{ tx.amount }} {{ tx.currency|default:"RUB" }}</td>
-                                <td>{{ tx.payment_system|default:"—" }}</td>
-                                <td>{{ tx.status }}</td>
-                            </tr>
-                        {% empty %}
-                            <tr>
-                                <td colspan="5" class="text-center text-secondary">Нет данных</td>
-                            </tr>
-                        {% endfor %}
-                        </tbody>
-                    </table>
+    </div>
+
+    {% if not is_support %}
+        <div class="modal fade" id="admxModalServers" tabindex="-1" aria-labelledby="admxModalServersLabel" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content admx-modal-content">
+                    <div class="modal-header border-secondary border-opacity-25">
+                        <h5 class="modal-title" id="admxModalServersLabel">Серверы</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="d-grid gap-2">
+                            <a class="btn btn-outline-light text-start" href="{% url 'admindashboardx:servers' %}">
+                                <i class="bi bi-hdd-network-fill me-2"></i>Серверы
+                            </a>
+                            <a class="btn btn-outline-light text-start" href="{% url 'admindashboardx:keys' %}">
+                                <i class="bi bi-key-fill me-2"></i>Ключи
+                            </a>
+                            <a class="btn btn-outline-light text-start" href="{% url 'admindashboardx:countries' %}">
+                                <i class="bi bi-globe2 me-2"></i>Страны
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="modal fade" id="admxModalNotifications" tabindex="-1" aria-labelledby="admxModalNotificationsLabel" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content admx-modal-content">
+                    <div class="modal-header border-secondary border-opacity-25">
+                        <h5 class="modal-title" id="admxModalNotificationsLabel">Уведомления</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="d-grid gap-2">
+                            <a class="btn btn-outline-light text-start" href="{% url 'admindashboardx:site_notifications' %}">
+                                <i class="bi bi-bell-fill me-2"></i>Site уведомления
+                            </a>
+                            <a class="btn btn-outline-light text-start" href="{% url 'admindashboardx:site_notification_states' %}">
+                                <i class="bi bi-bell me-2"></i>Состояния уведомлений
+                            </a>
+                            <a class="btn btn-outline-light text-start" href="{% url 'admindashboardx:telegram_messages' %}">
+                                <i class="bi bi-telegram me-2"></i>Telegram сообщения
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="modal fade" id="admxModalSettings" tabindex="-1" aria-labelledby="admxModalSettingsLabel" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content admx-modal-content">
+                    <div class="modal-header border-secondary border-opacity-25">
+                        <h5 class="modal-title" id="admxModalSettingsLabel">Настройки</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="d-grid gap-2">
+                            <a class="btn btn-outline-light text-start" href="{% url 'admindashboardx:prices' %}">
+                                <i class="bi bi-cash-coin me-2"></i>Цены
+                            </a>
+                            <a class="btn btn-outline-light text-start" href="{% url 'admindashboardx:income_info' %}">
+                                <i class="bi bi-wallet2 me-2"></i>Доходы (IncomeInfo)
+                            </a>
+                            <a class="btn btn-outline-light text-start" href="{% url 'admindashboardx:revenue_analytics' %}">
+                                <i class="bi bi-bar-chart-line me-2"></i>Аналитика доходов
+                            </a>
+                            <a class="btn btn-outline-light text-start" href="{% url 'admindashboardx:referral_settings' %}">
+                                <i class="bi bi-diagram-3-fill me-2"></i>Реферальные проценты
+                            </a>
+                            <a class="btn btn-outline-light text-start" href="{% url 'admindashboardx:telegram_bot_crud' %}">
+                                <i class="bi bi-robot me-2"></i>TelegramBot CRUD
+                            </a>
+                            <a class="btn btn-outline-light text-start" href="{% url 'admindashboardx:transactions' %}">
+                                <i class="bi bi-credit-card-2-front-fill me-2"></i>Платежи (транзакции)
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    {% endif %}
+
+    <div class="modal fade" id="admxModalLogs" tabindex="-1" aria-labelledby="admxModalLogsLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content admx-modal-content">
+                <div class="modal-header border-secondary border-opacity-25">
+                    <h5 class="modal-title" id="admxModalLogsLabel">Логи</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="d-grid gap-2">
+                        <a class="btn btn-outline-light text-start" href="{% url 'admindashboardx:logs' %}">
+                            <i class="bi bi-journal-text me-2"></i>Журнал логов
+                        </a>
+                        {% if kpi_error_logs %}
+                            <div class="small text-secondary mt-1">За последние {{ period_days }} дн.: предупреждений и ошибок — {{ kpi_error_logs }}</div>
+                        {% endif %}
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 {% endblock %}
-

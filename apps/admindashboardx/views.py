@@ -1,13 +1,15 @@
 from collections import defaultdict
 from datetime import datetime, timedelta
 from decimal import Decimal
+from math import sqrt
 
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.conf import settings
 from django import forms
 from django.forms import modelform_factory
 from django.core.paginator import Paginator
-from django.db.models import Q, Sum
+from django.db.models import Count, Q, Sum
+from django.db.models.functions import TruncDay
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -206,43 +208,350 @@ class AdminDashboardIndexView(DashboardBaseView):
     page_title = "AdminDashboardX · Главная"
     page_key = "index"
 
+    _SUCCESS_PAYMENT_Q = Q(paid=True) | Q(status="succeeded")
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         now = timezone.now()
-        period_days = 30
-        since = now - timedelta(days=period_days)
+        today = timezone.localdate()
 
-        kpi_users_total = TelegramUser.objects.count()
-        kpi_users_active = TelegramUser.objects.filter(subscription_status=True).count()
-        kpi_users_new = TelegramUser.objects.filter(join_date__gte=since.date()).count()
+        successful_payments = Transaction.objects.filter(self._SUCCESS_PAYMENT_Q).exclude(side="Вывод средств")
 
-        successful_tx_qs = Transaction.objects.filter(
-            timestamp__gte=since,
-            status="succeeded",
-            paid=True,
+        revenue_day = successful_payments.filter(timestamp__date=today).aggregate(t=Sum("amount")).get("t") or Decimal(
+            "0"
         )
-        kpi_success_tx_count = successful_tx_qs.count()
-        kpi_success_tx_sum = successful_tx_qs.aggregate(total=Sum("amount")).get("total") or Decimal("0")
+        revenue_month = successful_payments.filter(
+            timestamp__year=today.year,
+            timestamp__month=today.month,
+        ).aggregate(t=Sum("amount")).get("t") or Decimal("0")
+        revenue_year = successful_payments.filter(timestamp__year=today.year).aggregate(t=Sum("amount")).get(
+            "t"
+        ) or Decimal("0")
+
+        income_row = IncomeInfo.objects.order_by("-pk").first()
+        revenue_project_total = (
+            income_row.total_amount if income_row and income_row.total_amount is not None else Decimal("0")
+        )
+
+        users_total = TelegramUser.objects.count()
+        users_month = TelegramUser.objects.filter(join_date__year=today.year, join_date__month=today.month).count()
+        users_day = TelegramUser.objects.filter(join_date=today).count()
+
+        tx_qs = Transaction.objects.all()
+        tx_count_total = tx_qs.count()
+        tx_count_month = tx_qs.filter(timestamp__year=today.year, timestamp__month=today.month).count()
+        tx_count_day = tx_qs.filter(timestamp__date=today).count()
+
+        wd_qs = WithdrawalRequest.objects.all()
+        wd_with_ts = WithdrawalRequest.objects.exclude(timestamp__isnull=True)
+        wd_count_total = wd_qs.count()
+        wd_count_month = wd_with_ts.filter(timestamp__year=today.year, timestamp__month=today.month).count()
+        wd_count_day = wd_with_ts.filter(timestamp__date=today).count()
 
         error_levels = ("WARNING", "FATAL")
+        period_days = 30
+        since = now - timedelta(days=period_days)
         kpi_error_logs = Logging.objects.filter(datetime__gte=since, log_level__in=error_levels).count()
 
         context.update(
             {
                 **self._base_context(),
+                "stats_date": today,
+                "revenue_project_total": revenue_project_total,
+                "revenue_year": revenue_year,
+                "revenue_month": revenue_month,
+                "revenue_day": revenue_day,
+                "users_total": users_total,
+                "users_month": users_month,
+                "users_day": users_day,
+                "tx_count_total": tx_count_total,
+                "tx_count_month": tx_count_month,
+                "tx_count_day": tx_count_day,
+                "wd_count_total": wd_count_total,
+                "wd_count_month": wd_count_month,
+                "wd_count_day": wd_count_day,
                 "period_days": period_days,
-                "kpi_users_total": kpi_users_total,
-                "kpi_users_active": kpi_users_active,
-                "kpi_users_new": kpi_users_new,
-                "kpi_success_tx_count": kpi_success_tx_count,
-                "kpi_success_tx_sum": kpi_success_tx_sum,
                 "kpi_error_logs": kpi_error_logs,
-                "recent_error_logs": Logging.objects.filter(log_level__in=error_levels)
-                .select_related("user")
-                .order_by("-datetime")[:20],
-                "recent_failed_tx": Transaction.objects.filter(status__in=("failed", "canceled"))
-                .select_related("user")
-                .order_by("-timestamp")[:20],
+            }
+        )
+        return context
+
+
+def _admx_pearson_corr(xs, ys):
+    n = len(xs)
+    if n < 3 or n != len(ys):
+        return None
+    mx = sum(xs) / n
+    my = sum(ys) / n
+    var_x = sum((x - mx) ** 2 for x in xs)
+    var_y = sum((y - my) ** 2 for y in ys)
+    if var_x <= 0 or var_y <= 0:
+        return None
+    cov = sum((xs[i] - mx) * (ys[i] - my) for i in range(n))
+    return cov / sqrt(var_x * var_y)
+
+
+def _admx_payment_system_labels():
+    return dict(Transaction._meta.get_field("payment_system").choices)
+
+
+class RevenueAnalyticsView(DashboardBaseView):
+    """Доходы, пользователи, конверсия, рекуррент, платёжные системы, ошибки — по скользящему окну дней."""
+
+    template_name = "admindashboardx/revenue_analytics.html"
+    page_title = "AdminDashboardX · Аналитика доходов"
+    page_key = "revenue_analytics"
+
+    _INCOMING_OK = (Q(paid=True) | Q(status="succeeded")) & ~Q(side="Вывод средств")
+
+    def dispatch(self, request, *args, **kwargs):
+        if self._is_support():
+            return self._forbidden_response()
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        raw_days = (self.request.GET.get("days") or "90").strip()
+        try:
+            range_days = int(raw_days)
+        except ValueError:
+            range_days = 90
+        range_days = max(7, min(range_days, 730))
+
+        now = timezone.now()
+        start_dt = now - timedelta(days=range_days)
+        tz = timezone.get_current_timezone()
+        start_date = timezone.localtime(start_dt).date()
+        today = timezone.localdate()
+
+        ps_labels = _admx_payment_system_labels()
+
+        def ps_display(code):
+            if not code:
+                return "—"
+            return ps_labels.get(str(code), str(code))
+
+        incoming_base = Transaction.objects.filter(self._INCOMING_OK, timestamp__gte=start_dt)
+
+        agg_pay_by_day = (
+            incoming_base.annotate(period=TruncDay("timestamp", tzinfo=tz))
+            .values("period")
+            .annotate(revenue=Sum("amount"), payments_n=Count("id"))
+        )
+        pay_map = {}
+        for row in agg_pay_by_day:
+            pd = row["period"]
+            dkey = pd.date() if hasattr(pd, "date") else pd
+            pay_map[dkey] = {
+                "revenue": row["revenue"] or Decimal("0"),
+                "payments_n": row["payments_n"],
+            }
+
+        user_rows = (
+            TelegramUser.objects.filter(join_date__gte=start_date, join_date__lte=today)
+            .values("join_date")
+            .annotate(new_users=Count("id"))
+        )
+        user_map = {r["join_date"]: r["new_users"] for r in user_rows}
+
+        series_daily = []
+        d = start_date
+        rev_series = []
+        usr_series = []
+        while d <= today:
+            p = pay_map.get(d)
+            rev = float(p["revenue"]) if p else 0.0
+            nu = int(user_map.get(d, 0))
+            series_daily.append(
+                {
+                    "date": d.isoformat(),
+                    "date_short": d.strftime("%d.%m"),
+                    "revenue": rev,
+                    "new_users": nu,
+                    "payments_n": int(p["payments_n"]) if p else 0,
+                }
+            )
+            rev_series.append(rev)
+            usr_series.append(float(nu))
+            d += timedelta(days=1)
+
+        revenue_period = incoming_base.aggregate(t=Sum("amount")).get("t") or Decimal("0")
+        payments_period_n = incoming_base.count()
+
+        new_users_period = TelegramUser.objects.filter(join_date__gte=start_date, join_date__lte=today).count()
+        users_total = TelegramUser.objects.count()
+        paying_users_all = (
+            Transaction.objects.filter(self._INCOMING_OK).exclude(user_id__isnull=True).values("user_id").distinct().count()
+        )
+        conversion_all_pct = (Decimal(paying_users_all) / Decimal(users_total) * 100) if users_total else Decimal("0")
+
+        cohort_users_qs = TelegramUser.objects.filter(join_date__gte=start_date, join_date__lte=today)
+        new_ids_count = cohort_users_qs.count()
+        paid_among_new = (
+            Transaction.objects.filter(self._INCOMING_OK, user_id__in=cohort_users_qs.values_list("id", flat=True))
+            .values("user_id")
+            .distinct()
+            .count()
+            if new_ids_count
+            else 0
+        )
+        cohort_conversion_pct = (
+            (Decimal(paid_among_new) / Decimal(new_ids_count) * 100) if new_ids_count else Decimal("0")
+        )
+
+        payers_period = (
+            incoming_base.exclude(user_id__isnull=True).values("user_id").distinct().count()
+        )
+        arpu_period = (revenue_period / Decimal(payers_period)) if payers_period else Decimal("0")
+
+        corr_daily = _admx_pearson_corr(rev_series, usr_series)
+
+        by_ps = []
+        ps_agg = (
+            incoming_base.values("payment_system")
+            .annotate(revenue=Sum("amount"), ok_n=Count("id"))
+            .order_by("-revenue")
+        )
+        failed_qs = Transaction.objects.filter(
+            timestamp__gte=start_dt,
+            status__in=("failed", "canceled"),
+        ).exclude(side="Вывод средств")
+        failed_by_ps = {r["payment_system"]: r["fn"] for r in failed_qs.values("payment_system").annotate(fn=Count("id"))}
+        pending_by_ps = {
+            r["payment_system"]: r["pn"]
+            for r in Transaction.objects.filter(timestamp__gte=start_dt, status="pending")
+            .exclude(side="Вывод средств")
+            .values("payment_system")
+            .annotate(pn=Count("id"))
+        }
+
+        rev_other_chart = []
+        ps_chart_colors = []
+        palette = ["#7c9cff", "#6fd3a9", "#f0ad4e", "#e06666", "#b794f6", "#5bc0de", "#ffd066"]
+        pi = 0
+        for row in ps_agg:
+            ps_code = row["payment_system"]
+            lab = ps_display(ps_code)
+            rev_v = float(row["revenue"] or 0)
+            ok_n = row["ok_n"]
+            fn = failed_by_ps.get(ps_code, 0)
+            pn = pending_by_ps.get(ps_code, 0)
+            tot_attempts = ok_n + fn + pn
+            success_rate = (ok_n / tot_attempts * 100) if tot_attempts else None
+            by_ps.append(
+                {
+                    "payment_system": ps_code or "",
+                    "label": lab,
+                    "revenue": row["revenue"] or Decimal("0"),
+                    "ok_count": ok_n,
+                    "failed_count": fn,
+                    "pending_count": pn,
+                    "success_rate": success_rate,
+                }
+            )
+            rev_other_chart.append({"label": lab, "value": rev_v})
+            ps_chart_colors.append(palette[pi % len(palette)])
+            pi += 1
+
+        recurring_children_q = incoming_base.filter(
+            robokassa_recurring_previous_inv_id__isnull=False
+        ).exclude(robokassa_recurring_previous_inv_id="")
+        recurring_parents_q = incoming_base.filter(robokassa_is_recurring_parent=True)
+        rec_children_n = recurring_children_q.count()
+        rec_parents_n = recurring_parents_q.count()
+        rec_revenue = recurring_children_q.aggregate(t=Sum("amount")).get("t") or Decimal("0")
+        recurring_by_ps = []
+        for row in recurring_children_q.values("payment_system").annotate(n=Count("id"), rev=Sum("amount")).order_by("-rev"):
+            recurring_by_ps.append(
+                {
+                    "label": ps_display(row["payment_system"]),
+                    "count": row["n"],
+                    "revenue": row["rev"] or Decimal("0"),
+                }
+            )
+
+        one_off_n = payments_period_n - rec_children_n
+        cat_labels = dict(Logging._meta.get_field("category").choices)
+        log_issues = []
+        for row in (
+            Logging.objects.filter(datetime__gte=start_dt, log_level__in=("WARNING", "FATAL"))
+            .values("log_level", "category")
+            .annotate(n=Count("id"))
+            .order_by("-n")[:25]
+        ):
+            cat_key = row["category"]
+            log_issues.append(
+                {
+                    "level": row["log_level"],
+                    "category": cat_key,
+                    "category_label": cat_labels.get(cat_key, cat_key),
+                    "n": row["n"],
+                }
+            )
+
+        payment_related_logs_n = Logging.objects.filter(
+            datetime__gte=start_dt,
+            log_level__in=("WARNING", "FATAL"),
+            category="payment",
+        ).count()
+
+        income_row = IncomeInfo.objects.order_by("-pk").first()
+        income_snapshot = income_row.total_amount if income_row and income_row.total_amount is not None else Decimal("0")
+
+        failed_recent = (
+            Transaction.objects.filter(timestamp__gte=start_dt, status__in=("failed", "canceled"))
+            .exclude(side="Вывод средств")
+            .select_related("user")
+            .only("id", "timestamp", "amount", "currency", "payment_system", "status", "user__user_id")
+            .order_by("-timestamp")[:30]
+        )
+
+        chart_daily_payload = {
+            "labels": [x["date_short"] for x in series_daily],
+            "revenue": [x["revenue"] for x in series_daily],
+            "new_users": [x["new_users"] for x in series_daily],
+            "payments_n": [x["payments_n"] for x in series_daily],
+        }
+
+        context.update(
+            {
+                **self._base_context(),
+                "range_days": range_days,
+                "period_days": range_days,
+                "period_start": start_date,
+                "period_end": today,
+                "series_daily": series_daily,
+                "chart_daily_payload": chart_daily_payload,
+                "chart_ps_payload": {
+                    "labels": [x["label"] for x in rev_other_chart],
+                    "values": [x["value"] for x in rev_other_chart],
+                    "colors": ps_chart_colors,
+                },
+                "chart_recurring_payload": {
+                    "labels": ["Автосписания (рекуррент)", "Прочие успешные платежи"],
+                    "values": [float(rec_children_n), float(max(0, one_off_n))],
+                },
+                "revenue_period": revenue_period,
+                "payments_period_n": payments_period_n,
+                "new_users_period": new_users_period,
+                "users_total": users_total,
+                "paying_users_all": paying_users_all,
+                "conversion_all_pct": conversion_all_pct,
+                "cohort_conversion_pct": cohort_conversion_pct,
+                "paid_among_new": paid_among_new,
+                "payers_period": payers_period,
+                "arpu_period": arpu_period,
+                "corr_daily_revenue_new_users": corr_daily,
+                "by_payment_system": by_ps,
+                "rec_children_n": rec_children_n,
+                "rec_parents_n": rec_parents_n,
+                "rec_revenue": rec_revenue,
+                "recurring_by_ps": recurring_by_ps,
+                "log_issues": log_issues,
+                "payment_related_logs_n": payment_related_logs_n,
+                "income_snapshot": income_snapshot,
+                "failed_recent": failed_recent,
+                "days_choices": (30, 90, 180, 365),
             }
         )
         return context
@@ -290,7 +599,6 @@ class UsersListView(DashboardBaseView):
             }
         )
         return context
-
 
 
 class UserAnalyticsExcelExportView(LoginRequiredMixin, UserPassesTestMixin, View):

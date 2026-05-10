@@ -1,0 +1,360 @@
+{% extends "admindashboardx/admipanelbase.html" %}
+
+{% block title %} · Аналитика доходов{% endblock %}
+
+{% block content %}
+    <nav aria-label="breadcrumb" class="mb-3">
+        <ol class="breadcrumb admx-breadcrumb mb-0">
+            <li class="breadcrumb-item"><a href="{% url 'admindashboardx:index' %}">Главная</a></li>
+            <li class="breadcrumb-item active" aria-current="page">Аналитика доходов</li>
+        </ol>
+    </nav>
+
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+        <div>
+            <h2 class="h5 mb-1">Доходы и пользователи</h2>
+            <div class="small text-secondary">
+                Окно: {{ period_start|date:"d.m.Y" }} — {{ period_end|date:"d.m.Y" }}
+                · IncomeInfo (снимок): <strong>{{ income_snapshot|floatformat:2 }} ₽</strong>
+            </div>
+        </div>
+        <form method="get" class="d-flex align-items-center gap-2">
+            <label class="small text-secondary mb-0" for="id_days">Дней</label>
+            <select name="days" id="id_days" class="form-select form-select-sm" style="width: auto;" onchange="this.form.submit()">
+                {% for d in days_choices %}
+                    <option value="{{ d }}" {% if range_days == d %}selected{% endif %}>{{ d }}</option>
+                {% endfor %}
+            </select>
+            <noscript><button type="submit" class="btn btn-sm btn-outline-light">OK</button></noscript>
+        </form>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-lg-4 col-xl-2">
+            <div class="card admx-card h-100"><div class="card-body py-3">
+                <div class="small text-secondary">Доход за период</div>
+                <div class="fs-5 fw-semibold">{{ revenue_period|floatformat:2 }} ₽</div>
+            </div></div>
+        </div>
+        <div class="col-6 col-lg-4 col-xl-2">
+            <div class="card admx-card h-100"><div class="card-body py-3">
+                <div class="small text-secondary">Успешных платежей</div>
+                <div class="fs-5 fw-semibold">{{ payments_period_n }}</div>
+            </div></div>
+        </div>
+        <div class="col-6 col-lg-4 col-xl-2">
+            <div class="card admx-card h-100"><div class="card-body py-3">
+                <div class="small text-secondary">Новых пользователей</div>
+                <div class="fs-5 fw-semibold">{{ new_users_period }}</div>
+            </div></div>
+        </div>
+        <div class="col-6 col-lg-4 col-xl-2">
+            <div class="card admx-card h-100"><div class="card-body py-3">
+                <div class="small text-secondary">Плативших за период</div>
+                <div class="fs-5 fw-semibold">{{ payers_period }}</div>
+                <div class="small text-secondary mt-1">ARPU ≈ {{ arpu_period|floatformat:2 }} ₽</div>
+            </div></div>
+        </div>
+        <div class="col-6 col-lg-4 col-xl-2">
+            <div class="card admx-card h-100"><div class="card-body py-3">
+                <div class="small text-secondary">Конверсия (все время)</div>
+                <div class="fs-5 fw-semibold">{{ conversion_all_pct|floatformat:1 }}%</div>
+                <div class="small text-secondary mt-1">{{ paying_users_all }} / {{ users_total }} оплатили</div>
+            </div></div>
+        </div>
+        <div class="col-6 col-lg-4 col-xl-2">
+            <div class="card admx-card h-100"><div class="card-body py-3">
+                <div class="small text-secondary">Когорта периода</div>
+                <div class="fs-5 fw-semibold">{{ cohort_conversion_pct|floatformat:1 }}%</div>
+                <div class="small text-secondary mt-1">{{ paid_among_new }} / {{ new_users_period }} с оплатой</div>
+            </div></div>
+        </div>
+    </div>
+
+    {% if corr_daily_revenue_new_users is not None %}
+        <div class="alert admx-card border-secondary border-opacity-25 py-2 px-3 small mb-4">
+            Корреляция Пирсона (день): доход ↔ новые пользователи ≈ <strong>{{ corr_daily_revenue_new_users|floatformat:3 }}</strong>
+            <span class="text-secondary">— показывает совместную динамику по дням, не причинность.</span>
+        </div>
+    {% endif %}
+
+    <div class="row g-3 mb-4">
+        <div class="col-12 col-xl-8">
+            <div class="card admx-card h-100">
+                <div class="card-header">Динамика: доход и регистрации по дням</div>
+                <div class="card-body">
+                    <div class="admx-chart-wrap"><canvas id="admxMixDaily"></canvas></div>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-xl-4">
+            <div class="card admx-card h-100">
+                <div class="card-header">Доход по платёжным системам</div>
+                <div class="card-body">
+                    <div class="admx-chart-wrap admx-chart-wrap--donut"><canvas id="admxPsDonut"></canvas></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-12 col-lg-6">
+            <div class="card admx-card h-100">
+                <div class="card-header">Рекуррент (RoboKassa): автосписания vs прочие успешные платежи</div>
+                <div class="card-body">
+                    <p class="small text-secondary mb-2">
+                        Автосписания: платежи с заполненным <code>PreviousInvoiceID</code>.
+                        Материнские счета (флаг recurring parent): {{ rec_parents_n }} за период.
+                        Сумма автосписаний: <strong>{{ rec_revenue|floatformat:2 }} ₽</strong>.
+                    </p>
+                    <div class="admx-chart-wrap admx-chart-wrap--donut"><canvas id="admxRecurringSplit"></canvas></div>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-lg-6">
+            <div class="card admx-card h-100">
+                <div class="card-header">Автосписания по платёжным системам</div>
+                <div class="table-responsive">
+                    <table class="table table-dark table-sm align-middle mb-0 admx-table">
+                        <thead><tr><th>Система</th><th class="text-end">Шт.</th><th class="text-end">Сумма</th></tr></thead>
+                        <tbody>
+                        {% for row in recurring_by_ps %}
+                            <tr>
+                                <td>{{ row.label }}</td>
+                                <td class="text-end">{{ row.count }}</td>
+                                <td class="text-end">{{ row.revenue|floatformat:2 }} ₽</td>
+                            </tr>
+                        {% empty %}
+                            <tr><td colspan="3" class="text-center text-secondary">Нет данных за период</td></tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card admx-card mb-4">
+        <div class="card-header d-flex flex-wrap justify-content-between gap-2 align-items-center">
+            <span>Платёжные системы: успехи, отказы, ожидание</span>
+            {% if request.user.is_superuser %}
+                <a class="btn btn-sm btn-outline-light" href="{% url 'admindashboardx:users_analytics_export_xlsx' %}">Экспорт когорт пользователей (Excel)</a>
+            {% endif %}
+        </div>
+        <div class="table-responsive">
+            <table class="table table-dark table-hover align-middle mb-0 admx-table">
+                <thead>
+                <tr>
+                    <th>Система</th>
+                    <th class="text-end">Доход (успех)</th>
+                    <th class="text-end">Успешные</th>
+                    <th class="text-end">Failed / cancel</th>
+                    <th class="text-end">Pending</th>
+                    <th class="text-end">Успех попыток</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for row in by_payment_system %}
+                    <tr>
+                        <td>{{ row.label }}</td>
+                        <td class="text-end">{{ row.revenue|floatformat:2 }} ₽</td>
+                        <td class="text-end">{{ row.ok_count }}</td>
+                        <td class="text-end">{{ row.failed_count }}</td>
+                        <td class="text-end">{{ row.pending_count }}</td>
+                        <td class="text-end">
+                            {% if row.success_rate is not None %}
+                                {{ row.success_rate|floatformat:1 }}%
+                            {% else %}—{% endif %}
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="6" class="text-center text-secondary">Нет успешных платежей за период</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-12 col-xl-6">
+            <div class="card admx-card h-100">
+                <div class="card-header">Основные ошибки в логах (WARNING / FATAL)</div>
+                <div class="card-body py-2">
+                    <p class="small text-secondary mb-2">Категория «Платежи» за период: <strong>{{ payment_related_logs_n }}</strong> записей.</p>
+                    <div class="table-responsive">
+                        <table class="table table-dark table-sm align-middle mb-0 admx-table">
+                            <thead><tr><th>Уровень</th><th>Категория</th><th class="text-end">Кол-во</th></tr></thead>
+                            <tbody>
+                            {% for row in log_issues %}
+                                <tr>
+                                    <td>{{ row.level }}</td>
+                                    <td>{{ row.category_label }}</td>
+                                    <td class="text-end">{{ row.n }}</td>
+                                </tr>
+                            {% empty %}
+                                <tr><td colspan="3" class="text-center text-secondary">Нет записей</td></tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    <a class="btn btn-sm btn-outline-light mt-3" href="{% url 'admindashboardx:logs' %}">Все логи</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-xl-6">
+            <div class="card admx-card h-100">
+                <div class="card-header">Последние неуспешные платежи за период</div>
+                <div class="table-responsive">
+                    <table class="table table-dark table-sm align-middle mb-0 admx-table">
+                        <thead><tr><th>Время</th><th>ПС</th><th>Сумма</th><th>Статус</th></tr></thead>
+                        <tbody>
+                        {% for tx in failed_recent %}
+                            <tr>
+                                <td>
+                                    <a class="link-light" href="{% url 'admindashboardx:transaction_detail' tx.id %}">{{ tx.timestamp|date:"d.m.Y H:i" }}</a>
+                                </td>
+                                <td>{{ tx.payment_system|default:"—" }}</td>
+                                <td>{{ tx.amount }} {{ tx.currency|default:"RUB" }}</td>
+                                <td>{{ tx.status }}</td>
+                            </tr>
+                        {% empty %}
+                            <tr><td colspan="4" class="text-center text-secondary">Нет данных</td></tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                <div class="card-body pt-2 border-top border-secondary border-opacity-25">
+                    <a class="btn btn-sm btn-outline-light" href="{% url 'admindashboardx:transactions' %}">Все транзакции</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {{ chart_daily_payload|json_script:"admx-data-daily" }}
+    {{ chart_ps_payload|json_script:"admx-data-ps" }}
+    {{ chart_recurring_payload|json_script:"admx-data-recurring" }}
+{% endblock %}
+
+{% block extrascript %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+(function () {
+    const textMuted = '#abb5c7';
+    const grid = 'rgba(255,255,255,0.06)';
+    const legendColor = '#e8edf7';
+
+    const daily = JSON.parse(document.getElementById('admx-data-daily').textContent);
+    const psData = JSON.parse(document.getElementById('admx-data-ps').textContent);
+    const recData = JSON.parse(document.getElementById('admx-data-recurring').textContent);
+
+    const ctxMix = document.getElementById('admxMixDaily');
+    if (ctxMix && daily.labels && daily.labels.length) {
+        new Chart(ctxMix, {
+            type: 'bar',
+            data: {
+                labels: daily.labels,
+                datasets: [
+                    {
+                        type: 'bar',
+                        label: 'Доход, ₽',
+                        data: daily.revenue,
+                        backgroundColor: 'rgba(124, 156, 255, 0.42)',
+                        borderColor: 'rgba(124, 156, 255, 0.85)',
+                        borderWidth: 1,
+                        yAxisID: 'y',
+                        order: 2,
+                    },
+                    {
+                        type: 'line',
+                        label: 'Новые пользователи',
+                        data: daily.new_users,
+                        borderColor: '#6fd3a9',
+                        backgroundColor: 'rgba(111, 211, 169, 0.15)',
+                        tension: 0.25,
+                        fill: false,
+                        yAxisID: 'y1',
+                        order: 1,
+                        pointRadius: 2,
+                    },
+                ],
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: { mode: 'index', intersect: false },
+                plugins: {
+                    legend: { labels: { color: legendColor } },
+                    tooltip: {
+                        callbacks: {
+                            footer: (items) => {
+                                const i = items[0].dataIndex;
+                                const n = daily.payments_n[i];
+                                return 'Успешных платежей: ' + n;
+                            },
+                        },
+                    },
+                },
+                scales: {
+                    x: {
+                        ticks: { color: textMuted, maxTicksLimit: 18 },
+                        grid: { color: grid },
+                    },
+                    y: {
+                        position: 'left',
+                        ticks: { color: '#7c9cff' },
+                        grid: { color: grid },
+                        title: { display: true, text: 'Доход (₽)', color: textMuted },
+                    },
+                    y1: {
+                        position: 'right',
+                        grid: { drawOnChartArea: false },
+                        ticks: { color: '#6fd3a9', precision: 0 },
+                        title: { display: true, text: 'Новые пользователи', color: textMuted },
+                    },
+                },
+            },
+        });
+    }
+
+    const donutOpts = {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: { position: 'bottom', labels: { color: legendColor, boxWidth: 12 } },
+        },
+    };
+
+    const ctxPs = document.getElementById('admxPsDonut');
+    if (ctxPs && psData.labels && psData.labels.length) {
+        new Chart(ctxPs, {
+            type: 'doughnut',
+            data: {
+                labels: psData.labels,
+                datasets: [{
+                    data: psData.values,
+                    backgroundColor: psData.colors && psData.colors.length === psData.labels.length
+                        ? psData.colors
+                        : psData.labels.map((_, i) => ['#7c9cff','#6fd3a9','#f0ad4e','#e06666','#b794f6'][i % 5]),
+                }],
+            },
+            options: donutOpts,
+        });
+    }
+
+    const ctxRec = document.getElementById('admxRecurringSplit');
+    if (ctxRec && recData.labels && recData.values) {
+        new Chart(ctxRec, {
+            type: 'doughnut',
+            data: {
+                labels: recData.labels,
+                datasets: [{
+                    data: recData.values,
+                    backgroundColor: ['rgba(240, 173, 78, 0.85)', 'rgba(124, 156, 255, 0.55)'],
+                }],
+            },
+            options: donutOpts,
+        });
+    }
+})();
+</script>
+{% endblock %}
