@@ -10,6 +10,7 @@ from telebot import TeleBot
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 from apps.mtproxy.tasks import revoke_mtproxy_keys_for_user_task
+from bot.main.celerity_key_issue import try_delete_celerity_user
 from bot.main.utils import msg
 from bot.main.MarzbanAPI import MarzbanAPI
 from bot.main.celerity_node_bootstrap import bootstrap_celerity_for_server
@@ -157,6 +158,7 @@ def update_total_income(*args, **kwargs):
 
 @shared_task
 def update_user_subscription_status():
+
     """
     Updates user subscription status based on expiration and deletes VPN keys.
     This function is now synchronous and suitable for Celery tasks.
@@ -186,6 +188,7 @@ def update_user_subscription_status():
     for key in vpn_keys:
         try:
             MarzbanAPI().delete_user(username=str(key.user.user_id))
+            try_delete_celerity_user(key.user.user_id)
             key.delete()
         except Exception:
             Logging.objects.create(log_level='FATAL',
