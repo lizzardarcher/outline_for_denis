@@ -79,9 +79,12 @@
     .dv-main-info .dv-sub-form .form-control {
         border-radius: 8px;
     }
+    /* Кнопка внутри flex-column иначе растягивается на всю ширину карточки на ПК */
     .dv-main-info .dv-sub-form .btn-success {
         border-radius: 8px;
         font-weight: 600;
+        align-self: flex-start;
+        width: auto;
     }
 </style>
 
@@ -190,7 +193,6 @@
                 <button type="button" class="btn btn-success" data-toggle="modal" data-target="#confirmPurchaseModal">
                     <i class="fa fa-shopping-cart mr-1"></i> Купить подписку
                 </button>
-
                 <div class="modal fade" id="confirmPurchaseModal" tabindex="-1" role="dialog"
                      aria-labelledby="confirmPurchaseModalLabel" aria-hidden="true">
                     <div class="modal-dialog" role="document">
