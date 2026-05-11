@@ -2,8 +2,10 @@
 
 {% block title %} · Аналитика доходов{% endblock %}
 
-
 {% block content %}
+    <div id="admx-revenue-root"
+         data-api-url="{% url 'admindashboardx:revenue_analytics_data' %}?days={{ range_days }}"
+         data-tx-detail-base="{% url 'admindashboardx:transactions' %}"></div>
     <nav aria-label="breadcrumb" class="mb-3">
         <ol class="breadcrumb admx-breadcrumb mb-0">
             <li class="breadcrumb-item"><a href="{% url 'admindashboardx:index' %}">Главная</a></li>
@@ -15,8 +17,8 @@
         <div>
             <h2 class="h5 mb-1">Доходы и пользователи</h2>
             <div class="small text-secondary">
-                Окно: {{ period_start|date:"d.m.Y" }} — {{ period_end|date:"d.m.Y" }}
-                · IncomeInfo (снимок): <strong>{{ income_snapshot|floatformat:2 }} ₽</strong>
+                Окно: <span id="admx-period-range">—</span>
+                · IncomeInfo (снимок): <strong id="admx-income-snapshot">—</strong>
             </div>
         </div>
         <form method="get" class="d-flex align-items-center gap-2">
@@ -34,56 +36,59 @@
         <div class="col-6 col-lg-4 col-xl-2">
             <div class="card admx-card h-100"><div class="card-body py-3">
                 <div class="small text-secondary">Доход за период</div>
-                <div class="fs-5 fw-semibold">{{ revenue_period|floatformat:2 }} ₽</div>
+                <div class="fs-5 fw-semibold" id="admx-kpi-revenue-period">—</div>
             </div></div>
         </div>
         <div class="col-6 col-lg-4 col-xl-2">
             <div class="card admx-card h-100"><div class="card-body py-3">
                 <div class="small text-secondary">Успешных платежей</div>
-                <div class="fs-5 fw-semibold">{{ payments_period_n }}</div>
+                <div class="fs-5 fw-semibold" id="admx-kpi-payments-period-n">—</div>
             </div></div>
         </div>
         <div class="col-6 col-lg-4 col-xl-2">
             <div class="card admx-card h-100"><div class="card-body py-3">
                 <div class="small text-secondary">Новых пользователей</div>
-                <div class="fs-5 fw-semibold">{{ new_users_period }}</div>
+                <div class="fs-5 fw-semibold" id="admx-kpi-new-users-period">—</div>
             </div></div>
         </div>
         <div class="col-6 col-lg-4 col-xl-2">
             <div class="card admx-card h-100"><div class="card-body py-3">
                 <div class="small text-secondary">Плативших за период</div>
-                <div class="fs-5 fw-semibold">{{ payers_period }}</div>
-                <div class="small text-secondary mt-1">ARPU ≈ {{ arpu_period|floatformat:2 }} ₽</div>
+                <div class="fs-5 fw-semibold" id="admx-kpi-payers-period">—</div>
+                <div class="small text-secondary mt-1">ARPU ≈ <span id="admx-kpi-arpu-period">—</span></div>
             </div></div>
         </div>
         <div class="col-6 col-lg-4 col-xl-2">
             <div class="card admx-card h-100"><div class="card-body py-3">
                 <div class="small text-secondary">Конверсия (все время)</div>
-                <div class="fs-5 fw-semibold">{{ conversion_all_pct|floatformat:1 }}%</div>
-                <div class="small text-secondary mt-1">{{ paying_users_all }} / {{ users_total }} оплатили</div>
+                <div class="fs-5 fw-semibold" id="admx-kpi-conversion-all">—</div>
+                <div class="small text-secondary mt-1"><span id="admx-kpi-paid-among-all">—</span> / <span id="admx-kpi-users-total">—</span> оплатили</div>
             </div></div>
         </div>
         <div class="col-6 col-lg-4 col-xl-2">
             <div class="card admx-card h-100"><div class="card-body py-3">
                 <div class="small text-secondary">Когорта периода</div>
-                <div class="fs-5 fw-semibold">{{ cohort_conversion_pct|floatformat:1 }}%</div>
-                <div class="small text-secondary mt-1">{{ paid_among_new }} / {{ new_users_period }} с оплатой</div>
+                <div class="fs-5 fw-semibold" id="admx-kpi-cohort-conversion">—</div>
+                <div class="small text-secondary mt-1"><span id="admx-kpi-paid-among-new">—</span> / <span id="admx-kpi-new-users-period-2">—</span> с оплатой</div>
             </div></div>
         </div>
     </div>
 
-    {% if revenue_insights %}
-        <div class="card admx-card mb-4">
-            <div class="card-header">Автовыводы по данным периода</div>
-            <div class="card-body py-3">
-                <ul class="small mb-0 ps-3 admx-insights-list">
-                    {% for line in revenue_insights %}
-                        <li class="mb-2">{{ line }}</li>
-                    {% endfor %}
-                </ul>
-            </div>
+    <div class="card admx-card mb-4">
+        <div class="card-header">Соотношение: новые пользователи и положительные транзакции по дням</div>
+        <div class="card-body">
+            <div class="admx-chart-wrap"><canvas id="admxUsersTxDaily"></canvas></div>
         </div>
-    {% endif %}
+    </div>
+
+    <div class="card admx-card mb-4">
+        <div class="card-header">Автовыводы по данным периода</div>
+        <div class="card-body py-3">
+            <ul class="small mb-0 ps-3 admx-insights-list" id="admx-insights-list">
+                <li class="mb-2 text-secondary">Загрузка...</li>
+            </ul>
+        </div>
+    </div>
 
     <div class="row g-3 mb-4">
         <div class="col-12 col-xl-8">
@@ -110,21 +115,13 @@
             <p class="small text-secondary mb-3">
                 Учитываются успешные входящие платежи: RoboKassa — с непустым <code>PreviousInvoiceID</code>;
                 ЮKassa и др. — если в описании есть «рекуррент» (в т.ч. автоплатежи из Celery).
-                За период всего: <strong>{{ autodebit_n }}</strong> шт. на <strong>{{ autodebit_revenue|floatformat:2 }} ₽</strong>.
+                За период всего: <strong id="admx-kpi-autodebit-n">—</strong> шт. на <strong id="admx-kpi-autodebit-revenue">—</strong>.
             </p>
             <div class="table-responsive">
                 <table class="table table-dark table-sm align-middle mb-0 admx-table">
                     <thead><tr><th>Система</th><th class="text-end">Шт.</th><th class="text-end">Сумма</th></tr></thead>
-                    <tbody>
-                    {% for row in recurring_by_ps %}
-                        <tr>
-                            <td>{{ row.label }}</td>
-                            <td class="text-end">{{ row.count }}</td>
-                            <td class="text-end">{{ row.revenue|floatformat:2 }} ₽</td>
-                        </tr>
-                    {% empty %}
-                        <tr><td colspan="3" class="text-center text-secondary">Нет данных за период</td></tr>
-                    {% endfor %}
+                    <tbody id="admx-recurring-by-ps-body">
+                    <tr><td colspan="3" class="text-center text-secondary">Загрузка...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -150,23 +147,8 @@
                     <th class="text-end">Успех попыток</th>
                 </tr>
                 </thead>
-                <tbody>
-                {% for row in by_payment_system %}
-                    <tr>
-                        <td>{{ row.label }}</td>
-                        <td class="text-end">{{ row.revenue|floatformat:2 }} ₽</td>
-                        <td class="text-end">{{ row.ok_count }}</td>
-                        <td class="text-end">{{ row.failed_count }}</td>
-                        <td class="text-end">{{ row.pending_count }}</td>
-                        <td class="text-end">
-                            {% if row.success_rate is not None %}
-                                {{ row.success_rate|floatformat:1 }}%
-                            {% else %}—{% endif %}
-                        </td>
-                    </tr>
-                {% empty %}
-                    <tr><td colspan="6" class="text-center text-secondary">Нет успешных платежей за период</td></tr>
-                {% endfor %}
+                <tbody id="admx-by-ps-body">
+                <tr><td colspan="6" class="text-center text-secondary">Загрузка...</td></tr>
                 </tbody>
             </table>
         </div>
@@ -177,20 +159,12 @@
             <div class="card admx-card h-100">
                 <div class="card-header">Основные ошибки в логах (WARNING / FATAL)</div>
                 <div class="card-body py-2">
-                    <p class="small text-secondary mb-2">Категория «Платежи» за период: <strong>{{ payment_related_logs_n }}</strong> записей.</p>
+                    <p class="small text-secondary mb-2">Категория «Платежи» за период: <strong id="admx-kpi-payment-logs-n">—</strong> записей.</p>
                     <div class="table-responsive">
                         <table class="table table-dark table-sm align-middle mb-0 admx-table">
                             <thead><tr><th>Уровень</th><th>Категория</th><th class="text-end">Кол-во</th></tr></thead>
-                            <tbody>
-                            {% for row in log_issues %}
-                                <tr>
-                                    <td>{{ row.level }}</td>
-                                    <td>{{ row.category_label }}</td>
-                                    <td class="text-end">{{ row.n }}</td>
-                                </tr>
-                            {% empty %}
-                                <tr><td colspan="3" class="text-center text-secondary">Нет записей</td></tr>
-                            {% endfor %}
+                            <tbody id="admx-log-issues-body">
+                            <tr><td colspan="3" class="text-center text-secondary">Загрузка...</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -204,19 +178,8 @@
                 <div class="table-responsive">
                     <table class="table table-dark table-sm align-middle mb-0 admx-table">
                         <thead><tr><th>Время</th><th>ПС</th><th>Сумма</th><th>Статус</th></tr></thead>
-                        <tbody>
-                        {% for tx in failed_recent %}
-                            <tr>
-                                <td>
-                                    <a class="link-light" href="{% url 'admindashboardx:transaction_detail' tx.id %}">{{ tx.timestamp|date:"d.m.Y H:i" }}</a>
-                                </td>
-                                <td>{{ tx.payment_system|default:"—" }}</td>
-                                <td>{{ tx.amount }} {{ tx.currency|default:"RUB" }}</td>
-                                <td>{{ tx.status }}</td>
-                            </tr>
-                        {% empty %}
-                            <tr><td colspan="4" class="text-center text-secondary">Нет данных</td></tr>
-                        {% endfor %}
+                        <tbody id="admx-failed-recent-body">
+                        <tr><td colspan="4" class="text-center text-secondary">Загрузка...</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -227,8 +190,6 @@
         </div>
     </div>
 
-    {{ chart_daily_payload|json_script:"admx-data-daily" }}
-    {{ chart_ps_payload|json_script:"admx-data-ps" }}
 {% endblock %}
 
 {% block extrascript %}
@@ -238,103 +199,257 @@
     const textMuted = '#abb5c7';
     const grid = 'rgba(255,255,255,0.06)';
     const legendColor = '#e8edf7';
+    const root = document.getElementById('admx-revenue-root');
+    if (!root) return;
 
-    const daily = JSON.parse(document.getElementById('admx-data-daily').textContent);
-    const psData = JSON.parse(document.getElementById('admx-data-ps').textContent);
+    const apiUrl = root.getAttribute('data-api-url');
+    const txListUrl = root.getAttribute('data-tx-detail-base') || '';
 
-    const ctxMix = document.getElementById('admxMixDaily');
-    if (ctxMix && daily.labels && daily.labels.length) {
-        new Chart(ctxMix, {
-            type: 'bar',
-            data: {
-                labels: daily.labels,
-                datasets: [
-                    {
-                        type: 'bar',
-                        label: 'Доход, ₽',
-                        data: daily.revenue,
-                        backgroundColor: 'rgba(124, 156, 255, 0.42)',
-                        borderColor: 'rgba(124, 156, 255, 0.85)',
-                        borderWidth: 1,
-                        yAxisID: 'y',
-                        order: 2,
-                    },
-                    {
-                        type: 'line',
-                        label: 'Новые пользователи',
-                        data: daily.new_users,
-                        borderColor: '#6fd3a9',
-                        backgroundColor: 'rgba(111, 211, 169, 0.15)',
-                        tension: 0.25,
-                        fill: false,
-                        yAxisID: 'y1',
-                        order: 1,
-                        pointRadius: 2,
-                    },
-                ],
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                interaction: { mode: 'index', intersect: false },
-                plugins: {
-                    legend: { labels: { color: legendColor } },
-                    tooltip: {
-                        callbacks: {
-                            footer: (items) => {
-                                const i = items[0].dataIndex;
-                                const n = daily.payments_n[i];
-                                return 'Успешных платежей: ' + n;
+    const fmtMoney = (value) => `${Number(value || 0).toLocaleString('ru-RU', {minimumFractionDigits: 2, maximumFractionDigits: 2})} ₽`;
+    const fmtPct = (value) => `${Number(value || 0).toFixed(1)}%`;
+    const setText = (id, value) => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = value;
+    };
+    const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (m) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;', "'": '&#39;'}[m]));
+    const renderRows = (tbodyId, rowsHtml, emptyColspan, emptyText) => {
+        const tbody = document.getElementById(tbodyId);
+        if (!tbody) return;
+        tbody.innerHTML = rowsHtml.length ? rowsHtml.join('') : `<tr><td colspan="${emptyColspan}" class="text-center text-secondary">${emptyText}</td></tr>`;
+    };
+
+    let mixChart = null;
+    let psChart = null;
+    let usersTxChart = null;
+
+    function renderCharts(payload) {
+        const daily = (payload.charts || {}).daily || {};
+        const psData = (payload.charts || {}).payment_system_revenue || {};
+        const usersTxData = (payload.charts || {}).users_vs_positive_tx || {};
+
+        const ctxMix = document.getElementById('admxMixDaily');
+        if (ctxMix && daily.labels && daily.labels.length) {
+            if (mixChart) mixChart.destroy();
+            mixChart = new Chart(ctxMix, {
+                type: 'bar',
+                data: {
+                    labels: daily.labels,
+                    datasets: [
+                        {
+                            type: 'bar',
+                            label: 'Доход, ₽',
+                            data: daily.revenue,
+                            backgroundColor: 'rgba(124, 156, 255, 0.42)',
+                            borderColor: 'rgba(124, 156, 255, 0.85)',
+                            borderWidth: 1,
+                            yAxisID: 'y',
+                            order: 2,
+                        },
+                        {
+                            type: 'line',
+                            label: 'Новые пользователи',
+                            data: daily.new_users,
+                            borderColor: '#6fd3a9',
+                            backgroundColor: 'rgba(111, 211, 169, 0.15)',
+                            tension: 0.25,
+                            fill: false,
+                            yAxisID: 'y1',
+                            order: 1,
+                            pointRadius: 2,
+                        },
+                    ],
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: {
+                        legend: { labels: { color: legendColor } },
+                        tooltip: {
+                            callbacks: {
+                                footer: (items) => {
+                                    const i = items[0].dataIndex;
+                                    const n = daily.payments_n[i];
+                                    return 'Успешных платежей: ' + n;
+                                },
                             },
                         },
                     },
-                },
-                scales: {
-                    x: {
-                        ticks: { color: textMuted, maxTicksLimit: 18 },
-                        grid: { color: grid },
-                    },
-                    y: {
-                        position: 'left',
-                        ticks: { color: '#7c9cff' },
-                        grid: { color: grid },
-                        title: { display: true, text: 'Доход (₽)', color: textMuted },
-                    },
-                    y1: {
-                        position: 'right',
-                        grid: { drawOnChartArea: false },
-                        ticks: { color: '#6fd3a9', precision: 0 },
-                        title: { display: true, text: 'Новые пользователи', color: textMuted },
+                    scales: {
+                        x: { ticks: { color: textMuted, maxTicksLimit: 18 }, grid: { color: grid } },
+                        y: {
+                            position: 'left',
+                            ticks: { color: '#7c9cff' },
+                            grid: { color: grid },
+                            title: { display: true, text: 'Доход (₽)', color: textMuted },
+                        },
+                        y1: {
+                            position: 'right',
+                            grid: { drawOnChartArea: false },
+                            ticks: { color: '#6fd3a9', precision: 0 },
+                            title: { display: true, text: 'Новые пользователи', color: textMuted },
+                        },
                     },
                 },
-            },
-        });
+            });
+        }
+
+        const donutOpts = {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { position: 'bottom', labels: { color: legendColor, boxWidth: 12 } } },
+        };
+        const ctxPs = document.getElementById('admxPsDonut');
+        if (ctxPs && psData.labels && psData.labels.length) {
+            if (psChart) psChart.destroy();
+            psChart = new Chart(ctxPs, {
+                type: 'doughnut',
+                data: {
+                    labels: psData.labels,
+                    datasets: [{
+                        data: psData.values,
+                        backgroundColor: psData.colors && psData.colors.length === psData.labels.length
+                            ? psData.colors
+                            : psData.labels.map((_, i) => ['#7c9cff','#6fd3a9','#f0ad4e','#e06666','#b794f6'][i % 5]),
+                    }],
+                },
+                options: donutOpts,
+            });
+        }
+
+        const ctxUsersTx = document.getElementById('admxUsersTxDaily');
+        if (ctxUsersTx && usersTxData.labels && usersTxData.labels.length) {
+            if (usersTxChart) usersTxChart.destroy();
+            usersTxChart = new Chart(ctxUsersTx, {
+                type: 'bar',
+                data: {
+                    labels: usersTxData.labels,
+                    datasets: [
+                        {
+                            type: 'bar',
+                            label: 'Новые пользователи',
+                            data: usersTxData.new_users,
+                            backgroundColor: 'rgba(111, 211, 169, 0.45)',
+                            borderColor: '#6fd3a9',
+                            borderWidth: 1,
+                            yAxisID: 'y',
+                        },
+                        {
+                            type: 'bar',
+                            label: 'Положительные транзакции',
+                            data: usersTxData.positive_tx_n,
+                            backgroundColor: 'rgba(124, 156, 255, 0.38)',
+                            borderColor: '#7c9cff',
+                            borderWidth: 1,
+                            yAxisID: 'y',
+                        },
+                        {
+                            type: 'line',
+                            label: 'Пользователи / полож. транзакция',
+                            data: usersTxData.users_per_positive_tx,
+                            borderColor: '#f0ad4e',
+                            backgroundColor: 'rgba(240, 173, 78, 0.2)',
+                            yAxisID: 'y1',
+                            spanGaps: true,
+                            tension: 0.2,
+                            pointRadius: 2,
+                        },
+                    ],
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: { legend: { labels: { color: legendColor } } },
+                    scales: {
+                        x: { ticks: { color: textMuted, maxTicksLimit: 18 }, grid: { color: grid } },
+                        y: {
+                            position: 'left',
+                            ticks: { color: '#6fd3a9', precision: 0 },
+                            grid: { color: grid },
+                            title: { display: true, text: 'Количество', color: textMuted },
+                        },
+                        y1: {
+                            position: 'right',
+                            grid: { drawOnChartArea: false },
+                            ticks: { color: '#f0ad4e' },
+                            title: { display: true, text: 'Соотношение', color: textMuted },
+                        },
+                    },
+                },
+            });
+        }
     }
 
-    const donutOpts = {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-            legend: { position: 'bottom', labels: { color: legendColor, boxWidth: 12 } },
-        },
-    };
+    function renderData(payload) {
+        const k = payload.kpis || {};
+        setText('admx-period-range', `${payload.period_start || '—'} — ${payload.period_end || '—'}`);
+        setText('admx-income-snapshot', fmtMoney(k.income_snapshot));
+        setText('admx-kpi-revenue-period', fmtMoney(k.revenue_period));
+        setText('admx-kpi-payments-period-n', k.payments_period_n ?? 0);
+        setText('admx-kpi-new-users-period', k.new_users_period ?? 0);
+        setText('admx-kpi-new-users-period-2', k.new_users_period ?? 0);
+        setText('admx-kpi-payers-period', k.payers_period ?? 0);
+        setText('admx-kpi-arpu-period', fmtMoney(k.arpu_period));
+        setText('admx-kpi-conversion-all', fmtPct(k.conversion_all_pct));
+        setText('admx-kpi-users-total', k.users_total ?? 0);
+        setText('admx-kpi-paid-among-all', k.paying_users_all ?? 0);
+        setText('admx-kpi-cohort-conversion', fmtPct(k.cohort_conversion_pct));
+        setText('admx-kpi-paid-among-new', k.paid_among_new ?? 0);
+        setText('admx-kpi-autodebit-n', k.autodebit_n ?? 0);
+        setText('admx-kpi-autodebit-revenue', fmtMoney(k.autodebit_revenue));
+        setText('admx-kpi-payment-logs-n', k.payment_related_logs_n ?? 0);
 
-    const ctxPs = document.getElementById('admxPsDonut');
-    if (ctxPs && psData.labels && psData.labels.length) {
-        new Chart(ctxPs, {
-            type: 'doughnut',
-            data: {
-                labels: psData.labels,
-                datasets: [{
-                    data: psData.values,
-                    backgroundColor: psData.colors && psData.colors.length === psData.labels.length
-                        ? psData.colors
-                        : psData.labels.map((_, i) => ['#7c9cff','#6fd3a9','#f0ad4e','#e06666','#b794f6'][i % 5]),
-                }],
-            },
-            options: donutOpts,
-        });
+        const insightsEl = document.getElementById('admx-insights-list');
+        if (insightsEl) {
+            const insights = payload.revenue_insights || [];
+            insightsEl.innerHTML = insights.length
+                ? insights.map((line) => `<li class="mb-2">${escapeHtml(line)}</li>`).join('')
+                : '<li class="mb-2 text-secondary">Недостаточно данных</li>';
+        }
+
+        renderRows(
+            'admx-recurring-by-ps-body',
+            (payload.recurring_by_ps || []).map((row) => `<tr><td>${escapeHtml(row.label)}</td><td class="text-end">${row.count}</td><td class="text-end">${fmtMoney(row.revenue)}</td></tr>`),
+            3,
+            'Нет данных за период'
+        );
+        renderRows(
+            'admx-by-ps-body',
+            (payload.by_payment_system || []).map((row) => {
+                const successRate = row.success_rate === null || row.success_rate === undefined ? '—' : fmtPct(row.success_rate);
+                return `<tr><td>${escapeHtml(row.label)}</td><td class="text-end">${fmtMoney(row.revenue)}</td><td class="text-end">${row.ok_count}</td><td class="text-end">${row.failed_count}</td><td class="text-end">${row.pending_count}</td><td class="text-end">${successRate}</td></tr>`;
+            }),
+            6,
+            'Нет успешных платежей за период'
+        );
+        renderRows(
+            'admx-log-issues-body',
+            (payload.log_issues || []).map((row) => `<tr><td>${escapeHtml(row.level)}</td><td>${escapeHtml(row.category_label)}</td><td class="text-end">${row.n}</td></tr>`),
+            3,
+            'Нет записей'
+        );
+        renderRows(
+            'admx-failed-recent-body',
+            (payload.failed_recent || []).map((tx) => `<tr><td><a class="link-light" href="${txListUrl}${tx.id}/">${escapeHtml(tx.timestamp)}</a></td><td>${escapeHtml(tx.payment_system)}</td><td>${Number(tx.amount || 0).toLocaleString('ru-RU', {minimumFractionDigits: 2, maximumFractionDigits: 2})} ${escapeHtml(tx.currency || 'RUB')}</td><td>${escapeHtml(tx.status)}</td></tr>`),
+            4,
+            'Нет данных'
+        );
+
+        renderCharts(payload);
     }
+
+    fetch(apiUrl, {headers: {'X-Requested-With': 'XMLHttpRequest'}})
+        .then((res) => {
+            if (!res.ok) throw new Error('bad response');
+            return res.json();
+        })
+        .then(renderData)
+        .catch(() => {
+            setText('admx-period-range', 'ошибка загрузки');
+            const insightsEl = document.getElementById('admx-insights-list');
+            if (insightsEl) insightsEl.innerHTML = '<li class="mb-2 text-danger">Не удалось загрузить данные аналитики</li>';
+        });
 })();
 </script>
 {% endblock %}

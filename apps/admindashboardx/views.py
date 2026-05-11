@@ -10,7 +10,7 @@ from django.forms import modelform_factory
 from django.core.paginator import Paginator
 from django.db.models import Case, Count, F, IntegerField, Q, Sum, Value, When
 from django.db.models.functions import TruncDay
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -432,6 +432,7 @@ def _admx_build_revenue_insights(
         if share_top >= 45:
             bullets.append(f"Концентрация: «{top['label']}» даёт ≈ {share_top:.1f}% успешного дохода за период.")
 
+
     delta = float(cohort_conversion_pct - conversion_all_pct)
     if new_users_period > 0 and abs(delta) >= 8:
         if delta > 0:
@@ -475,15 +476,17 @@ class RevenueAnalyticsView(DashboardBaseView):
             return self._forbidden_response()
         return super().dispatch(request, *args, **kwargs)
 
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        raw_days = (self.request.GET.get("days") or "90").strip()
+    @staticmethod
+    def _parse_range_days(raw_value):
+        raw_days = (raw_value or "90").strip()
         try:
             range_days = int(raw_days)
         except ValueError:
             range_days = 90
-        range_days = max(7, min(range_days, 730))
+        return max(7, min(range_days, 730))
 
+    @classmethod
+    def _build_payload(cls, range_days):
         now = timezone.now()
         start_dt = now - timedelta(days=range_days)
         tz = timezone.get_current_timezone()
@@ -497,7 +500,7 @@ class RevenueAnalyticsView(DashboardBaseView):
                 return "—"
             return ps_labels.get(str(code), str(code))
 
-        incoming_base = Transaction.objects.filter(self._INCOMING_OK, timestamp__gte=start_dt)
+        incoming_base = Transaction.objects.filter(cls._INCOMING_OK, timestamp__gte=start_dt)
 
         agg_pay_by_day = (
             incoming_base.annotate(period=TruncDay("timestamp", tzinfo=tz))
@@ -505,7 +508,6 @@ class RevenueAnalyticsView(DashboardBaseView):
             .annotate(revenue=Sum("amount"), payments_n=Count("id"))
         )
         pay_map = {}
-
         for row in agg_pay_by_day:
             pd = row["period"]
             dkey = pd.date() if hasattr(pd, "date") else pd
@@ -548,14 +550,14 @@ class RevenueAnalyticsView(DashboardBaseView):
         new_users_period = TelegramUser.objects.filter(join_date__gte=start_date, join_date__lte=today).count()
         users_total = TelegramUser.objects.count()
         paying_users_all = (
-            Transaction.objects.filter(self._INCOMING_OK).exclude(user_id__isnull=True).values("user_id").distinct().count()
+            Transaction.objects.filter(cls._INCOMING_OK).exclude(user_id__isnull=True).values("user_id").distinct().count()
         )
         conversion_all_pct = (Decimal(paying_users_all) / Decimal(users_total) * 100) if users_total else Decimal("0")
 
         cohort_users_qs = TelegramUser.objects.filter(join_date__gte=start_date, join_date__lte=today)
         new_ids_count = cohort_users_qs.count()
         paid_among_new = (
-            Transaction.objects.filter(self._INCOMING_OK, user_id__in=cohort_users_qs.values_list("id", flat=True))
+            Transaction.objects.filter(cls._INCOMING_OK, user_id__in=cohort_users_qs.values_list("id", flat=True))
             .values("user_id")
             .distinct()
             .count()
@@ -566,9 +568,7 @@ class RevenueAnalyticsView(DashboardBaseView):
             (Decimal(paid_among_new) / Decimal(new_ids_count) * 100) if new_ids_count else Decimal("0")
         )
 
-        payers_period = (
-            incoming_base.exclude(user_id__isnull=True).values("user_id").distinct().count()
-        )
+        payers_period = incoming_base.exclude(user_id__isnull=True).values("user_id").distinct().count()
         arpu_period = (revenue_period / Decimal(payers_period)) if payers_period else Decimal("0")
 
         corr_daily = _admx_pearson_corr(rev_series, usr_series)
@@ -619,6 +619,32 @@ class RevenueAnalyticsView(DashboardBaseView):
             rev_other_chart.append({"label": lab, "value": rev_v})
             ps_chart_colors.append(palette[pi % len(palette)])
             pi += 1
+
+        positive_tx_by_day = (
+            incoming_base.exclude(side="Вывод средств")
+            .annotate(period=TruncDay("timestamp", tzinfo=tz))
+            .values("period")
+            .annotate(tx_n=Count("id"))
+        )
+        positive_tx_map = {}
+        for row in positive_tx_by_day:
+            pd = row["period"]
+            dkey = pd.date() if hasattr(pd, "date") else pd
+            positive_tx_map[dkey] = int(row["tx_n"] or 0)
+
+        users_tx_series = []
+        for item in series_daily:
+            dkey = datetime.strptime(item["date"], "%Y-%m-%d").date()
+            tx_n = positive_tx_map.get(dkey, 0)
+            users_n = int(item["new_users"])
+            users_tx_series.append(
+                {
+                    "date_short": item["date_short"],
+                    "new_users": users_n,
+                    "positive_tx_n": tx_n,
+                    "users_per_positive_tx": (users_n / tx_n) if tx_n else None,
+                }
+            )
 
         autodebit_q = _admx_autodebit_payment_q()
         autodebit_qs = incoming_base.filter(autodebit_q)
@@ -677,13 +703,22 @@ class RevenueAnalyticsView(DashboardBaseView):
         income_row = IncomeInfo.objects.order_by("-pk").first()
         income_snapshot = income_row.total_amount if income_row and income_row.total_amount is not None else Decimal("0")
 
-        failed_recent = (
+        failed_recent_qs = (
             Transaction.objects.filter(timestamp__gte=start_dt, status__in=("failed", "canceled"))
             .exclude(side="Вывод средств")
-            .select_related("user")
-            .only("id", "timestamp", "amount", "currency", "payment_system", "status", "user__user_id")
             .order_by("-timestamp")[:30]
         )
+        failed_recent = [
+            {
+                "id": tx.id,
+                "timestamp": timezone.localtime(tx.timestamp).strftime("%d.%m.%Y %H:%M") if tx.timestamp else "—",
+                "amount": float(tx.amount or 0),
+                "currency": tx.currency or "RUB",
+                "payment_system": tx.payment_system or "—",
+                "status": tx.status or "—",
+            }
+            for tx in failed_recent_qs
+        ]
 
         chart_daily_payload = {
             "labels": [x["date_short"] for x in series_daily],
@@ -692,43 +727,76 @@ class RevenueAnalyticsView(DashboardBaseView):
             "payments_n": [x["payments_n"] for x in series_daily],
         }
 
+        return {
+            "range_days": range_days,
+            "period_days": range_days,
+            "period_start": start_date.strftime("%d.%m.%Y"),
+            "period_end": today.strftime("%d.%m.%Y"),
+            "days_choices": (30, 90, 180, 365),
+            "kpis": {
+                "revenue_period": float(revenue_period),
+                "payments_period_n": payments_period_n,
+                "new_users_period": new_users_period,
+                "payers_period": payers_period,
+                "arpu_period": float(arpu_period),
+                "conversion_all_pct": float(conversion_all_pct),
+                "cohort_conversion_pct": float(cohort_conversion_pct),
+                "paid_among_new": paid_among_new,
+                "paying_users_all": paying_users_all,
+                "users_total": users_total,
+                "income_snapshot": float(income_snapshot),
+                "autodebit_n": autodebit_n,
+                "autodebit_revenue": float(autodebit_revenue),
+                "payment_related_logs_n": payment_related_logs_n,
+            },
+            "revenue_insights": revenue_insights,
+            "by_payment_system": [{**row, "revenue": float(row["revenue"])} for row in by_ps],
+            "recurring_by_ps": [{**row, "revenue": float(row["revenue"])} for row in recurring_by_ps],
+            "log_issues": log_issues,
+            "failed_recent": failed_recent,
+            "charts": {
+                "daily": chart_daily_payload,
+                "payment_system_revenue": {
+                    "labels": [x["label"] for x in rev_other_chart],
+                    "values": [x["value"] for x in rev_other_chart],
+                    "colors": ps_chart_colors,
+                },
+                "users_vs_positive_tx": {
+                    "labels": [x["date_short"] for x in users_tx_series],
+                    "new_users": [x["new_users"] for x in users_tx_series],
+                    "positive_tx_n": [x["positive_tx_n"] for x in users_tx_series],
+                    "users_per_positive_tx": [x["users_per_positive_tx"] for x in users_tx_series],
+                },
+            },
+        }
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        range_days = self._parse_range_days(self.request.GET.get("days"))
         context.update(
             {
                 **self._base_context(),
                 "range_days": range_days,
                 "period_days": range_days,
-                "period_start": start_date,
-                "period_end": today,
-                "series_daily": series_daily,
-                "chart_daily_payload": chart_daily_payload,
-                "chart_ps_payload": {
-                    "labels": [x["label"] for x in rev_other_chart],
-                    "values": [x["value"] for x in rev_other_chart],
-                    "colors": ps_chart_colors,
-                },
-                "revenue_period": revenue_period,
-                "payments_period_n": payments_period_n,
-                "new_users_period": new_users_period,
-                "users_total": users_total,
-                "paying_users_all": paying_users_all,
-                "conversion_all_pct": conversion_all_pct,
-                "cohort_conversion_pct": cohort_conversion_pct,
-                "paid_among_new": paid_among_new,
-                "payers_period": payers_period,
-                "arpu_period": arpu_period,
-                "by_payment_system": by_ps,
-                "autodebit_n": autodebit_n,
-                "autodebit_revenue": autodebit_revenue,
-                "recurring_by_ps": recurring_by_ps,
-                "revenue_insights": revenue_insights,
-                "log_issues": log_issues,
-                "payment_related_logs_n": payment_related_logs_n,
-                "income_snapshot": income_snapshot,
-                "failed_recent": failed_recent,
                 "days_choices": (30, 90, 180, 365),
             }
         )
         return context
+
+
+class RevenueAnalyticsDataView(DashboardBaseView, View):
+    page_title = "AdminDashboardX · Аналитика доходов"
+    page_key = "revenue_analytics"
+
+    def dispatch(self, request, *args, **kwargs):
+        if self._is_support():
+            return JsonResponse({"detail": "forbidden"}, status=403)
+        return super().dispatch(request, *args, **kwargs)
+
+    def get(self, request, *args, **kwargs):
+        range_days = RevenueAnalyticsView._parse_range_days(request.GET.get("days"))
+        payload = RevenueAnalyticsView._build_payload(range_days=range_days)
+        return JsonResponse(payload)
 
 
 class UsersListView(DashboardBaseView):
