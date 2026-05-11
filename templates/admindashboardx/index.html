@@ -2,7 +2,6 @@
 
 {% block title %} · Главная{% endblock %}
 
-
 {% block content %}
     <div id="admx-index-root" data-api-url="{% url 'admindashboardx:index_data' %}"></div>
     <div class="row g-3 mb-4">
@@ -13,20 +12,20 @@
                         <div class="admx-kpi-title mb-0">Доход проекта</div>
                         <i class="bi bi-graph-up-arrow text-secondary fs-5"></i>
                     </div>
-                    <div class="admx-kpi-value"><span id="admx-idx-revenue-total"><span class="spinner-border spinner-border-sm text-secondary" role="status" aria-hidden="true"></span></span> <span class="fs-6 fw-normal text-secondary">RUB</span></div>
+                    <div class="admx-kpi-value"><span id="admx-idx-revenue-total"><span class="admx-skeleton admx-skeleton-inline" aria-hidden="true"></span></span> <span class="fs-6 fw-normal text-secondary">RUB</span></div>
                     <div class="admx-kpi-foot mb-3">Сводное значение (IncomeInfo)</div>
                     <ul class="list-unstyled small mb-0 admx-stat-breakdown">
                         <li class="d-flex justify-content-between py-1 border-top border-secondary border-opacity-25">
-                            <span class="text-secondary">За год (<span id="admx-idx-stats-year"><span class="spinner-border spinner-border-sm text-secondary" role="status" aria-hidden="true"></span></span>)</span>
-                            <span class="fw-semibold" id="admx-idx-revenue-year"><span class="spinner-border spinner-border-sm text-secondary" role="status" aria-hidden="true"></span></span>
+                            <span class="text-secondary">За год (<span id="admx-idx-stats-year"><span class="admx-skeleton admx-skeleton-inline" aria-hidden="true"></span></span>)</span>
+                            <span class="fw-semibold" id="admx-idx-revenue-year"><span class="admx-skeleton admx-skeleton-inline" aria-hidden="true"></span></span>
                         </li>
                         <li class="d-flex justify-content-between py-1 border-top border-secondary border-opacity-25">
                             <span class="text-secondary">За месяц</span>
-                            <span class="fw-semibold" id="admx-idx-revenue-month"><span class="spinner-border spinner-border-sm text-secondary" role="status" aria-hidden="true"></span></span>
+                            <span class="fw-semibold" id="admx-idx-revenue-month"><span class="admx-skeleton admx-skeleton-inline" aria-hidden="true"></span></span>
                         </li>
                         <li class="d-flex justify-content-between py-1 border-top border-secondary border-opacity-25">
                             <span class="text-secondary">Сегодня</span>
-                            <span class="fw-semibold" id="admx-idx-revenue-day"><span class="spinner-border spinner-border-sm text-secondary" role="status" aria-hidden="true"></span></span>
+                            <span class="fw-semibold" id="admx-idx-revenue-day"><span class="admx-skeleton admx-skeleton-inline" aria-hidden="true"></span></span>
                         </li>
                     </ul>
                     <div class="admx-kpi-foot mt-2 small">Периоды: сумма успешных платежей (без выводов)</div>
@@ -45,16 +44,16 @@
                         <div class="admx-kpi-title mb-0">Пользователи</div>
                         <i class="bi bi-people-fill text-secondary fs-5"></i>
                     </div>
-                    <div class="admx-kpi-value" id="admx-idx-users-total"><span class="spinner-border spinner-border-sm text-secondary" role="status" aria-hidden="true"></span></div>
+                    <div class="admx-kpi-value" id="admx-idx-users-total"><span class="admx-skeleton admx-skeleton-inline" aria-hidden="true"></span></div>
                     <div class="admx-kpi-foot mb-3">Всего в базе</div>
                     <ul class="list-unstyled small mb-0 admx-stat-breakdown">
                         <li class="d-flex justify-content-between py-1 border-top border-secondary border-opacity-25">
                             <span class="text-secondary">Новых за месяц</span>
-                            <span class="fw-semibold" id="admx-idx-users-month"><span class="spinner-border spinner-border-sm text-secondary" role="status" aria-hidden="true"></span></span>
+                            <span class="fw-semibold" id="admx-idx-users-month"><span class="admx-skeleton admx-skeleton-inline" aria-hidden="true"></span></span>
                         </li>
                         <li class="d-flex justify-content-between py-1 border-top border-secondary border-opacity-25">
                             <span class="text-secondary">Новых за день</span>
-                            <span class="fw-semibold" id="admx-idx-users-day"><span class="spinner-border spinner-border-sm text-secondary" role="status" aria-hidden="true"></span></span>
+                            <span class="fw-semibold" id="admx-idx-users-day"><span class="admx-skeleton admx-skeleton-inline" aria-hidden="true"></span></span>
                         </li>
                     </ul>
                     <div class="admx-kpi-foot mt-2 small">По дате регистрации (join_date)</div>
@@ -73,15 +72,15 @@
                         <ul class="list-unstyled small mb-0 admx-stat-breakdown">
                             <li class="d-flex justify-content-between py-1 border-top border-secondary border-opacity-25">
                                 <span class="text-secondary">Всего</span>
-                                <span class="fw-semibold" id="admx-idx-tx-total"><span class="spinner-border spinner-border-sm text-secondary" role="status" aria-hidden="true"></span></span>
+                                <span class="fw-semibold" id="admx-idx-tx-total"><span class="admx-skeleton admx-skeleton-inline" aria-hidden="true"></span></span>
                             </li>
                             <li class="d-flex justify-content-between py-1 border-top border-secondary border-opacity-25">
                                 <span class="text-secondary">За месяц</span>
-                                <span class="fw-semibold" id="admx-idx-tx-month"><span class="spinner-border spinner-border-sm text-secondary" role="status" aria-hidden="true"></span></span>
+                                <span class="fw-semibold" id="admx-idx-tx-month"><span class="admx-skeleton admx-skeleton-inline" aria-hidden="true"></span></span>
                             </li>
                             <li class="d-flex justify-content-between py-1 border-top border-secondary border-opacity-25">
                                 <span class="text-secondary">За день</span>
-                                <span class="fw-semibold" id="admx-idx-tx-day"><span class="spinner-border spinner-border-sm text-secondary" role="status" aria-hidden="true"></span></span>
+                                <span class="fw-semibold" id="admx-idx-tx-day"><span class="admx-skeleton admx-skeleton-inline" aria-hidden="true"></span></span>
                             </li>
                         </ul>
                     </div>
@@ -90,15 +89,15 @@
                         <ul class="list-unstyled small mb-0 admx-stat-breakdown">
                             <li class="d-flex justify-content-between py-1 border-top border-secondary border-opacity-25">
                                 <span class="text-secondary">Всего</span>
-                                <span class="fw-semibold" id="admx-idx-wd-total"><span class="spinner-border spinner-border-sm text-secondary" role="status" aria-hidden="true"></span></span>
+                                <span class="fw-semibold" id="admx-idx-wd-total"><span class="admx-skeleton admx-skeleton-inline" aria-hidden="true"></span></span>
                             </li>
                             <li class="d-flex justify-content-between py-1 border-top border-secondary border-opacity-25">
                                 <span class="text-secondary">За месяц</span>
-                                <span class="fw-semibold" id="admx-idx-wd-month"><span class="spinner-border spinner-border-sm text-secondary" role="status" aria-hidden="true"></span></span>
+                                <span class="fw-semibold" id="admx-idx-wd-month"><span class="admx-skeleton admx-skeleton-inline" aria-hidden="true"></span></span>
                             </li>
                             <li class="d-flex justify-content-between py-1 border-top border-secondary border-opacity-25">
                                 <span class="text-secondary">За день</span>
-                                <span class="fw-semibold" id="admx-idx-wd-day"><span class="spinner-border spinner-border-sm text-secondary" role="status" aria-hidden="true"></span></span>
+                                <span class="fw-semibold" id="admx-idx-wd-day"><span class="admx-skeleton admx-skeleton-inline" aria-hidden="true"></span></span>
                             </li>
                         </ul>
                     </div>
@@ -298,7 +297,7 @@
                         <a class="btn btn-outline-light text-start" href="{% url 'admindashboardx:logs' %}">
                             <i class="bi bi-journal-text me-2"></i>Журнал логов
                         </a>
-                        <div class="small text-secondary mt-1">За последние <span id="admx-idx-period-days">{{ period_days }}</span> дн.: предупреждений и ошибок — <span id="admx-idx-error-logs"><span class="spinner-border spinner-border-sm text-secondary" role="status" aria-hidden="true"></span></span></div>
+                        <div class="small text-secondary mt-1">За последние <span id="admx-idx-period-days">{{ period_days }}</span> дн.: предупреждений и ошибок — <span id="admx-idx-error-logs"><span class="admx-skeleton admx-skeleton-inline" aria-hidden="true"></span></span></div>
                     </div>
                 </div>
             </div>
@@ -333,21 +332,21 @@
             : '';
         if (show) {
             const btn = document.getElementById('admx-index-retry-btn');
-            if (btn) btn.addEventListener('click', () => loadData(1));
+            if (btn) btn.addEventListener('click', () => loadData());
         }
     };
-    const fetchWithTimeout = (url, timeoutMs) => {
-        const ctrl = new AbortController();
-        const timer = setTimeout(() => ctrl.abort(), timeoutMs);
-        return fetch(url, {headers: {'X-Requested-With': 'XMLHttpRequest'}, signal: ctrl.signal})
-            .finally(() => clearTimeout(timer));
-    };
-    const loadData = (retriesLeft) => fetchWithTimeout(apiUrl, 10000)
-        .then((res) => {
-            if (!res.ok) throw new Error('bad response');
-            return res.json();
-        })
-        .then((data) => {
+    const api = window.AdmxApi;
+    function loadData() {
+        if (!api || typeof api.fetchJsonWithRetry !== 'function') {
+            setText('admx-idx-error-logs', 'ошибка');
+            setRetryState(true);
+            return;
+        }
+        api.fetchJsonWithRetry(apiUrl, {
+            retries: 1,
+            timeoutMs: 10000,
+            fetchOptions: { headers: {'X-Requested-With': 'XMLHttpRequest'} },
+        }).then((data) => {
             setRetryState(false);
             setText('admx-idx-stats-year', data.stats_year ?? '—');
             setText('admx-idx-period-days', data.period_days ?? 30);
@@ -365,13 +364,12 @@
             setText('admx-idx-wd-total', data.wd_count_total ?? 0);
             setText('admx-idx-wd-month', data.wd_count_month ?? 0);
             setText('admx-idx-wd-day', data.wd_count_day ?? 0);
-        })
-        .catch(() => {
-            if (retriesLeft > 0) return loadData(retriesLeft - 1);
+        }).catch(() => {
             setText('admx-idx-error-logs', 'ошибка');
             setRetryState(true);
         });
-    loadData(1);
+    }
+    loadData();
 })();
 </script>
 {% endblock %}

@@ -1,5 +1,6 @@
 from django.urls import path
 
+
 from .views import (
     AdminDashboardIndexDataView,
     AdminDashboardIndexView,
@@ -7,9 +8,11 @@ from .views import (
     RevenueAnalyticsExportCsvView,
     RevenueAnalyticsView,
     CountriesListView,
+    FunnelAnalyticsView,
     CountryCreateView,
     CountryDeleteView,
     CountryUpdateView,
+    GlobalSearchView,
     IncomeInfoCreateView,
     IncomeInfoDeleteView,
     IncomeInfoListView,
@@ -85,7 +88,9 @@ app_name = "admindashboardx"
 
 urlpatterns = [
     path("", AdminDashboardIndexView.as_view(), name="index"),
+    path("search/", GlobalSearchView.as_view(), name="global_search"),
     path("index/data/", AdminDashboardIndexDataView.as_view(), name="index_data"),
+    path("analytics/funnel/", FunnelAnalyticsView.as_view(), name="funnel_analytics"),
     path("analytics/revenue/", RevenueAnalyticsView.as_view(), name="revenue_analytics"),
     path("analytics/revenue/data/", RevenueAnalyticsDataView.as_view(), name="revenue_analytics_data"),
     path("analytics/revenue/export/csv/", RevenueAnalyticsExportCsvView.as_view(), name="revenue_analytics_export_csv"),

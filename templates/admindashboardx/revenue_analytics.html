@@ -2,7 +2,6 @@
 
 {% block title %} · Аналитика доходов{% endblock %}
 
-
 {% block content %}
     <div id="admx-revenue-root"
          data-api-url="{% url 'admindashboardx:revenue_analytics_data' %}"
@@ -19,8 +18,8 @@
         <div>
             <h2 class="h5 mb-1">Доходы и пользователи</h2>
             <div class="small text-secondary">
-                Окно: <span id="admx-period-range"><span class="spinner-border spinner-border-sm text-secondary" role="status" aria-hidden="true"></span></span>
-                · IncomeInfo (снимок): <strong id="admx-income-snapshot"><span class="spinner-border spinner-border-sm text-secondary" role="status" aria-hidden="true"></span></strong>
+                Окно: <span id="admx-period-range"><span class="admx-skeleton admx-skeleton-inline" aria-hidden="true"></span></span>
+                · IncomeInfo (снимок): <strong id="admx-income-snapshot"><span class="admx-skeleton admx-skeleton-inline" aria-hidden="true"></span></strong>
             </div>
         </div>
         <form method="get" class="d-flex flex-wrap align-items-center gap-2">
@@ -52,44 +51,44 @@
         <div class="col-6 col-lg-4 col-xl-2">
             <div class="card admx-card h-100"><div class="card-body py-3">
                 <div class="small text-secondary">Доход за период</div>
-                <div class="fs-5 fw-semibold" id="admx-kpi-revenue-period"><span class="spinner-border spinner-border-sm text-secondary" role="status" aria-hidden="true"></span></div>
-                <div class="small mt-1 text-secondary" id="admx-delta-revenue-period">к пред. периоду: <span class="spinner-border spinner-border-sm text-secondary" role="status" aria-hidden="true"></span></div>
+                <div class="fs-5 fw-semibold" id="admx-kpi-revenue-period"><span class="admx-skeleton admx-skeleton-inline" aria-hidden="true"></span></div>
+                <div class="small mt-1 text-secondary" id="admx-delta-revenue-period">к пред. периоду: <span class="admx-skeleton admx-skeleton-inline" aria-hidden="true"></span></div>
             </div></div>
         </div>
         <div class="col-6 col-lg-4 col-xl-2">
             <div class="card admx-card h-100"><div class="card-body py-3">
                 <div class="small text-secondary">Успешных платежей</div>
-                <div class="fs-5 fw-semibold" id="admx-kpi-payments-period-n"><span class="spinner-border spinner-border-sm text-secondary" role="status" aria-hidden="true"></span></div>
-                <div class="small mt-1 text-secondary" id="admx-delta-payments-period-n">к пред. периоду: <span class="spinner-border spinner-border-sm text-secondary" role="status" aria-hidden="true"></span></div>
+                <div class="fs-5 fw-semibold" id="admx-kpi-payments-period-n"><span class="admx-skeleton admx-skeleton-inline" aria-hidden="true"></span></div>
+                <div class="small mt-1 text-secondary" id="admx-delta-payments-period-n">к пред. периоду: <span class="admx-skeleton admx-skeleton-inline" aria-hidden="true"></span></div>
             </div></div>
         </div>
         <div class="col-6 col-lg-4 col-xl-2">
             <div class="card admx-card h-100"><div class="card-body py-3">
                 <div class="small text-secondary">Новых пользователей</div>
-                <div class="fs-5 fw-semibold" id="admx-kpi-new-users-period"><span class="spinner-border spinner-border-sm text-secondary" role="status" aria-hidden="true"></span></div>
-                <div class="small mt-1 text-secondary" id="admx-delta-new-users-period">к пред. периоду: <span class="spinner-border spinner-border-sm text-secondary" role="status" aria-hidden="true"></span></div>
+                <div class="fs-5 fw-semibold" id="admx-kpi-new-users-period"><span class="admx-skeleton admx-skeleton-inline" aria-hidden="true"></span></div>
+                <div class="small mt-1 text-secondary" id="admx-delta-new-users-period">к пред. периоду: <span class="admx-skeleton admx-skeleton-inline" aria-hidden="true"></span></div>
             </div></div>
         </div>
         <div class="col-6 col-lg-4 col-xl-2">
             <div class="card admx-card h-100"><div class="card-body py-3">
                 <div class="small text-secondary">Плативших за период</div>
-                <div class="fs-5 fw-semibold" id="admx-kpi-payers-period"><span class="spinner-border spinner-border-sm text-secondary" role="status" aria-hidden="true"></span></div>
-                <div class="small text-secondary mt-1">ARPU ≈ <span id="admx-kpi-arpu-period"><span class="spinner-border spinner-border-sm text-secondary" role="status" aria-hidden="true"></span></span></div>
-                <div class="small mt-1 text-secondary" id="admx-delta-arpu-period">ARPU к пред. периоду: <span class="spinner-border spinner-border-sm text-secondary" role="status" aria-hidden="true"></span></div>
+                <div class="fs-5 fw-semibold" id="admx-kpi-payers-period"><span class="admx-skeleton admx-skeleton-inline" aria-hidden="true"></span></div>
+                <div class="small text-secondary mt-1">ARPU ≈ <span id="admx-kpi-arpu-period"><span class="admx-skeleton admx-skeleton-inline" aria-hidden="true"></span></span></div>
+                <div class="small mt-1 text-secondary" id="admx-delta-arpu-period">ARPU к пред. периоду: <span class="admx-skeleton admx-skeleton-inline" aria-hidden="true"></span></div>
             </div></div>
         </div>
         <div class="col-6 col-lg-4 col-xl-2">
             <div class="card admx-card h-100"><div class="card-body py-3">
                 <div class="small text-secondary">Конверсия (все время)</div>
-                <div class="fs-5 fw-semibold" id="admx-kpi-conversion-all"><span class="spinner-border spinner-border-sm text-secondary" role="status" aria-hidden="true"></span></div>
-                <div class="small text-secondary mt-1"><span id="admx-kpi-paid-among-all"><span class="spinner-border spinner-border-sm text-secondary" role="status" aria-hidden="true"></span></span> / <span id="admx-kpi-users-total"><span class="spinner-border spinner-border-sm text-secondary" role="status" aria-hidden="true"></span></span> оплатили</div>
+                <div class="fs-5 fw-semibold" id="admx-kpi-conversion-all"><span class="admx-skeleton admx-skeleton-inline" aria-hidden="true"></span></div>
+                <div class="small text-secondary mt-1"><span id="admx-kpi-paid-among-all"><span class="admx-skeleton admx-skeleton-inline" aria-hidden="true"></span></span> / <span id="admx-kpi-users-total"><span class="admx-skeleton admx-skeleton-inline" aria-hidden="true"></span></span> оплатили</div>
             </div></div>
         </div>
         <div class="col-6 col-lg-4 col-xl-2">
             <div class="card admx-card h-100"><div class="card-body py-3">
                 <div class="small text-secondary">Когорта периода</div>
-                <div class="fs-5 fw-semibold" id="admx-kpi-cohort-conversion"><span class="spinner-border spinner-border-sm text-secondary" role="status" aria-hidden="true"></span></div>
-                <div class="small text-secondary mt-1"><span id="admx-kpi-paid-among-new"><span class="spinner-border spinner-border-sm text-secondary" role="status" aria-hidden="true"></span></span> / <span id="admx-kpi-new-users-period-2"><span class="spinner-border spinner-border-sm text-secondary" role="status" aria-hidden="true"></span></span> с оплатой</div>
+                <div class="fs-5 fw-semibold" id="admx-kpi-cohort-conversion"><span class="admx-skeleton admx-skeleton-inline" aria-hidden="true"></span></div>
+                <div class="small text-secondary mt-1"><span id="admx-kpi-paid-among-new"><span class="admx-skeleton admx-skeleton-inline" aria-hidden="true"></span></span> / <span id="admx-kpi-new-users-period-2"><span class="admx-skeleton admx-skeleton-inline" aria-hidden="true"></span></span> с оплатой</div>
             </div></div>
         </div>
     </div>
@@ -98,9 +97,7 @@
         <div class="card-header">Соотношение: новые пользователи и положительные транзакции по дням</div>
         <div class="card-body">
             <div class="admx-chart-wrap position-relative">
-                <div id="admx-loader-users-tx" class="position-absolute top-50 start-50 translate-middle text-secondary">
-                    <span class="spinner-border" role="status" aria-hidden="true"></span>
-                </div>
+                <div id="admx-loader-users-tx" class="admx-skeleton admx-skeleton-chart" aria-hidden="true"></div>
                 <canvas id="admxUsersTxDaily"></canvas>
             </div>
         </div>
@@ -110,7 +107,7 @@
         <div class="card-header">Автовыводы по данным периода</div>
         <div class="card-body py-3">
             <ul class="small mb-0 ps-3 admx-insights-list" id="admx-insights-list">
-                <li class="mb-2 text-secondary"><span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Загрузка...</li>
+                <li class="mb-2 text-secondary"><span class="admx-skeleton admx-skeleton-sm me-2 d-inline-block align-middle" aria-hidden="true"></span>Загрузка...</li>
             </ul>
         </div>
     </div>
@@ -119,7 +116,7 @@
         <div class="card-header">Алерты периода</div>
         <div class="card-body py-3">
             <ul class="small mb-0 ps-3" id="admx-alerts-list">
-                <li class="mb-2 text-secondary"><span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Загрузка...</li>
+                <li class="mb-2 text-secondary"><span class="admx-skeleton admx-skeleton-sm me-2 d-inline-block align-middle" aria-hidden="true"></span>Загрузка...</li>
             </ul>
         </div>
     </div>
@@ -146,9 +143,7 @@
                 <div class="card-header">Динамика: доход и регистрации по дням</div>
                 <div class="card-body">
                     <div class="admx-chart-wrap position-relative">
-                        <div id="admx-loader-mix" class="position-absolute top-50 start-50 translate-middle text-secondary">
-                            <span class="spinner-border" role="status" aria-hidden="true"></span>
-                        </div>
+                        <div id="admx-loader-mix" class="admx-skeleton admx-skeleton-chart" aria-hidden="true"></div>
                         <canvas id="admxMixDaily"></canvas>
                     </div>
                 </div>
@@ -159,9 +154,7 @@
                 <div class="card-header">Доход по платёжным системам</div>
                 <div class="card-body">
                     <div class="admx-chart-wrap admx-chart-wrap--donut position-relative">
-                        <div id="admx-loader-ps" class="position-absolute top-50 start-50 translate-middle text-secondary">
-                            <span class="spinner-border" role="status" aria-hidden="true"></span>
-                        </div>
+                        <div id="admx-loader-ps" class="admx-skeleton admx-skeleton-chart" aria-hidden="true"></div>
                         <canvas id="admxPsDonut"></canvas>
                     </div>
                 </div>
@@ -175,13 +168,13 @@
             <p class="small text-secondary mb-3">
                 Учитываются успешные входящие платежи: RoboKassa — с непустым <code>PreviousInvoiceID</code>;
                 ЮKassa и др. — если в описании есть «рекуррент» (в т.ч. автоплатежи из Celery).
-                За период всего: <strong id="admx-kpi-autodebit-n"><span class="spinner-border spinner-border-sm text-secondary" role="status" aria-hidden="true"></span></strong> шт. на <strong id="admx-kpi-autodebit-revenue"><span class="spinner-border spinner-border-sm text-secondary" role="status" aria-hidden="true"></span></strong>.
+                За период всего: <strong id="admx-kpi-autodebit-n"><span class="admx-skeleton admx-skeleton-inline" aria-hidden="true"></span></strong> шт. на <strong id="admx-kpi-autodebit-revenue"><span class="admx-skeleton admx-skeleton-inline" aria-hidden="true"></span></strong>.
             </p>
             <div class="table-responsive">
                 <table class="table table-dark table-sm align-middle mb-0 admx-table">
                     <thead><tr><th>Система</th><th class="text-end">Шт.</th><th class="text-end">Сумма</th></tr></thead>
                     <tbody id="admx-recurring-by-ps-body">
-                    <tr><td colspan="3" class="text-center text-secondary"><span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Загрузка...</td></tr>
+                    <tr><td colspan="3" class="text-center text-secondary"><span class="admx-skeleton admx-skeleton-sm me-2 d-inline-block align-middle" aria-hidden="true"></span>Загрузка...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -208,7 +201,7 @@
                 </tr>
                 </thead>
                 <tbody id="admx-by-ps-body">
-                <tr><td colspan="6" class="text-center text-secondary"><span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Загрузка...</td></tr>
+                <tr><td colspan="6" class="text-center text-secondary"><span class="admx-skeleton admx-skeleton-sm me-2 d-inline-block align-middle" aria-hidden="true"></span>Загрузка...</td></tr>
                 </tbody>
             </table>
         </div>
@@ -219,12 +212,12 @@
             <div class="card admx-card h-100">
                 <div class="card-header">Основные ошибки в логах (WARNING / FATAL)</div>
                 <div class="card-body py-2">
-                    <p class="small text-secondary mb-2">Категория «Платежи» за период: <strong id="admx-kpi-payment-logs-n"><span class="spinner-border spinner-border-sm text-secondary" role="status" aria-hidden="true"></span></strong> записей.</p>
+                    <p class="small text-secondary mb-2">Категория «Платежи» за период: <strong id="admx-kpi-payment-logs-n"><span class="admx-skeleton admx-skeleton-inline" aria-hidden="true"></span></strong> записей.</p>
                     <div class="table-responsive">
                         <table class="table table-dark table-sm align-middle mb-0 admx-table">
                             <thead><tr><th>Уровень</th><th>Категория</th><th class="text-end">Кол-во</th></tr></thead>
                             <tbody id="admx-log-issues-body">
-                            <tr><td colspan="3" class="text-center text-secondary"><span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Загрузка...</td></tr>
+                            <tr><td colspan="3" class="text-center text-secondary"><span class="admx-skeleton admx-skeleton-sm me-2 d-inline-block align-middle" aria-hidden="true"></span>Загрузка...</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -239,7 +232,7 @@
                     <table class="table table-dark table-sm align-middle mb-0 admx-table">
                         <thead><tr><th>Время</th><th>ПС</th><th>Сумма</th><th>Статус</th></tr></thead>
                         <tbody id="admx-failed-recent-body">
-                        <tr><td colspan="4" class="text-center text-secondary"><span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Загрузка...</td></tr>
+                        <tr><td colspan="4" class="text-center text-secondary"><span class="admx-skeleton admx-skeleton-sm me-2 d-inline-block align-middle" aria-hidden="true"></span>Загрузка...</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -321,12 +314,12 @@
         }
     };
     const renderLoadingRows = () => {
-        renderRows('admx-recurring-by-ps-body', [], 3, '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Загрузка...');
-        renderRows('admx-by-ps-body', [], 6, '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Загрузка...');
-        renderRows('admx-log-issues-body', [], 3, '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Загрузка...');
-        renderRows('admx-failed-recent-body', [], 4, '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Загрузка...');
+        renderRows('admx-recurring-by-ps-body', [], 3, '<span class="admx-skeleton admx-skeleton-sm me-2 d-inline-block align-middle" aria-hidden="true"></span>Загрузка...');
+        renderRows('admx-by-ps-body', [], 6, '<span class="admx-skeleton admx-skeleton-sm me-2 d-inline-block align-middle" aria-hidden="true"></span>Загрузка...');
+        renderRows('admx-log-issues-body', [], 3, '<span class="admx-skeleton admx-skeleton-sm me-2 d-inline-block align-middle" aria-hidden="true"></span>Загрузка...');
+        renderRows('admx-failed-recent-body', [], 4, '<span class="admx-skeleton admx-skeleton-sm me-2 d-inline-block align-middle" aria-hidden="true"></span>Загрузка...');
         const alertsEl = document.getElementById('admx-alerts-list');
-        if (alertsEl) alertsEl.innerHTML = '<li class="mb-2 text-secondary"><span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Загрузка...</li>';
+        if (alertsEl) alertsEl.innerHTML = '<li class="mb-2 text-secondary"><span class="admx-skeleton admx-skeleton-sm me-2 d-inline-block align-middle" aria-hidden="true"></span>Загрузка...</li>';
     };
 
     let mixChart = null;
@@ -529,10 +522,12 @@
         const alertsEl = document.getElementById('admx-alerts-list');
         if (alertsEl) {
             const alerts = payload.alerts || [];
+            const escAttr = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
             alertsEl.innerHTML = alerts.length
                 ? alerts.map((a) => {
                     const levelClass = a.level === 'critical' ? 'text-danger' : (a.level === 'warning' ? 'text-warning' : 'text-success');
-                    return `<li class="mb-2"><span class="${levelClass} fw-semibold">${escapeHtml(a.title || 'Алерт')}:</span> ${escapeHtml(a.message || '')}</li>`;
+                    const actions = (a.actions || []).map((x) => `<a class="btn btn-sm btn-outline-light ms-1 mb-1" href="${escAttr(x.url)}">${escapeHtml(x.label || '')}</a>`).join('');
+                    return `<li class="mb-2"><span class="${levelClass} fw-semibold">${escapeHtml(a.title || 'Алерт')}:</span> ${escapeHtml(a.message || '')}${actions ? `<div class="mt-1">${actions}</div>` : ''}</li>`;
                 }).join('')
                 : '<li class="mb-2 text-secondary">Нет алертов</li>';
         }
@@ -600,13 +595,6 @@
         exportCsvBtn.href = `${exportCsvBaseUrl}?${params.toString()}`;
     }
 
-    function fetchWithTimeout(url, timeoutMs) {
-        const ctrl = new AbortController();
-        const timer = setTimeout(() => ctrl.abort(), timeoutMs);
-        return fetch(url, {headers: {'X-Requested-With': 'XMLHttpRequest'}, signal: ctrl.signal})
-            .finally(() => clearTimeout(timer));
-    }
-
     function loadData(filters, retriesLeft) {
         const params = new URLSearchParams();
         params.set('days', String(filters.days || 90));
@@ -617,28 +605,33 @@
         showLoader('admx-loader-ps');
         showLoader('admx-loader-users-tx');
         renderLoadingRows();
-        fetchWithTimeout(reqUrl, 10000)
-            .then((res) => {
-                if (!res.ok) throw new Error('bad response');
-                return res.json();
-            })
-            .then((payload) => {
-                setRetryState(false, filters);
-                renderData(payload);
-            })
-            .catch(() => {
-                if (retriesLeft > 0) {
-                    loadData(filters, retriesLeft - 1);
-                    return;
-                }
-                setText('admx-period-range', 'ошибка загрузки');
-                const insightsEl = document.getElementById('admx-insights-list');
-                if (insightsEl) insightsEl.innerHTML = '<li class="mb-2 text-danger">Данные временно недоступны</li>';
-                setRetryState(true, filters);
-                hideLoader('admx-loader-mix');
-                hideLoader('admx-loader-ps');
-                hideLoader('admx-loader-users-tx');
-            });
+        const api = window.AdmxApi;
+        if (!api || typeof api.fetchJsonWithRetry !== 'function') {
+            setText('admx-period-range', 'ошибка загрузки');
+            const insightsEl = document.getElementById('admx-insights-list');
+            if (insightsEl) insightsEl.innerHTML = '<li class="mb-2 text-danger">Данные временно недоступны</li>';
+            setRetryState(true, filters);
+            hideLoader('admx-loader-mix');
+            hideLoader('admx-loader-ps');
+            hideLoader('admx-loader-users-tx');
+            return;
+        }
+        api.fetchJsonWithRetry(reqUrl, {
+            retries: retriesLeft != null ? retriesLeft : 1,
+            timeoutMs: 10000,
+            fetchOptions: { headers: {'X-Requested-With': 'XMLHttpRequest'} },
+        }).then((payload) => {
+            setRetryState(false, filters);
+            renderData(payload);
+        }).catch(() => {
+            setText('admx-period-range', 'ошибка загрузки');
+            const insightsEl = document.getElementById('admx-insights-list');
+            if (insightsEl) insightsEl.innerHTML = '<li class="mb-2 text-danger">Данные временно недоступны</li>';
+            setRetryState(true, filters);
+            hideLoader('admx-loader-mix');
+            hideLoader('admx-loader-ps');
+            hideLoader('admx-loader-users-tx');
+        });
     }
 
     const initialFilters = getFiltersFromUrlOrForm();

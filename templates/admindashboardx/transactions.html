@@ -2,17 +2,16 @@
 
 {% block title %} · Транзакции{% endblock %}
 
-
 {% block content %}
     <div class="card admx-card mb-3 admx-sticky-filters">
         <div class="card-body">
             <form method="get" class="row g-2 align-items-end">
-                <div class="col-12 col-md-6 col-lg-5">
+                <div class="col-12 col-md-6 col-lg-4">
                     <label class="form-label">Поиск</label>
                     <input type="text" name="q" class="form-control admx-search-input" value="{{ q }}" autofocus
                            placeholder="payment_id, описание, username, user_id">
                 </div>
-                <div class="col-12 col-md-3 col-lg-3">
+                <div class="col-6 col-md-3 col-lg-2">
                     <label class="form-label">Статус</label>
                     <select name="status" class="form-select">
                         <option value="">Все</option>
@@ -20,6 +19,23 @@
                             <option value="{{ s }}" {% if status == s %}selected{% endif %}>{{ s }}</option>
                         {% endfor %}
                     </select>
+                </div>
+                <div class="col-6 col-md-3 col-lg-2">
+                    <label class="form-label">ПС</label>
+                    <select name="payment_system" class="form-select">
+                        <option value="">Все</option>
+                        {% for item in payment_system_choices %}
+                            <option value="{{ item.value }}" {% if payment_system == item.value %}selected{% endif %}>{{ item.label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-6 col-md-3 col-lg-2">
+                    <label class="form-label">С даты</label>
+                    <input type="date" name="date_from" class="form-control" value="{{ date_from }}">
+                </div>
+                <div class="col-6 col-md-3 col-lg-2">
+                    <label class="form-label">По дату</label>
+                    <input type="date" name="date_to" class="form-control" value="{{ date_to }}">
                 </div>
                 {% include "admindashboardx/partials/filter_actions.html" with reset_url=reset_url %}
             </form>

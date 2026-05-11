@@ -1,3 +1,4 @@
+
 <header class="admx-navbar px-4 py-3 d-flex align-items-center justify-content-between gap-3">
     <div class="d-flex align-items-start min-w-0 flex-grow-1">
         <button type="button"
@@ -13,7 +14,16 @@
             <div class="small text-secondary-emphasis">Период: последние {{ period_days|default:30 }} дней</div>
         </div>
     </div>
-    <div class="d-flex align-items-center gap-2">
+    <div class="d-flex align-items-center gap-2 flex-shrink-0">
+        <form class="d-none d-md-flex align-items-center gap-1" method="get" action="{% url 'admindashboardx:global_search' %}" role="search">
+            <label class="visually-hidden" for="admx-global-search-q">Поиск по админке</label>
+            <input id="admx-global-search-q" type="search" name="q" class="form-control form-control-sm"
+                   style="min-width: 10rem; max-width: 14rem;" placeholder="ID, user_id, текст…"
+                   value="{{ request.GET.q|default:'' }}" autocomplete="off">
+            <button type="submit" class="btn btn-sm btn-outline-light" title="Найти">
+                <i class="bi bi-search" aria-hidden="true"></i>
+            </button>
+        </form>
         {% if request.user.is_authenticated %}
             <span class="badge text-bg-secondary">{{ request.user.username }}</span>
         {% else %}

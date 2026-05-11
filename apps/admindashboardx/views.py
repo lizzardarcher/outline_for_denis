@@ -1,6 +1,7 @@
 from collections import defaultdict
 import csv
 from datetime import datetime, timedelta
+from urllib.parse import urlencode
 from decimal import Decimal
 from math import sqrt
 
@@ -11,7 +12,7 @@ from django import forms
 from django.forms import modelform_factory
 from django.core.paginator import Paginator
 from django.db.models import Case, Count, F, IntegerField, Q, Sum, Value, When
-from django.db.models.functions import TruncDay
+from django.db.models.functions import TruncDay, TruncWeek
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -371,6 +372,7 @@ def _admx_autodebit_payment_q():
         & ~Q(robokassa_recurring_previous_inv_id="")
     ) | Q(description__icontains="рекуррент")
 
+
 def _admx_corr_strength_label(r):
     if r is None:
         return None
@@ -481,6 +483,17 @@ def _admx_build_revenue_insights(
 
 def _admx_payment_system_labels():
     return dict(Transaction._meta.get_field("payment_system").choices)
+
+
+def _admx_parse_optional_date(raw):
+    raw = (raw or "").strip()
+    if not raw:
+        return None
+    try:
+        return datetime.strptime(raw, "%Y-%m-%d").date()
+    except ValueError:
+        return None
+
 
 class RevenueAnalyticsView(DashboardBaseView):
     """Доходы, пользователи, конверсия, автосписания (несколько ПС), платёжные системы, ошибки — по окну дней."""
@@ -808,6 +821,14 @@ class RevenueAnalyticsView(DashboardBaseView):
             "payment_related_logs_n_pct": pct_delta(payment_related_logs_n, prev_payment_related_logs_n),
         }
 
+        tx_list_url = reverse("admindashboardx:transactions")
+        logs_list_url = reverse("admindashboardx:logs")
+        rev_analytics_url = reverse("admindashboardx:revenue_analytics")
+        funnel_url = reverse("admindashboardx:funnel_analytics")
+        dcf = start_date.isoformat()
+        dct = today.isoformat()
+        period_tx_qs = urlencode({"date_from": dcf, "date_to": dct})
+
         alerts = []
         if kpi_deltas["revenue_period_pct"] is not None and kpi_deltas["revenue_period_pct"] <= -20:
             alerts.append(
@@ -815,6 +836,10 @@ class RevenueAnalyticsView(DashboardBaseView):
                     "level": "critical",
                     "title": "Сильная просадка дохода",
                     "message": f"Доход ниже прошлого периода на {abs(kpi_deltas['revenue_period_pct']):.1f}%.",
+                    "actions": [
+                        {"label": "Транзакции за период", "url": f"{tx_list_url}?{period_tx_qs}"},
+                        {"label": "Аналитика доходов", "url": f"{rev_analytics_url}?{urlencode({'days': range_days})}"},
+                    ],
                 }
             )
         if payment_related_logs_n >= 20:
@@ -823,6 +848,16 @@ class RevenueAnalyticsView(DashboardBaseView):
                     "level": "warning",
                     "title": "Рост ошибок в платежах",
                     "message": f"За окно зафиксировано {payment_related_logs_n} WARNING/FATAL по категории payment.",
+                    "actions": [
+                        {
+                            "label": "Логи (WARNING)",
+                            "url": f"{logs_list_url}?{urlencode({'date_from': dcf, 'date_to': dct, 'level': 'WARNING'})}",
+                        },
+                        {
+                            "label": "Логи (FATAL)",
+                            "url": f"{logs_list_url}?{urlencode({'date_from': dcf, 'date_to': dct, 'level': 'FATAL'})}",
+                        },
+                    ],
                 }
             )
         total_failed = sum(int(x["failed_count"]) for x in by_ps)
@@ -835,10 +870,31 @@ class RevenueAnalyticsView(DashboardBaseView):
                         "level": "warning",
                         "title": "Высокая доля неуспешных платежей",
                         "message": f"Failed/canceled составляет {fail_rate:.1f}% от завершенных попыток.",
+                        "actions": [
+                            {
+                                "label": "Failed",
+                                "url": f"{tx_list_url}?{urlencode({'date_from': dcf, 'date_to': dct, 'status': 'failed'})}",
+                            },
+                            {
+                                "label": "Canceled",
+                                "url": f"{tx_list_url}?{urlencode({'date_from': dcf, 'date_to': dct, 'status': 'canceled'})}",
+                            },
+                            {"label": "Все за период", "url": f"{tx_list_url}?{period_tx_qs}"},
+                        ],
                     }
                 )
         if not alerts:
-            alerts.append({"level": "ok", "title": "Критичных аномалий не найдено", "message": "Метрики в ожидаемых пределах."})
+            alerts.append(
+                {
+                    "level": "ok",
+                    "title": "Критичных аномалий не найдено",
+                    "message": "Метрики в ожидаемых пределах.",
+                    "actions": [
+                        {"label": "Транзакции", "url": tx_list_url},
+                        {"label": "Воронка", "url": funnel_url},
+                    ],
+                }
+            )
 
         return {
             "range_days": range_days,
@@ -1161,6 +1217,11 @@ class TransactionsListView(DashboardBaseView):
         context = super().get_context_data(**kwargs)
         query = (self.request.GET.get("q") or "").strip()
         status = (self.request.GET.get("status") or "").strip()
+        date_from_raw = (self.request.GET.get("date_from") or "").strip()
+        date_to_raw = (self.request.GET.get("date_to") or "").strip()
+        payment_system = (self.request.GET.get("payment_system") or "").strip()
+        date_from = _admx_parse_optional_date(date_from_raw)
+        date_to = _admx_parse_optional_date(date_to_raw)
 
         tx_qs = Transaction.objects.select_related("user").only(
             "id",
@@ -1183,6 +1244,17 @@ class TransactionsListView(DashboardBaseView):
             )
         if status:
             tx_qs = tx_qs.filter(status=status)
+        if payment_system:
+            tx_qs = tx_qs.filter(payment_system=payment_system)
+        if date_from:
+            tx_qs = tx_qs.filter(timestamp__date__gte=date_from)
+        if date_to:
+            tx_qs = tx_qs.filter(timestamp__date__lte=date_to)
+
+        ps_labels = _admx_payment_system_labels()
+        payment_system_choices = [
+            {"value": str(k), "label": v} for k, v in sorted(ps_labels.items(), key=lambda item: item[1]) if k
+        ]
 
         context.update(
             {
@@ -1190,6 +1262,10 @@ class TransactionsListView(DashboardBaseView):
                 "tx_page": self._paginate(tx_qs, per_page=50),
                 "q": query,
                 "status": status,
+                "date_from": date_from_raw,
+                "date_to": date_to_raw,
+                "payment_system": payment_system,
+                "payment_system_choices": payment_system_choices,
                 "status_choices": ("pending", "succeeded", "canceled", "failed", "refunded", "captured"),
                 "page_qs": self._page_qs(),
                 "reset_url": reverse("admindashboardx:transactions"),
@@ -1224,6 +1300,10 @@ class LogsListView(DashboardBaseView):
         context = super().get_context_data(**kwargs)
         query = (self.request.GET.get("q") or "").strip()
         level = (self.request.GET.get("level") or "").strip()
+        date_from_raw = (self.request.GET.get("date_from") or "").strip()
+        date_to_raw = (self.request.GET.get("date_to") or "").strip()
+        date_from = _admx_parse_optional_date(date_from_raw)
+        date_to = _admx_parse_optional_date(date_to_raw)
         ops = (self.request.GET.get("ops") or "").strip()
         deleted_days = (self.request.GET.get("days") or "").strip()
         deleted_count = (self.request.GET.get("count") or "").strip()
@@ -1240,6 +1320,10 @@ class LogsListView(DashboardBaseView):
             logs_qs = logs_qs.filter(Q(message__icontains=query) | Q(user__user_id__icontains=query))
         if level:
             logs_qs = logs_qs.filter(log_level=level)
+        if date_from:
+            logs_qs = logs_qs.filter(datetime__date__gte=date_from)
+        if date_to:
+            logs_qs = logs_qs.filter(datetime__date__lte=date_to)
 
         context.update(
             {
@@ -1247,12 +1331,120 @@ class LogsListView(DashboardBaseView):
                 "logs_page": self._paginate(logs_qs, per_page=50),
                 "q": query,
                 "level": level,
+                "date_from": date_from_raw,
+                "date_to": date_to_raw,
                 "level_choices": ("TRACE", "DEBUG", "INFO", "WARNING", "FATAL", "SUCCESS"),
                 "page_qs": self._page_qs(),
                 "reset_url": reverse("admindashboardx:logs"),
                 "ops": ops,
                 "deleted_days": deleted_days,
                 "deleted_count": deleted_count,
+            }
+        )
+        return context
+
+
+class GlobalSearchView(DashboardBaseView):
+    """GET ?q= — редирект на транзакцию / пользователя по числу или страница быстрых ссылок."""
+
+    template_name = "admindashboardx/global_search.html"
+    page_title = "AdminDashboardX · Поиск"
+    page_key = "global_search"
+
+    def get(self, request, *args, **kwargs):
+        q = (request.GET.get("q") or "").strip()
+        if q.isdigit():
+            n = int(q)
+            if Transaction.objects.filter(pk=n).exists():
+                return redirect(reverse("admindashboardx:transaction_detail", kwargs={"tx_id": n}))
+            if TelegramUser.objects.filter(user_id=n).exists():
+                return redirect(reverse("admindashboardx:user_detail", kwargs={"telegram_user_id": n}))
+        return super().get(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        q = (self.request.GET.get("q") or "").strip()
+        quick_links = []
+        if q:
+            quick_links = [
+                ("Транзакции", f"{reverse('admindashboardx:transactions')}?{urlencode({'q': q})}"),
+                ("Пользователи", f"{reverse('admindashboardx:users')}?{urlencode({'q': q})}"),
+                ("Логи", f"{reverse('admindashboardx:logs')}?{urlencode({'q': q})}"),
+            ]
+        context.update({**self._base_context(), "search_q": q, "quick_links": quick_links})
+        return context
+
+
+class FunnelAnalyticsView(DashboardBaseView):
+    """Упрощённая воронка: регистрации за окно и доля с первым успешным платежом в течение 7 дней."""
+
+    template_name = "admindashboardx/funnel_analytics.html"
+    page_title = "AdminDashboardX · Воронка регистраций"
+    page_key = "funnel_analytics"
+
+    def dispatch(self, request, *args, **kwargs):
+        if self._is_support():
+            return self._forbidden_response()
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        range_days = RevenueAnalyticsView._parse_range_days(self.request.GET.get("days"))
+        now = timezone.now()
+        start_dt = now - timedelta(days=range_days)
+        start_date = timezone.localtime(start_dt).date()
+        today = timezone.localdate()
+        tz = timezone.get_current_timezone()
+        incoming_ok = RevenueAnalyticsView._INCOMING_OK
+
+        total_cohort = TelegramUser.objects.filter(join_date__gte=start_date, join_date__lte=today).count()
+        cohort_slice = (
+            TelegramUser.objects.filter(join_date__gte=start_date, join_date__lte=today)
+            .order_by("-join_date")
+            .values("id", "join_date")[:8000]
+        )
+
+        new_users_n = 0
+        paid_within_7 = 0
+        for row in cohort_slice:
+            new_users_n += 1
+            jd = row["join_date"]
+            end = jd + timedelta(days=7)
+            if Transaction.objects.filter(
+                incoming_ok,
+                user_id=row["id"],
+                timestamp__date__gte=jd,
+                timestamp__date__lte=end,
+            ).exclude(side="Вывод средств").exists():
+                paid_within_7 += 1
+
+        conv_7 = (paid_within_7 / new_users_n * 100) if new_users_n else 0.0
+
+        try:
+            weekly_rows = list(
+                TelegramUser.objects.filter(join_date__gte=start_date, join_date__lte=today)
+                .annotate(week=TruncWeek("join_date", tzinfo=tz))
+                .values("week")
+                .annotate(registrations=Count("id"))
+                .order_by("week")
+            )
+        except Exception:
+            weekly_rows = []
+
+        context.update(
+            {
+                **self._base_context(),
+                "range_days": range_days,
+                "days_choices": (30, 90, 180, 365),
+                "period_start": start_date,
+                "period_end": today,
+                "total_cohort": total_cohort,
+                "new_users_n": new_users_n,
+                "paid_within_7": paid_within_7,
+                "conv_7_pct": round(conv_7, 2),
+                "sample_capped": total_cohort > new_users_n,
+                "weekly_rows": weekly_rows,
+                "page_qs": self._page_qs(),
             }
         )
         return context

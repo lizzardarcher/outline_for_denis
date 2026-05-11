@@ -1,0 +1,46 @@
+{% extends "admindashboardx/admipanelbase.html" %}
+
+{% block title %} · Поиск{% endblock %}
+
+
+{% block content %}
+    <nav aria-label="breadcrumb" class="mb-3">
+        <ol class="breadcrumb admx-breadcrumb mb-0">
+            <li class="breadcrumb-item"><a href="{% url 'admindashboardx:index' %}">Главная</a></li>
+            <li class="breadcrumb-item active" aria-current="page">Поиск</li>
+        </ol>
+    </nav>
+
+    <h2 class="h5 mb-3">Поиск по админке</h2>
+    <p class="small text-secondary mb-3">
+        Если ввести только цифры: при совпадении с <strong>id транзакции</strong> откроется карточка платежа;
+        при совпадении с <strong>Telegram user_id</strong> — карточка пользователя. Иначе ниже — быстрые ссылки в списки с тем же запросом.
+    </p>
+
+    <div class="card admx-card mb-4">
+        <div class="card-body">
+            <form method="get" class="row g-2 align-items-end">
+                <div class="col-12 col-md-8">
+                    <label class="form-label" for="id_q_page">Запрос</label>
+                    <input type="search" name="q" id="id_q_page" class="form-control" value="{{ search_q }}" autofocus placeholder="Например: payment_id, username, 12345">
+                </div>
+                <div class="col-12 col-md-4">
+                    <button type="submit" class="btn btn-outline-light w-100">Искать</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    {% if quick_links %}
+        <div class="card admx-card">
+            <div class="card-header">Быстрые ссылки</div>
+            <div class="card-body">
+                <ul class="mb-0 ps-3">
+                    {% for label, href in quick_links %}
+                        <li class="mb-2"><a class="link-light" href="{{ href }}">{{ label }}</a></li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+    {% endif %}
+{% endblock %}

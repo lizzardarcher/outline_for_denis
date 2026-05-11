@@ -1,3 +1,4 @@
+
 <aside class="admx-sidebar" id="admx-sidebar">
     <div class="admx-brand px-3 py-3">
         <div class="small text-secondary-emphasis">DomVPN</div>
@@ -49,6 +50,14 @@
             <a class="admx-nav-link {% if page_key == 'income_info' %}active{% endif %}" href="{% url 'admindashboardx:income_info' %}">
                 <i class="bi bi-wallet2 me-2"></i>
                 IncomeInfo
+            </a>
+            <a class="admx-nav-link {% if page_key == 'revenue_analytics' %}active{% endif %}" href="{% url 'admindashboardx:revenue_analytics' %}">
+                <i class="bi bi-bar-chart-line me-2"></i>
+                Аналитика доходов
+            </a>
+            <a class="admx-nav-link {% if page_key == 'funnel_analytics' %}active{% endif %}" href="{% url 'admindashboardx:funnel_analytics' %}">
+                <i class="bi bi-funnel me-2"></i>
+                Воронка регистраций
             </a>
             <a class="admx-nav-link {% if page_key == 'referral_settings' %}active{% endif %}" href="{% url 'admindashboardx:referral_settings' %}">
                 <i class="bi bi-diagram-3-fill me-2"></i>
