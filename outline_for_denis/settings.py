@@ -86,7 +86,9 @@ CRYPTOBOT_API_KEY_BOT = os.getenv("CRYPTOBOT_API_KEY_BOT")
 CRYPTOBOT_ASSET_SITE = os.getenv("CRYPTOBOT_ASSET_SITE", "USDT")
 CRYPTOBOT_ASSET_BOT = os.getenv("CRYPTOBOT_ASSET_BOT", "USDT")
 
+
 INSTALLED_APPS = [
+    'outline_for_denis.apps.OutlineForDenisConfig',
     'jazzmin',
     'django.contrib.admin',
     'django.contrib.auth',
@@ -252,6 +254,10 @@ DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
         'NAME': BASE_DIR / 'db.sqlite3',
+        # SQLite: reduce "database is locked" when admin, Celery, and the bot share one file.
+        'OPTIONS': {
+            'timeout': 30,
+        },
     },
     # 'default': {
     #     'ENGINE': 'django.db.backends.postgresql',
@@ -279,7 +285,7 @@ CELERYD_CONCURRENCY = 4  # Количество процессов воркер�
 CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers:DatabaseScheduler'
 CELERY_BEAT_MAX_LOOP_INTERVAL = 5  # Проверять каждые 5 секунд
 
-CELERY_TASK_ALWAYS_EAGER = True  ### только для отладки
+CELERY_TASK_ALWAYS_EAGER = False  ### только для отладки
 
 CELERY_IMPORTS = [
     'bot.tasks',

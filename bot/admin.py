@@ -307,7 +307,12 @@ class TelegramUserAdmin(admin.ModelAdmin):
     exclude = ('data_limit', 'top_up_balance_listener', 'withdrawal_listener')
     ordering = ('-subscription_status', '-join_date',)
     empty_value_display = '---'
-    inlines = [TransactionInline, VpnKeyInline, WithdrawalRequestInline, LogInline]
+    inlines = [
+        # TransactionInline,
+        # VpnKeyInline,
+        # WithdrawalRequestInline,
+        # LogInline
+    ]
 
     def referral_link(self, obj):
         referral_url = f"https://t.me/xDomvpn_Bot?start={obj.user_id}"
