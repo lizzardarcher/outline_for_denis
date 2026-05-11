@@ -2,6 +2,7 @@ from django.urls import path
 
 
 from .views import (
+    AdminDashboardIndexDataView,
     AdminDashboardIndexView,
     RevenueAnalyticsDataView,
     RevenueAnalyticsView,
@@ -84,6 +85,7 @@ app_name = "admindashboardx"
 
 urlpatterns = [
     path("", AdminDashboardIndexView.as_view(), name="index"),
+    path("index/data/", AdminDashboardIndexDataView.as_view(), name="index_data"),
     path("analytics/revenue/", RevenueAnalyticsView.as_view(), name="revenue_analytics"),
     path("analytics/revenue/data/", RevenueAnalyticsDataView.as_view(), name="revenue_analytics_data"),
     path("users/", UsersListView.as_view(), name="users"),

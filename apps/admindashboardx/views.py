@@ -5,6 +5,7 @@ from math import sqrt
 
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.conf import settings
+from django.core.cache import cache
 from django import forms
 from django.forms import modelform_factory
 from django.core.paginator import Paginator
@@ -210,12 +211,12 @@ class AdminDashboardIndexView(DashboardBaseView):
 
     _SUCCESS_PAYMENT_Q = Q(paid=True) | Q(status="succeeded")
 
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
+    @classmethod
+    def _build_payload(cls):
         now = timezone.now()
         today = timezone.localdate()
 
-        pay_ok = Transaction.objects.filter(self._SUCCESS_PAYMENT_Q).exclude(side="Вывод средств")
+        pay_ok = Transaction.objects.filter(cls._SUCCESS_PAYMENT_Q).exclude(side="Вывод средств")
         amt_field = Transaction._meta.get_field("amount")
         zero_money = Value(Decimal("0"), output_field=amt_field)
         rev_row = pay_ok.aggregate(
@@ -289,28 +290,47 @@ class AdminDashboardIndexView(DashboardBaseView):
         since = now - timedelta(days=period_days)
         kpi_error_logs = Logging.objects.filter(datetime__gte=since, log_level__in=error_levels).count()
 
+        return {
+            "stats_year": today.year,
+            "period_days": period_days,
+            "kpi_error_logs": kpi_error_logs,
+            "revenue_project_total": float(revenue_project_total),
+            "revenue_year": float(revenue_year),
+            "revenue_month": float(revenue_month),
+            "revenue_day": float(revenue_day),
+            "users_total": users_row["users_total"],
+            "users_month": users_row["users_month"],
+            "users_day": users_row["users_day"],
+            "tx_count_total": tx_row["tx_count_total"],
+            "tx_count_month": tx_row["tx_count_month"],
+            "tx_count_day": tx_row["tx_count_day"],
+            "wd_count_total": wd_row["wd_count_total"],
+            "wd_count_month": wd_row["wd_count_month"],
+            "wd_count_day": wd_row["wd_count_day"],
+        }
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
         context.update(
             {
                 **self._base_context(),
-                "stats_date": today,
-                "revenue_project_total": revenue_project_total,
-                "revenue_year": revenue_year,
-                "revenue_month": revenue_month,
-                "revenue_day": revenue_day,
-                "users_total": users_row["users_total"],
-                "users_month": users_row["users_month"],
-                "users_day": users_row["users_day"],
-                "tx_count_total": tx_row["tx_count_total"],
-                "tx_count_month": tx_row["tx_count_month"],
-                "tx_count_day": tx_row["tx_count_day"],
-                "wd_count_total": wd_row["wd_count_total"],
-                "wd_count_month": wd_row["wd_count_month"],
-                "wd_count_day": wd_row["wd_count_day"],
-                "period_days": period_days,
-                "kpi_error_logs": kpi_error_logs,
+                "period_days": 30,
             }
         )
         return context
+
+
+class AdminDashboardIndexDataView(DashboardBaseView, View):
+    page_title = "AdminDashboardX · Главная"
+    page_key = "index"
+
+    def get(self, request, *args, **kwargs):
+        cache_key = "admx:index:data:v1"
+        payload = cache.get(cache_key)
+        if payload is None:
+            payload = AdminDashboardIndexView._build_payload()
+            cache.set(cache_key, payload, 60)
+        return JsonResponse(payload)
 
 
 def _admx_pearson_corr(xs, ys):
@@ -394,6 +414,7 @@ def _admx_build_revenue_insights(
             f"При сдвиге на {lag} дн. (доход позже регистраций) корреляция доходит до ≈ {lag_r:.3f} — возможна отложенная оплата после регистрации."
         )
 
+
     n_days = len(series_daily)
     if n_days >= 14:
         mid = n_days // 2
@@ -431,7 +452,6 @@ def _admx_build_revenue_insights(
         share_top = top["revenue"] / revenue_period * 100
         if share_top >= 45:
             bullets.append(f"Концентрация: «{top['label']}» даёт ≈ {share_top:.1f}% успешного дохода за период.")
-
 
     delta = float(cohort_conversion_pct - conversion_all_pct)
     if new_users_period > 0 and abs(delta) >= 8:
@@ -795,7 +815,11 @@ class RevenueAnalyticsDataView(DashboardBaseView, View):
 
     def get(self, request, *args, **kwargs):
         range_days = RevenueAnalyticsView._parse_range_days(request.GET.get("days"))
-        payload = RevenueAnalyticsView._build_payload(range_days=range_days)
+        cache_key = f"admx:revenue:data:v2:{range_days}"
+        payload = cache.get(cache_key)
+        if payload is None:
+            payload = RevenueAnalyticsView._build_payload(range_days=range_days)
+            cache.set(cache_key, payload, 90)
         return JsonResponse(payload)
 
 

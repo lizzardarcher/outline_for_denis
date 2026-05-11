@@ -2,10 +2,9 @@
 
 {% block title %} · Аналитика доходов{% endblock %}
 
-
 {% block content %}
     <div id="admx-revenue-root"
-         data-api-url="{% url 'admindashboardx:revenue_analytics_data' %}?days={{ range_days }}"
+         data-api-url="{% url 'admindashboardx:revenue_analytics_data' %}"
          data-tx-detail-base="{% url 'admindashboardx:transactions' %}"></div>
     <nav aria-label="breadcrumb" class="mb-3">
         <ol class="breadcrumb admx-breadcrumb mb-0">
@@ -24,7 +23,7 @@
         </div>
         <form method="get" class="d-flex align-items-center gap-2">
             <label class="small text-secondary mb-0" for="id_days">Дней</label>
-            <select name="days" id="id_days" class="form-select form-select-sm" style="width: auto;" onchange="this.form.submit()">
+            <select name="days" id="id_days" class="form-select form-select-sm" style="width: auto;">
                 {% for d in days_choices %}
                     <option value="{{ d }}" {% if range_days == d %}selected{% endif %}>{{ d }}</option>
                 {% endfor %}
@@ -93,6 +92,22 @@
             <ul class="small mb-0 ps-3 admx-insights-list" id="admx-insights-list">
                 <li class="mb-2 text-secondary"><span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Загрузка...</li>
             </ul>
+        </div>
+    </div>
+
+    <div class="card admx-card mb-4">
+        <div class="card-header">Мини-глоссарий метрик</div>
+        <div class="card-body py-3">
+            <dl class="admx-glossary small mb-0">
+                <dt>Положительная транзакция</dt>
+                <dd>Транзакция со статусом <code>succeeded</code> или <code>paid=True</code> в выбранном окне.</dd>
+                <dt>Когортная конверсия</dt>
+                <dd>Доля новых пользователей периода, у которых есть хотя бы одна положительная транзакция.</dd>
+                <dt>ARPU</dt>
+                <dd>Средний доход на платящего пользователя за выбранный период.</dd>
+                <dt>Автосписание</dt>
+                <dd>RoboKassa по <code>PreviousInvoiceID</code> и платежи с пометкой «рекуррент» в описании.</dd>
+            </dl>
         </div>
     </div>
 
@@ -220,6 +235,7 @@
 
     const apiUrl = root.getAttribute('data-api-url');
     const txListUrl = root.getAttribute('data-tx-detail-base') || '';
+    const daysSelect = document.getElementById('id_days');
 
     const fmtMoney = (value) => `${Number(value || 0).toLocaleString('ru-RU', {minimumFractionDigits: 2, maximumFractionDigits: 2})} ₽`;
     const fmtPct = (value) => `${Number(value || 0).toFixed(1)}%`;
@@ -236,6 +252,35 @@
     const hideLoader = (id) => {
         const el = document.getElementById(id);
         if (el) el.style.display = 'none';
+    };
+    const showLoader = (id) => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = '';
+    };
+    const setRetryState = (show, days) => {
+        const hostId = 'admx-revenue-retry-host';
+        let host = document.getElementById(hostId);
+        if (!host) {
+            host = document.createElement('div');
+            host.id = hostId;
+            host.className = 'mt-3';
+            const anchor = document.getElementById('admx-insights-list');
+            if (anchor && anchor.parentElement) anchor.parentElement.appendChild(host);
+        }
+        if (!host) return;
+        host.innerHTML = show
+            ? '<button type="button" class="btn btn-sm btn-outline-light" id="admx-revenue-retry-btn">Повторить</button>'
+            : '';
+        if (show) {
+            const btn = document.getElementById('admx-revenue-retry-btn');
+            if (btn) btn.addEventListener('click', () => loadData(days, 1));
+        }
+    };
+    const renderLoadingRows = () => {
+        renderRows('admx-recurring-by-ps-body', [], 3, '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Загрузка...');
+        renderRows('admx-by-ps-body', [], 6, '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Загрузка...');
+        renderRows('admx-log-issues-body', [], 3, '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Загрузка...');
+        renderRows('admx-failed-recent-body', [], 4, '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Загрузка...');
     };
 
     let mixChart = null;
@@ -462,20 +507,68 @@
         renderCharts(payload);
     }
 
-    fetch(apiUrl, {headers: {'X-Requested-With': 'XMLHttpRequest'}})
-        .then((res) => {
-            if (!res.ok) throw new Error('bad response');
-            return res.json();
-        })
-        .then(renderData)
-        .catch(() => {
-            setText('admx-period-range', 'ошибка загрузки');
-            const insightsEl = document.getElementById('admx-insights-list');
-            if (insightsEl) insightsEl.innerHTML = '<li class="mb-2 text-danger">Не удалось загрузить данные аналитики</li>';
-            hideLoader('admx-loader-mix');
-            hideLoader('admx-loader-ps');
-            hideLoader('admx-loader-users-tx');
+    function getDaysFromUrlOrSelect() {
+        const url = new URL(window.location.href);
+        const fromUrl = Number(url.searchParams.get('days'));
+        if (Number.isFinite(fromUrl) && fromUrl > 0) return fromUrl;
+        const fromSelect = Number(daysSelect && daysSelect.value);
+        return Number.isFinite(fromSelect) && fromSelect > 0 ? fromSelect : 90;
+    }
+
+    function updateDaysInUrl(days) {
+        const url = new URL(window.location.href);
+        url.searchParams.set('days', String(days));
+        history.replaceState(null, '', url.toString());
+    }
+
+    function fetchWithTimeout(url, timeoutMs) {
+        const ctrl = new AbortController();
+        const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+        return fetch(url, {headers: {'X-Requested-With': 'XMLHttpRequest'}, signal: ctrl.signal})
+            .finally(() => clearTimeout(timer));
+    }
+
+    function loadData(days, retriesLeft) {
+        const reqUrl = `${apiUrl}?days=${encodeURIComponent(days)}`;
+        showLoader('admx-loader-mix');
+        showLoader('admx-loader-ps');
+        showLoader('admx-loader-users-tx');
+        renderLoadingRows();
+        fetchWithTimeout(reqUrl, 10000)
+            .then((res) => {
+                if (!res.ok) throw new Error('bad response');
+                return res.json();
+            })
+            .then((payload) => {
+                setRetryState(false, days);
+                renderData(payload);
+            })
+            .catch(() => {
+                if (retriesLeft > 0) {
+                    loadData(days, retriesLeft - 1);
+                    return;
+                }
+                setText('admx-period-range', 'ошибка загрузки');
+                const insightsEl = document.getElementById('admx-insights-list');
+                if (insightsEl) insightsEl.innerHTML = '<li class="mb-2 text-danger">Данные временно недоступны</li>';
+                setRetryState(true, days);
+                hideLoader('admx-loader-mix');
+                hideLoader('admx-loader-ps');
+                hideLoader('admx-loader-users-tx');
+            });
+    }
+
+    const initialDays = getDaysFromUrlOrSelect();
+    if (daysSelect) {
+        daysSelect.value = String(initialDays);
+        daysSelect.addEventListener('change', () => {
+            const days = Number(daysSelect.value) || 90;
+            updateDaysInUrl(days);
+            loadData(days, 1);
         });
+    }
+    updateDaysInUrl(initialDays);
+    loadData(initialDays, 1);
 })();
 </script>
 {% endblock %}

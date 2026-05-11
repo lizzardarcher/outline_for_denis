@@ -4,6 +4,7 @@
 
 
 {% block content %}
+    <div id="admx-index-root" data-api-url="{% url 'admindashboardx:index_data' %}"></div>
     <div class="row g-3 mb-4">
         <div class="col-12 col-xl-4">
             <div class="card admx-card h-100">
@@ -12,20 +13,20 @@
                         <div class="admx-kpi-title mb-0">Доход проекта</div>
                         <i class="bi bi-graph-up-arrow text-secondary fs-5"></i>
                     </div>
-                    <div class="admx-kpi-value">{{ revenue_project_total|floatformat:2 }} <span class="fs-6 fw-normal text-secondary">RUB</span></div>
+                    <div class="admx-kpi-value"><span id="admx-idx-revenue-total"><span class="spinner-border spinner-border-sm text-secondary" role="status" aria-hidden="true"></span></span> <span class="fs-6 fw-normal text-secondary">RUB</span></div>
                     <div class="admx-kpi-foot mb-3">Сводное значение (IncomeInfo)</div>
                     <ul class="list-unstyled small mb-0 admx-stat-breakdown">
                         <li class="d-flex justify-content-between py-1 border-top border-secondary border-opacity-25">
-                            <span class="text-secondary">За год ({{ stats_date.year }})</span>
-                            <span class="fw-semibold">{{ revenue_year|floatformat:2 }} ₽</span>
+                            <span class="text-secondary">За год (<span id="admx-idx-stats-year"><span class="spinner-border spinner-border-sm text-secondary" role="status" aria-hidden="true"></span></span>)</span>
+                            <span class="fw-semibold" id="admx-idx-revenue-year"><span class="spinner-border spinner-border-sm text-secondary" role="status" aria-hidden="true"></span></span>
                         </li>
                         <li class="d-flex justify-content-between py-1 border-top border-secondary border-opacity-25">
                             <span class="text-secondary">За месяц</span>
-                            <span class="fw-semibold">{{ revenue_month|floatformat:2 }} ₽</span>
+                            <span class="fw-semibold" id="admx-idx-revenue-month"><span class="spinner-border spinner-border-sm text-secondary" role="status" aria-hidden="true"></span></span>
                         </li>
                         <li class="d-flex justify-content-between py-1 border-top border-secondary border-opacity-25">
                             <span class="text-secondary">Сегодня</span>
-                            <span class="fw-semibold">{{ revenue_day|floatformat:2 }} ₽</span>
+                            <span class="fw-semibold" id="admx-idx-revenue-day"><span class="spinner-border spinner-border-sm text-secondary" role="status" aria-hidden="true"></span></span>
                         </li>
                     </ul>
                     <div class="admx-kpi-foot mt-2 small">Периоды: сумма успешных платежей (без выводов)</div>
@@ -44,16 +45,16 @@
                         <div class="admx-kpi-title mb-0">Пользователи</div>
                         <i class="bi bi-people-fill text-secondary fs-5"></i>
                     </div>
-                    <div class="admx-kpi-value">{{ users_total }}</div>
+                    <div class="admx-kpi-value" id="admx-idx-users-total"><span class="spinner-border spinner-border-sm text-secondary" role="status" aria-hidden="true"></span></div>
                     <div class="admx-kpi-foot mb-3">Всего в базе</div>
                     <ul class="list-unstyled small mb-0 admx-stat-breakdown">
                         <li class="d-flex justify-content-between py-1 border-top border-secondary border-opacity-25">
                             <span class="text-secondary">Новых за месяц</span>
-                            <span class="fw-semibold">{{ users_month }}</span>
+                            <span class="fw-semibold" id="admx-idx-users-month"><span class="spinner-border spinner-border-sm text-secondary" role="status" aria-hidden="true"></span></span>
                         </li>
                         <li class="d-flex justify-content-between py-1 border-top border-secondary border-opacity-25">
                             <span class="text-secondary">Новых за день</span>
-                            <span class="fw-semibold">{{ users_day }}</span>
+                            <span class="fw-semibold" id="admx-idx-users-day"><span class="spinner-border spinner-border-sm text-secondary" role="status" aria-hidden="true"></span></span>
                         </li>
                     </ul>
                     <div class="admx-kpi-foot mt-2 small">По дате регистрации (join_date)</div>
@@ -72,15 +73,15 @@
                         <ul class="list-unstyled small mb-0 admx-stat-breakdown">
                             <li class="d-flex justify-content-between py-1 border-top border-secondary border-opacity-25">
                                 <span class="text-secondary">Всего</span>
-                                <span class="fw-semibold">{{ tx_count_total }}</span>
+                                <span class="fw-semibold" id="admx-idx-tx-total"><span class="spinner-border spinner-border-sm text-secondary" role="status" aria-hidden="true"></span></span>
                             </li>
                             <li class="d-flex justify-content-between py-1 border-top border-secondary border-opacity-25">
                                 <span class="text-secondary">За месяц</span>
-                                <span class="fw-semibold">{{ tx_count_month }}</span>
+                                <span class="fw-semibold" id="admx-idx-tx-month"><span class="spinner-border spinner-border-sm text-secondary" role="status" aria-hidden="true"></span></span>
                             </li>
                             <li class="d-flex justify-content-between py-1 border-top border-secondary border-opacity-25">
                                 <span class="text-secondary">За день</span>
-                                <span class="fw-semibold">{{ tx_count_day }}</span>
+                                <span class="fw-semibold" id="admx-idx-tx-day"><span class="spinner-border spinner-border-sm text-secondary" role="status" aria-hidden="true"></span></span>
                             </li>
                         </ul>
                     </div>
@@ -89,20 +90,34 @@
                         <ul class="list-unstyled small mb-0 admx-stat-breakdown">
                             <li class="d-flex justify-content-between py-1 border-top border-secondary border-opacity-25">
                                 <span class="text-secondary">Всего</span>
-                                <span class="fw-semibold">{{ wd_count_total }}</span>
+                                <span class="fw-semibold" id="admx-idx-wd-total"><span class="spinner-border spinner-border-sm text-secondary" role="status" aria-hidden="true"></span></span>
                             </li>
                             <li class="d-flex justify-content-between py-1 border-top border-secondary border-opacity-25">
                                 <span class="text-secondary">За месяц</span>
-                                <span class="fw-semibold">{{ wd_count_month }}</span>
+                                <span class="fw-semibold" id="admx-idx-wd-month"><span class="spinner-border spinner-border-sm text-secondary" role="status" aria-hidden="true"></span></span>
                             </li>
                             <li class="d-flex justify-content-between py-1 border-top border-secondary border-opacity-25">
                                 <span class="text-secondary">За день</span>
-                                <span class="fw-semibold">{{ wd_count_day }}</span>
+                                <span class="fw-semibold" id="admx-idx-wd-day"><span class="spinner-border spinner-border-sm text-secondary" role="status" aria-hidden="true"></span></span>
                             </li>
                         </ul>
                     </div>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <div class="card admx-card mb-4">
+        <div class="card-header">Мини-глоссарий метрик</div>
+        <div class="card-body py-3">
+            <dl class="admx-glossary small mb-0">
+                <dt>Доход проекта</dt>
+                <dd>Текущее сводное значение из <code>IncomeInfo</code>, отдельно от расчетов за периоды.</dd>
+                <dt>Транзакции</dt>
+                <dd>Все записи в таблице транзакций, включая разные статусы и направления.</dd>
+                <dt>Списания</dt>
+                <dd>Количество заявок на вывод средств по периодам.</dd>
+            </dl>
         </div>
     </div>
 
@@ -283,12 +298,80 @@
                         <a class="btn btn-outline-light text-start" href="{% url 'admindashboardx:logs' %}">
                             <i class="bi bi-journal-text me-2"></i>Журнал логов
                         </a>
-                        {% if kpi_error_logs %}
-                            <div class="small text-secondary mt-1">За последние {{ period_days }} дн.: предупреждений и ошибок — {{ kpi_error_logs }}</div>
-                        {% endif %}
+                        <div class="small text-secondary mt-1">За последние <span id="admx-idx-period-days">{{ period_days }}</span> дн.: предупреждений и ошибок — <span id="admx-idx-error-logs"><span class="spinner-border spinner-border-sm text-secondary" role="status" aria-hidden="true"></span></span></div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
+{% endblock %}
+
+{% block extrascript %}
+<script>
+(function () {
+    const root = document.getElementById('admx-index-root');
+    if (!root) return;
+    const apiUrl = root.getAttribute('data-api-url');
+    const fmtMoney = (value) => Number(value || 0).toLocaleString('ru-RU', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    const setText = (id, value) => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = value;
+    };
+    const setRetryState = (show) => {
+        const hostId = 'admx-index-retry-host';
+        let host = document.getElementById(hostId);
+        if (!host) {
+            host = document.createElement('div');
+            host.id = hostId;
+            host.className = 'mt-2';
+            const target = document.getElementById('admx-idx-error-logs');
+            if (target && target.parentElement) target.parentElement.appendChild(host);
+        }
+        if (!host) return;
+        host.innerHTML = show
+            ? '<div class="small text-danger mb-2">Данные временно недоступны</div><button type="button" class="btn btn-sm btn-outline-light" id="admx-index-retry-btn">Повторить</button>'
+            : '';
+        if (show) {
+            const btn = document.getElementById('admx-index-retry-btn');
+            if (btn) btn.addEventListener('click', () => loadData(1));
+        }
+    };
+    const fetchWithTimeout = (url, timeoutMs) => {
+        const ctrl = new AbortController();
+        const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+        return fetch(url, {headers: {'X-Requested-With': 'XMLHttpRequest'}, signal: ctrl.signal})
+            .finally(() => clearTimeout(timer));
+    };
+    const loadData = (retriesLeft) => fetchWithTimeout(apiUrl, 10000)
+        .then((res) => {
+            if (!res.ok) throw new Error('bad response');
+            return res.json();
+        })
+        .then((data) => {
+            setRetryState(false);
+            setText('admx-idx-stats-year', data.stats_year ?? '—');
+            setText('admx-idx-period-days', data.period_days ?? 30);
+            setText('admx-idx-error-logs', data.kpi_error_logs ?? 0);
+            setText('admx-idx-revenue-total', fmtMoney(data.revenue_project_total));
+            setText('admx-idx-revenue-year', `${fmtMoney(data.revenue_year)} ₽`);
+            setText('admx-idx-revenue-month', `${fmtMoney(data.revenue_month)} ₽`);
+            setText('admx-idx-revenue-day', `${fmtMoney(data.revenue_day)} ₽`);
+            setText('admx-idx-users-total', data.users_total ?? 0);
+            setText('admx-idx-users-month', data.users_month ?? 0);
+            setText('admx-idx-users-day', data.users_day ?? 0);
+            setText('admx-idx-tx-total', data.tx_count_total ?? 0);
+            setText('admx-idx-tx-month', data.tx_count_month ?? 0);
+            setText('admx-idx-tx-day', data.tx_count_day ?? 0);
+            setText('admx-idx-wd-total', data.wd_count_total ?? 0);
+            setText('admx-idx-wd-month', data.wd_count_month ?? 0);
+            setText('admx-idx-wd-day', data.wd_count_day ?? 0);
+        })
+        .catch(() => {
+            if (retriesLeft > 0) return loadData(retriesLeft - 1);
+            setText('admx-idx-error-logs', 'ошибка');
+            setRetryState(true);
+        });
+    loadData(1);
+})();
+</script>
 {% endblock %}

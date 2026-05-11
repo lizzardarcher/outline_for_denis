@@ -8,6 +8,7 @@
     --admx-accent: #7c9cff;
 }
 
+
 body.admx-body {
     background: var(--admx-bg);
     color: var(--admx-text);
@@ -252,6 +253,70 @@ body.admx-body {
 .admx-chart-wrap--donut {
     min-height: 260px;
     max-height: 320px;
+}
+
+.admx-skeleton {
+    display: inline-block;
+    border-radius: 0.35rem;
+    background: linear-gradient(90deg, rgba(255, 255, 255, 0.08) 25%, rgba(255, 255, 255, 0.2) 37%, rgba(255, 255, 255, 0.08) 63%);
+    background-size: 400% 100%;
+    animation: admx-skeleton-shimmer 1.2s ease-in-out infinite;
+}
+
+.admx-skeleton-inline {
+    width: 5.5rem;
+    height: 1em;
+    vertical-align: middle;
+}
+
+.admx-skeleton-sm {
+    width: 2.25rem;
+    height: 0.9em;
+}
+
+.admx-skeleton-chart {
+    position: absolute;
+    inset: 0;
+    border-radius: 0.35rem;
+}
+
+.admx-glossary dt {
+    color: var(--admx-text);
+    font-weight: 600;
+}
+
+.admx-glossary dd {
+    color: var(--admx-muted);
+    margin-bottom: 0.65rem;
+}
+
+/* Legacy spinner markup rendered as skeleton placeholders */
+.admx-content .spinner-border {
+    width: 5.5rem;
+    height: 1em;
+    border: 0;
+    border-radius: 0.35rem;
+    background: linear-gradient(90deg, rgba(255, 255, 255, 0.08) 25%, rgba(255, 255, 255, 0.2) 37%, rgba(255, 255, 255, 0.08) 63%);
+    background-size: 400% 100%;
+    animation: admx-skeleton-shimmer 1.2s ease-in-out infinite;
+}
+
+.admx-content .spinner-border-sm.me-2 {
+    width: 2.25rem;
+    height: 0.9em;
+}
+
+.admx-chart-wrap .spinner-border {
+    position: absolute;
+    inset: 0;
+    width: auto;
+    height: auto;
+    border-radius: 0.5rem;
+}
+
+@keyframes admx-skeleton-shimmer {
+    0% { background-position: 100% 50%; }
+    100% { background-position: 0 50%; }
 }
 
 .admx-table {
