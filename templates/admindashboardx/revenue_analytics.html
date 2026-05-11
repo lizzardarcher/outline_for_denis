@@ -2,9 +2,11 @@
 
 {% block title %} · Аналитика доходов{% endblock %}
 
+
 {% block content %}
     <div id="admx-revenue-root"
          data-api-url="{% url 'admindashboardx:revenue_analytics_data' %}"
+         data-export-csv-url="{% url 'admindashboardx:revenue_analytics_export_csv' %}"
          data-tx-detail-base="{% url 'admindashboardx:transactions' %}"></div>
     <nav aria-label="breadcrumb" class="mb-3">
         <ol class="breadcrumb admx-breadcrumb mb-0">
@@ -21,13 +23,27 @@
                 · IncomeInfo (снимок): <strong id="admx-income-snapshot"><span class="spinner-border spinner-border-sm text-secondary" role="status" aria-hidden="true"></span></strong>
             </div>
         </div>
-        <form method="get" class="d-flex align-items-center gap-2">
+        <form method="get" class="d-flex flex-wrap align-items-center gap-2">
             <label class="small text-secondary mb-0" for="id_days">Дней</label>
             <select name="days" id="id_days" class="form-select form-select-sm" style="width: auto;">
                 {% for d in days_choices %}
                     <option value="{{ d }}" {% if range_days == d %}selected{% endif %}>{{ d }}</option>
                 {% endfor %}
             </select>
+            <label class="small text-secondary mb-0" for="id_payment_system">ПС</label>
+            <select name="payment_system" id="id_payment_system" class="form-select form-select-sm" style="width: auto;">
+                <option value="">Все</option>
+                {% for item in available_payment_systems %}
+                    <option value="{{ item.value }}" {% if selected_payment_system == item.value %}selected{% endif %}>{{ item.label }}</option>
+                {% endfor %}
+            </select>
+            <label class="small text-secondary mb-0" for="id_autodebit_mode">Автосписания</label>
+            <select name="autodebit_mode" id="id_autodebit_mode" class="form-select form-select-sm" style="width: auto;">
+                <option value="all" {% if selected_autodebit_mode == 'all' %}selected{% endif %}>Все</option>
+                <option value="only" {% if selected_autodebit_mode == 'only' %}selected{% endif %}>Только авто</option>
+                <option value="exclude" {% if selected_autodebit_mode == 'exclude' %}selected{% endif %}>Без авто</option>
+            </select>
+            <a class="btn btn-sm btn-outline-light" id="admx-export-csv-btn" href="{% url 'admindashboardx:revenue_analytics_export_csv' %}">Экспорт CSV</a>
             <noscript><button type="submit" class="btn btn-sm btn-outline-light">OK</button></noscript>
         </form>
     </div>
@@ -37,18 +53,21 @@
             <div class="card admx-card h-100"><div class="card-body py-3">
                 <div class="small text-secondary">Доход за период</div>
                 <div class="fs-5 fw-semibold" id="admx-kpi-revenue-period"><span class="spinner-border spinner-border-sm text-secondary" role="status" aria-hidden="true"></span></div>
+                <div class="small mt-1 text-secondary" id="admx-delta-revenue-period">к пред. периоду: <span class="spinner-border spinner-border-sm text-secondary" role="status" aria-hidden="true"></span></div>
             </div></div>
         </div>
         <div class="col-6 col-lg-4 col-xl-2">
             <div class="card admx-card h-100"><div class="card-body py-3">
                 <div class="small text-secondary">Успешных платежей</div>
                 <div class="fs-5 fw-semibold" id="admx-kpi-payments-period-n"><span class="spinner-border spinner-border-sm text-secondary" role="status" aria-hidden="true"></span></div>
+                <div class="small mt-1 text-secondary" id="admx-delta-payments-period-n">к пред. периоду: <span class="spinner-border spinner-border-sm text-secondary" role="status" aria-hidden="true"></span></div>
             </div></div>
         </div>
         <div class="col-6 col-lg-4 col-xl-2">
             <div class="card admx-card h-100"><div class="card-body py-3">
                 <div class="small text-secondary">Новых пользователей</div>
                 <div class="fs-5 fw-semibold" id="admx-kpi-new-users-period"><span class="spinner-border spinner-border-sm text-secondary" role="status" aria-hidden="true"></span></div>
+                <div class="small mt-1 text-secondary" id="admx-delta-new-users-period">к пред. периоду: <span class="spinner-border spinner-border-sm text-secondary" role="status" aria-hidden="true"></span></div>
             </div></div>
         </div>
         <div class="col-6 col-lg-4 col-xl-2">
@@ -56,6 +75,7 @@
                 <div class="small text-secondary">Плативших за период</div>
                 <div class="fs-5 fw-semibold" id="admx-kpi-payers-period"><span class="spinner-border spinner-border-sm text-secondary" role="status" aria-hidden="true"></span></div>
                 <div class="small text-secondary mt-1">ARPU ≈ <span id="admx-kpi-arpu-period"><span class="spinner-border spinner-border-sm text-secondary" role="status" aria-hidden="true"></span></span></div>
+                <div class="small mt-1 text-secondary" id="admx-delta-arpu-period">ARPU к пред. периоду: <span class="spinner-border spinner-border-sm text-secondary" role="status" aria-hidden="true"></span></div>
             </div></div>
         </div>
         <div class="col-6 col-lg-4 col-xl-2">
@@ -90,6 +110,15 @@
         <div class="card-header">Автовыводы по данным периода</div>
         <div class="card-body py-3">
             <ul class="small mb-0 ps-3 admx-insights-list" id="admx-insights-list">
+                <li class="mb-2 text-secondary"><span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Загрузка...</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="card admx-card mb-4">
+        <div class="card-header">Алерты периода</div>
+        <div class="card-body py-3">
+            <ul class="small mb-0 ps-3" id="admx-alerts-list">
                 <li class="mb-2 text-secondary"><span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Загрузка...</li>
             </ul>
         </div>
@@ -234,8 +263,12 @@
     if (!root) return;
 
     const apiUrl = root.getAttribute('data-api-url');
+    const exportCsvBaseUrl = root.getAttribute('data-export-csv-url') || '';
     const txListUrl = root.getAttribute('data-tx-detail-base') || '';
     const daysSelect = document.getElementById('id_days');
+    const paymentSystemSelect = document.getElementById('id_payment_system');
+    const autodebitModeSelect = document.getElementById('id_autodebit_mode');
+    const exportCsvBtn = document.getElementById('admx-export-csv-btn');
 
     const fmtMoney = (value) => `${Number(value || 0).toLocaleString('ru-RU', {minimumFractionDigits: 2, maximumFractionDigits: 2})} ₽`;
     const fmtPct = (value) => `${Number(value || 0).toFixed(1)}%`;
@@ -244,6 +277,17 @@
         if (el) el.textContent = value;
     };
     const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (m) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;', "'": '&#39;'}[m]));
+    const fmtDelta = (value) => (value === null || value === undefined ? '—' : `${value >= 0 ? '+' : ''}${Number(value).toFixed(1)}%`);
+    const setDelta = (id, value) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        if (value === null || value === undefined) {
+            el.innerHTML = 'к пред. периоду: <span class="text-secondary">н/д</span>';
+            return;
+        }
+        const cls = value >= 0 ? 'text-success' : 'text-danger';
+        el.innerHTML = `к пред. периоду: <span class="${cls}">${fmtDelta(value)}</span>`;
+    };
     const renderRows = (tbodyId, rowsHtml, emptyColspan, emptyText) => {
         const tbody = document.getElementById(tbodyId);
         if (!tbody) return;
@@ -257,7 +301,7 @@
         const el = document.getElementById(id);
         if (el) el.style.display = '';
     };
-    const setRetryState = (show, days) => {
+    const setRetryState = (show, filters) => {
         const hostId = 'admx-revenue-retry-host';
         let host = document.getElementById(hostId);
         if (!host) {
@@ -273,7 +317,7 @@
             : '';
         if (show) {
             const btn = document.getElementById('admx-revenue-retry-btn');
-            if (btn) btn.addEventListener('click', () => loadData(days, 1));
+            if (btn) btn.addEventListener('click', () => loadData(filters, 1));
         }
     };
     const renderLoadingRows = () => {
@@ -281,6 +325,8 @@
         renderRows('admx-by-ps-body', [], 6, '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Загрузка...');
         renderRows('admx-log-issues-body', [], 3, '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Загрузка...');
         renderRows('admx-failed-recent-body', [], 4, '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Загрузка...');
+        const alertsEl = document.getElementById('admx-alerts-list');
+        if (alertsEl) alertsEl.innerHTML = '<li class="mb-2 text-secondary"><span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Загрузка...</li>';
     };
 
     let mixChart = null;
@@ -467,6 +513,11 @@
         setText('admx-kpi-autodebit-n', k.autodebit_n ?? 0);
         setText('admx-kpi-autodebit-revenue', fmtMoney(k.autodebit_revenue));
         setText('admx-kpi-payment-logs-n', k.payment_related_logs_n ?? 0);
+        const d = payload.kpi_deltas || {};
+        setDelta('admx-delta-revenue-period', d.revenue_period_pct);
+        setDelta('admx-delta-payments-period-n', d.payments_period_n_pct);
+        setDelta('admx-delta-new-users-period', d.new_users_period_pct);
+        setDelta('admx-delta-arpu-period', d.arpu_period_pct);
 
         const insightsEl = document.getElementById('admx-insights-list');
         if (insightsEl) {
@@ -474,6 +525,16 @@
             insightsEl.innerHTML = insights.length
                 ? insights.map((line) => `<li class="mb-2">${escapeHtml(line)}</li>`).join('')
                 : '<li class="mb-2 text-secondary">Недостаточно данных</li>';
+        }
+        const alertsEl = document.getElementById('admx-alerts-list');
+        if (alertsEl) {
+            const alerts = payload.alerts || [];
+            alertsEl.innerHTML = alerts.length
+                ? alerts.map((a) => {
+                    const levelClass = a.level === 'critical' ? 'text-danger' : (a.level === 'warning' ? 'text-warning' : 'text-success');
+                    return `<li class="mb-2"><span class="${levelClass} fw-semibold">${escapeHtml(a.title || 'Алерт')}:</span> ${escapeHtml(a.message || '')}</li>`;
+                }).join('')
+                : '<li class="mb-2 text-secondary">Нет алертов</li>';
         }
 
         renderRows(
@@ -507,18 +568,36 @@
         renderCharts(payload);
     }
 
-    function getDaysFromUrlOrSelect() {
+    function getFiltersFromUrlOrForm() {
         const url = new URL(window.location.href);
         const fromUrl = Number(url.searchParams.get('days'));
-        if (Number.isFinite(fromUrl) && fromUrl > 0) return fromUrl;
-        const fromSelect = Number(daysSelect && daysSelect.value);
-        return Number.isFinite(fromSelect) && fromSelect > 0 ? fromSelect : 90;
+        const days = Number.isFinite(fromUrl) && fromUrl > 0
+            ? fromUrl
+            : (Number(daysSelect && daysSelect.value) || 90);
+        const payment_system = (url.searchParams.get('payment_system') ?? (paymentSystemSelect ? paymentSystemSelect.value : '')).trim();
+        const autodebit_mode = (url.searchParams.get('autodebit_mode') ?? (autodebitModeSelect ? autodebitModeSelect.value : 'all')).trim() || 'all';
+        return {days, payment_system, autodebit_mode};
     }
 
-    function updateDaysInUrl(days) {
+    function updateFiltersInUrl(filters) {
+        const {days, payment_system, autodebit_mode} = filters;
+        const fromSelect = Number(daysSelect && daysSelect.value);
         const url = new URL(window.location.href);
-        url.searchParams.set('days', String(days));
+        url.searchParams.set('days', String(days || (Number.isFinite(fromSelect) ? fromSelect : 90)));
+        if (payment_system) url.searchParams.set('payment_system', payment_system);
+        else url.searchParams.delete('payment_system');
+        if (autodebit_mode && autodebit_mode !== 'all') url.searchParams.set('autodebit_mode', autodebit_mode);
+        else url.searchParams.delete('autodebit_mode');
         history.replaceState(null, '', url.toString());
+    }
+
+    function updateExportLink(filters) {
+        if (!exportCsvBtn || !exportCsvBaseUrl) return;
+        const params = new URLSearchParams();
+        params.set('days', String(filters.days || 90));
+        if (filters.payment_system) params.set('payment_system', filters.payment_system);
+        if (filters.autodebit_mode && filters.autodebit_mode !== 'all') params.set('autodebit_mode', filters.autodebit_mode);
+        exportCsvBtn.href = `${exportCsvBaseUrl}?${params.toString()}`;
     }
 
     function fetchWithTimeout(url, timeoutMs) {
@@ -528,8 +607,12 @@
             .finally(() => clearTimeout(timer));
     }
 
-    function loadData(days, retriesLeft) {
-        const reqUrl = `${apiUrl}?days=${encodeURIComponent(days)}`;
+    function loadData(filters, retriesLeft) {
+        const params = new URLSearchParams();
+        params.set('days', String(filters.days || 90));
+        if (filters.payment_system) params.set('payment_system', filters.payment_system);
+        if (filters.autodebit_mode && filters.autodebit_mode !== 'all') params.set('autodebit_mode', filters.autodebit_mode);
+        const reqUrl = `${apiUrl}?${params.toString()}`;
         showLoader('admx-loader-mix');
         showLoader('admx-loader-ps');
         showLoader('admx-loader-users-tx');
@@ -540,35 +623,46 @@
                 return res.json();
             })
             .then((payload) => {
-                setRetryState(false, days);
+                setRetryState(false, filters);
                 renderData(payload);
             })
             .catch(() => {
                 if (retriesLeft > 0) {
-                    loadData(days, retriesLeft - 1);
+                    loadData(filters, retriesLeft - 1);
                     return;
                 }
                 setText('admx-period-range', 'ошибка загрузки');
                 const insightsEl = document.getElementById('admx-insights-list');
                 if (insightsEl) insightsEl.innerHTML = '<li class="mb-2 text-danger">Данные временно недоступны</li>';
-                setRetryState(true, days);
+                setRetryState(true, filters);
                 hideLoader('admx-loader-mix');
                 hideLoader('admx-loader-ps');
                 hideLoader('admx-loader-users-tx');
             });
     }
 
-    const initialDays = getDaysFromUrlOrSelect();
+    const initialFilters = getFiltersFromUrlOrForm();
     if (daysSelect) {
-        daysSelect.value = String(initialDays);
-        daysSelect.addEventListener('change', () => {
-            const days = Number(daysSelect.value) || 90;
-            updateDaysInUrl(days);
-            loadData(days, 1);
-        });
+        daysSelect.value = String(initialFilters.days);
     }
-    updateDaysInUrl(initialDays);
-    loadData(initialDays, 1);
+    if (paymentSystemSelect) paymentSystemSelect.value = initialFilters.payment_system;
+    if (autodebitModeSelect) autodebitModeSelect.value = initialFilters.autodebit_mode;
+    const onFiltersChanged = () => {
+        const filters = {
+            days: Number(daysSelect && daysSelect.value) || 90,
+            payment_system: (paymentSystemSelect && paymentSystemSelect.value) || '',
+            autodebit_mode: (autodebitModeSelect && autodebitModeSelect.value) || 'all',
+        };
+        updateFiltersInUrl(filters);
+        updateExportLink(filters);
+        loadData(filters, 1);
+    };
+    if (daysSelect) daysSelect.addEventListener('change', onFiltersChanged);
+    if (paymentSystemSelect) paymentSystemSelect.addEventListener('change', onFiltersChanged);
+    if (autodebitModeSelect) autodebitModeSelect.addEventListener('change', onFiltersChanged);
+    updateFiltersInUrl(initialFilters);
+    updateExportLink(initialFilters);
+    loadData(initialFilters, 1);
 })();
 </script>
 {% endblock %}

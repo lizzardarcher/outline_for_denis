@@ -1,10 +1,10 @@
 from django.urls import path
 
-
 from .views import (
     AdminDashboardIndexDataView,
     AdminDashboardIndexView,
     RevenueAnalyticsDataView,
+    RevenueAnalyticsExportCsvView,
     RevenueAnalyticsView,
     CountriesListView,
     CountryCreateView,
@@ -88,6 +88,7 @@ urlpatterns = [
     path("index/data/", AdminDashboardIndexDataView.as_view(), name="index_data"),
     path("analytics/revenue/", RevenueAnalyticsView.as_view(), name="revenue_analytics"),
     path("analytics/revenue/data/", RevenueAnalyticsDataView.as_view(), name="revenue_analytics_data"),
+    path("analytics/revenue/export/csv/", RevenueAnalyticsExportCsvView.as_view(), name="revenue_analytics_export_csv"),
     path("users/", UsersListView.as_view(), name="users"),
     path("users/export/analytics/xlsx/", UserAnalyticsExcelExportView.as_view(), name="users_analytics_export_xlsx"),
     path("users/<int:telegram_user_id>/", UserDetailView.as_view(), name="user_detail"),

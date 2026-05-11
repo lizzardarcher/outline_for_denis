@@ -1,4 +1,5 @@
 from collections import defaultdict
+import csv
 from datetime import datetime, timedelta
 from decimal import Decimal
 from math import sqrt
@@ -370,7 +371,6 @@ def _admx_autodebit_payment_q():
         & ~Q(robokassa_recurring_previous_inv_id="")
     ) | Q(description__icontains="рекуррент")
 
-
 def _admx_corr_strength_label(r):
     if r is None:
         return None
@@ -505,12 +505,24 @@ class RevenueAnalyticsView(DashboardBaseView):
             range_days = 90
         return max(7, min(range_days, 730))
 
+    @staticmethod
+    def _parse_payment_system(raw_value):
+        return (raw_value or "").strip()
+
+    @staticmethod
+    def _parse_autodebit_mode(raw_value):
+        mode = (raw_value or "all").strip().lower()
+        return mode if mode in ("all", "only", "exclude") else "all"
+
     @classmethod
-    def _build_payload(cls, range_days):
+    def _build_payload(cls, range_days, payment_system="", autodebit_mode="all"):
         now = timezone.now()
         start_dt = now - timedelta(days=range_days)
+        prev_start_dt = start_dt - timedelta(days=range_days)
         tz = timezone.get_current_timezone()
         start_date = timezone.localtime(start_dt).date()
+        prev_start_date = timezone.localtime(prev_start_dt).date()
+        prev_end_date = start_date - timedelta(days=1)
         today = timezone.localdate()
 
         ps_labels = _admx_payment_system_labels()
@@ -521,6 +533,25 @@ class RevenueAnalyticsView(DashboardBaseView):
             return ps_labels.get(str(code), str(code))
 
         incoming_base = Transaction.objects.filter(cls._INCOMING_OK, timestamp__gte=start_dt)
+        if payment_system:
+            incoming_base = incoming_base.filter(payment_system=payment_system)
+        autodebit_q = _admx_autodebit_payment_q()
+        if autodebit_mode == "only":
+            incoming_base = incoming_base.filter(autodebit_q)
+        elif autodebit_mode == "exclude":
+            incoming_base = incoming_base.exclude(autodebit_q)
+
+        prev_incoming_base = Transaction.objects.filter(
+            cls._INCOMING_OK,
+            timestamp__gte=prev_start_dt,
+            timestamp__lt=start_dt,
+        )
+        if payment_system:
+            prev_incoming_base = prev_incoming_base.filter(payment_system=payment_system)
+        if autodebit_mode == "only":
+            prev_incoming_base = prev_incoming_base.filter(autodebit_q)
+        elif autodebit_mode == "exclude":
+            prev_incoming_base = prev_incoming_base.exclude(autodebit_q)
 
         agg_pay_by_day = (
             incoming_base.annotate(period=TruncDay("timestamp", tzinfo=tz))
@@ -568,6 +599,10 @@ class RevenueAnalyticsView(DashboardBaseView):
         payments_period_n = incoming_base.count()
 
         new_users_period = TelegramUser.objects.filter(join_date__gte=start_date, join_date__lte=today).count()
+        prev_new_users_period = TelegramUser.objects.filter(
+            join_date__gte=prev_start_date,
+            join_date__lte=prev_end_date,
+        ).count()
         users_total = TelegramUser.objects.count()
         paying_users_all = (
             Transaction.objects.filter(cls._INCOMING_OK).exclude(user_id__isnull=True).values("user_id").distinct().count()
@@ -590,6 +625,10 @@ class RevenueAnalyticsView(DashboardBaseView):
 
         payers_period = incoming_base.exclude(user_id__isnull=True).values("user_id").distinct().count()
         arpu_period = (revenue_period / Decimal(payers_period)) if payers_period else Decimal("0")
+        prev_revenue_period = prev_incoming_base.aggregate(t=Sum("amount")).get("t") or Decimal("0")
+        prev_payments_period_n = prev_incoming_base.count()
+        prev_payers_period = prev_incoming_base.exclude(user_id__isnull=True).values("user_id").distinct().count()
+        prev_arpu_period = (prev_revenue_period / Decimal(prev_payers_period)) if prev_payers_period else Decimal("0")
 
         corr_daily = _admx_pearson_corr(rev_series, usr_series)
 
@@ -666,7 +705,6 @@ class RevenueAnalyticsView(DashboardBaseView):
                 }
             )
 
-        autodebit_q = _admx_autodebit_payment_q()
         autodebit_qs = incoming_base.filter(autodebit_q)
         autodebit_n = autodebit_qs.count()
         autodebit_revenue = autodebit_qs.aggregate(t=Sum("amount")).get("t") or Decimal("0")
@@ -700,6 +738,13 @@ class RevenueAnalyticsView(DashboardBaseView):
 
         payment_related_logs_n = Logging.objects.filter(
             datetime__gte=start_dt,
+            log_level__in=("WARNING", "FATAL"),
+            category="payment",
+        ).count()
+
+        prev_payment_related_logs_n = Logging.objects.filter(
+            datetime__gte=prev_start_dt,
+            datetime__lt=start_dt,
             log_level__in=("WARNING", "FATAL"),
             category="payment",
         ).count()
@@ -747,12 +792,67 @@ class RevenueAnalyticsView(DashboardBaseView):
             "payments_n": [x["payments_n"] for x in series_daily],
         }
 
+        def pct_delta(cur, prev):
+            cur = float(cur or 0)
+            prev = float(prev or 0)
+            if prev == 0:
+                return None
+            return (cur - prev) / prev * 100.0
+
+        kpi_deltas = {
+            "revenue_period_pct": pct_delta(revenue_period, prev_revenue_period),
+            "payments_period_n_pct": pct_delta(payments_period_n, prev_payments_period_n),
+            "new_users_period_pct": pct_delta(new_users_period, prev_new_users_period),
+            "payers_period_pct": pct_delta(payers_period, prev_payers_period),
+            "arpu_period_pct": pct_delta(arpu_period, prev_arpu_period),
+            "payment_related_logs_n_pct": pct_delta(payment_related_logs_n, prev_payment_related_logs_n),
+        }
+
+        alerts = []
+        if kpi_deltas["revenue_period_pct"] is not None and kpi_deltas["revenue_period_pct"] <= -20:
+            alerts.append(
+                {
+                    "level": "critical",
+                    "title": "Сильная просадка дохода",
+                    "message": f"Доход ниже прошлого периода на {abs(kpi_deltas['revenue_period_pct']):.1f}%.",
+                }
+            )
+        if payment_related_logs_n >= 20:
+            alerts.append(
+                {
+                    "level": "warning",
+                    "title": "Рост ошибок в платежах",
+                    "message": f"За окно зафиксировано {payment_related_logs_n} WARNING/FATAL по категории payment.",
+                }
+            )
+        total_failed = sum(int(x["failed_count"]) for x in by_ps)
+        total_ok = sum(int(x["ok_count"]) for x in by_ps)
+        if total_ok + total_failed >= 20:
+            fail_rate = (total_failed / (total_ok + total_failed)) * 100
+            if fail_rate >= 15:
+                alerts.append(
+                    {
+                        "level": "warning",
+                        "title": "Высокая доля неуспешных платежей",
+                        "message": f"Failed/canceled составляет {fail_rate:.1f}% от завершенных попыток.",
+                    }
+                )
+        if not alerts:
+            alerts.append({"level": "ok", "title": "Критичных аномалий не найдено", "message": "Метрики в ожидаемых пределах."})
+
         return {
             "range_days": range_days,
             "period_days": range_days,
             "period_start": start_date.strftime("%d.%m.%Y"),
             "period_end": today.strftime("%d.%m.%Y"),
             "days_choices": (30, 90, 180, 365),
+            "selected_payment_system": payment_system,
+            "selected_autodebit_mode": autodebit_mode,
+            "available_payment_systems": [
+                {"value": str(k), "label": v}
+                for k, v in sorted(ps_labels.items(), key=lambda item: item[1])
+                if k
+            ],
             "kpis": {
                 "revenue_period": float(revenue_period),
                 "payments_period_n": payments_period_n,
@@ -769,6 +869,18 @@ class RevenueAnalyticsView(DashboardBaseView):
                 "autodebit_revenue": float(autodebit_revenue),
                 "payment_related_logs_n": payment_related_logs_n,
             },
+            "kpi_deltas": kpi_deltas,
+            "prev_period": {
+                "period_start": prev_start_date.strftime("%d.%m.%Y"),
+                "period_end": prev_end_date.strftime("%d.%m.%Y"),
+                "revenue_period": float(prev_revenue_period),
+                "payments_period_n": prev_payments_period_n,
+                "new_users_period": prev_new_users_period,
+                "payers_period": prev_payers_period,
+                "arpu_period": float(prev_arpu_period),
+                "payment_related_logs_n": prev_payment_related_logs_n,
+            },
+            "alerts": alerts,
             "revenue_insights": revenue_insights,
             "by_payment_system": [{**row, "revenue": float(row["revenue"])} for row in by_ps],
             "recurring_by_ps": [{**row, "revenue": float(row["revenue"])} for row in recurring_by_ps],
@@ -793,12 +905,22 @@ class RevenueAnalyticsView(DashboardBaseView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         range_days = self._parse_range_days(self.request.GET.get("days"))
+        payment_system = self._parse_payment_system(self.request.GET.get("payment_system"))
+        autodebit_mode = self._parse_autodebit_mode(self.request.GET.get("autodebit_mode"))
+        ps_labels = _admx_payment_system_labels()
         context.update(
             {
                 **self._base_context(),
                 "range_days": range_days,
                 "period_days": range_days,
                 "days_choices": (30, 90, 180, 365),
+                "selected_payment_system": payment_system,
+                "selected_autodebit_mode": autodebit_mode,
+                "available_payment_systems": [
+                    {"value": str(k), "label": v}
+                    for k, v in sorted(ps_labels.items(), key=lambda item: item[1])
+                    if k
+                ],
             }
         )
         return context
@@ -815,12 +937,76 @@ class RevenueAnalyticsDataView(DashboardBaseView, View):
 
     def get(self, request, *args, **kwargs):
         range_days = RevenueAnalyticsView._parse_range_days(request.GET.get("days"))
-        cache_key = f"admx:revenue:data:v2:{range_days}"
+        payment_system = RevenueAnalyticsView._parse_payment_system(request.GET.get("payment_system"))
+        autodebit_mode = RevenueAnalyticsView._parse_autodebit_mode(request.GET.get("autodebit_mode"))
+        cache_key = f"admx:revenue:data:v3:{range_days}:{payment_system or 'all'}:{autodebit_mode}"
         payload = cache.get(cache_key)
         if payload is None:
-            payload = RevenueAnalyticsView._build_payload(range_days=range_days)
+            payload = RevenueAnalyticsView._build_payload(
+                range_days=range_days,
+                payment_system=payment_system,
+                autodebit_mode=autodebit_mode,
+            )
             cache.set(cache_key, payload, 90)
         return JsonResponse(payload)
+
+
+class RevenueAnalyticsExportCsvView(DashboardBaseView, View):
+    page_title = "AdminDashboardX · Аналитика доходов CSV"
+    page_key = "revenue_analytics"
+
+    def dispatch(self, request, *args, **kwargs):
+        if self._is_support():
+            return JsonResponse({"detail": "forbidden"}, status=403)
+        return super().dispatch(request, *args, **kwargs)
+
+    def get(self, request, *args, **kwargs):
+        range_days = RevenueAnalyticsView._parse_range_days(request.GET.get("days"))
+        payment_system = RevenueAnalyticsView._parse_payment_system(request.GET.get("payment_system"))
+        autodebit_mode = RevenueAnalyticsView._parse_autodebit_mode(request.GET.get("autodebit_mode"))
+        payload = RevenueAnalyticsView._build_payload(
+            range_days=range_days,
+            payment_system=payment_system,
+            autodebit_mode=autodebit_mode,
+        )
+
+        now_str = timezone.localtime(timezone.now()).strftime("%Y%m%d_%H%M")
+        response = HttpResponse(content_type="text/csv; charset=utf-8")
+        response["Content-Disposition"] = f'attachment; filename="revenue_analytics_{now_str}.csv"'
+        response.write("\ufeff")
+        writer = csv.writer(response)
+
+        writer.writerow(["Параметр", "Значение"])
+        writer.writerow(["Период", f"{payload['period_start']} - {payload['period_end']}"])
+        writer.writerow(["Дней", payload["range_days"]])
+        writer.writerow(["Payment system", payload.get("selected_payment_system") or "all"])
+        writer.writerow(["Autodebit mode", payload.get("selected_autodebit_mode") or "all"])
+        writer.writerow([])
+        writer.writerow(["KPI", "Текущее окно", "Предыдущее окно", "Delta %"])
+        prev = payload.get("prev_period") or {}
+        deltas = payload.get("kpi_deltas") or {}
+        kpi = payload.get("kpis") or {}
+        rows = [
+            ("Доход за период", kpi.get("revenue_period"), prev.get("revenue_period"), deltas.get("revenue_period_pct")),
+            ("Успешных платежей", kpi.get("payments_period_n"), prev.get("payments_period_n"), deltas.get("payments_period_n_pct")),
+            ("Новых пользователей", kpi.get("new_users_period"), prev.get("new_users_period"), deltas.get("new_users_period_pct")),
+            ("Плативших пользователей", kpi.get("payers_period"), prev.get("payers_period"), deltas.get("payers_period_pct")),
+            ("ARPU", kpi.get("arpu_period"), prev.get("arpu_period"), deltas.get("arpu_period_pct")),
+            ("Payment warning/fatal logs", kpi.get("payment_related_logs_n"), prev.get("payment_related_logs_n"), deltas.get("payment_related_logs_n_pct")),
+        ]
+        for title, cur, prv, dlt in rows:
+            writer.writerow([title, cur, prv, "" if dlt is None else round(float(dlt), 2)])
+        writer.writerow([])
+        writer.writerow(["Дата", "Доход", "Новые пользователи", "Успешных платежей"])
+        daily = (payload.get("charts") or {}).get("daily") or {}
+        labels = daily.get("labels") or []
+        rev = daily.get("revenue") or []
+        users = daily.get("new_users") or []
+        payments = daily.get("payments_n") or []
+        for i, label in enumerate(labels):
+            writer.writerow([label, rev[i] if i < len(rev) else "", users[i] if i < len(users) else "", payments[i] if i < len(payments) else ""])
+
+        return response
 
 
 class UsersListView(DashboardBaseView):
