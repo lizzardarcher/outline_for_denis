@@ -11,8 +11,8 @@ from django.core.cache import cache
 from django import forms
 from django.forms import modelform_factory
 from django.core.paginator import Paginator
-from django.db.models import Case, Count, F, IntegerField, Q, Sum, Value, When
-from django.db.models.functions import TruncDay, TruncWeek
+from django.db.models import Case, Count, DecimalField, F, IntegerField, OuterRef, Q, Subquery, Sum, Value, When
+from django.db.models.functions import Coalesce, TruncDay, TruncWeek
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -334,7 +334,6 @@ class AdminDashboardIndexDataView(DashboardBaseView, View):
             cache.set(cache_key, payload, 60)
         return JsonResponse(payload)
 
-
 def _admx_pearson_corr(xs, ys):
     n = len(xs)
     if n < 3 or n != len(ys):
@@ -401,6 +400,7 @@ def _admx_build_revenue_insights(
     payment_related_logs_n,
 ):
     bullets = []
+
 
     if corr_daily is not None:
         strength = _admx_corr_strength_label(corr_daily)
@@ -781,6 +781,63 @@ class RevenueAnalyticsView(DashboardBaseView):
         income_row = IncomeInfo.objects.order_by("-pk").first()
         income_snapshot = income_row.total_amount if income_row and income_row.total_amount is not None else Decimal("0")
 
+        # Ожидаемый рекуррент на завтра: сегодня последний день подписки, автосписание не отменено, подписка активна.
+        amt_field = Transaction._meta.get_field("amount")
+        zero_money = Value(Decimal("0"), output_field=amt_field)
+        last_success_amount_sq = (
+            Transaction.objects.filter(
+                cls._INCOMING_OK,
+                user_id=OuterRef("pk"),
+            )
+            .exclude(side="Вывод средств")
+            .order_by("-timestamp", "-id")
+            .values("amount")[:1]
+        )
+        exp_recurring_row = (
+            TelegramUser.objects.filter(
+                subscription_expiration=today,
+                permission_revoked=False,
+                subscription_status=True,
+            )
+            .annotate(
+                last_success_amount=Coalesce(
+                    Subquery(last_success_amount_sq, output_field=amt_field),
+                    zero_money,
+                )
+            )
+            .aggregate(
+                expected_recurring_tomorrow_n=Count("id"),
+                expected_recurring_tomorrow_revenue=Sum("last_success_amount"),
+            )
+        )
+        expected_recurring_tomorrow_n = exp_recurring_row["expected_recurring_tomorrow_n"] or 0
+        expected_recurring_tomorrow_revenue = (
+            exp_recurring_row["expected_recurring_tomorrow_revenue"] or Decimal("0")
+        )
+
+        # Истекшая подписка, но есть платёжный метод и разрешение на списание не отозвано.
+        expired_paymethod_row = (
+            TelegramUser.objects.filter(
+                subscription_expiration__lt=today,
+                permission_revoked=False,
+            )
+            .exclude(Q(payment_method_id__isnull=True) | Q(payment_method_id=""))
+            .annotate(
+                last_success_amount=Coalesce(
+                    Subquery(last_success_amount_sq, output_field=amt_field),
+                    zero_money,
+                )
+            )
+            .aggregate(
+                expired_sub_paymethod_not_revoked_n=Count("id"),
+                expired_sub_paymethod_not_revoked_revenue=Sum("last_success_amount"),
+            )
+        )
+        expired_sub_paymethod_not_revoked_n = expired_paymethod_row["expired_sub_paymethod_not_revoked_n"] or 0
+        expired_sub_paymethod_not_revoked_revenue = (
+            expired_paymethod_row["expired_sub_paymethod_not_revoked_revenue"] or Decimal("0")
+        )
+
         failed_recent_qs = (
             Transaction.objects.filter(timestamp__gte=start_dt, status__in=("failed", "canceled"))
             .exclude(side="Вывод средств")
@@ -924,6 +981,10 @@ class RevenueAnalyticsView(DashboardBaseView):
                 "autodebit_n": autodebit_n,
                 "autodebit_revenue": float(autodebit_revenue),
                 "payment_related_logs_n": payment_related_logs_n,
+                "expected_recurring_tomorrow_n": expected_recurring_tomorrow_n,
+                "expected_recurring_tomorrow_revenue": float(expected_recurring_tomorrow_revenue),
+                "expired_sub_paymethod_not_revoked_n": expired_sub_paymethod_not_revoked_n,
+                "expired_sub_paymethod_not_revoked_revenue": float(expired_sub_paymethod_not_revoked_revenue),
             },
             "kpi_deltas": kpi_deltas,
             "prev_period": {
@@ -1052,6 +1113,39 @@ class RevenueAnalyticsExportCsvView(DashboardBaseView, View):
         ]
         for title, cur, prv, dlt in rows:
             writer.writerow([title, cur, prv, "" if dlt is None else round(float(dlt), 2)])
+        writer.writerow([])
+        writer.writerow(
+            [
+                "Рекуррент на завтра (оценка): пользователей",
+                kpi.get("expected_recurring_tomorrow_n"),
+                "",
+                "",
+            ]
+        )
+        writer.writerow(
+            [
+                "Рекуррент на завтра (оценка): сумма по последним успешным платежам, ₽",
+                kpi.get("expected_recurring_tomorrow_revenue"),
+                "",
+                "",
+            ]
+        )
+        writer.writerow(
+            [
+                "Истекшая подписка + метод оплаты + не отозвано списание: пользователей",
+                kpi.get("expired_sub_paymethod_not_revoked_n"),
+                "",
+                "",
+            ]
+        )
+        writer.writerow(
+            [
+                "Истекшая подписка + метод оплаты + не отозвано: сумма последних успешных платежей, ₽",
+                kpi.get("expired_sub_paymethod_not_revoked_revenue"),
+                "",
+                "",
+            ]
+        )
         writer.writerow([])
         writer.writerow(["Дата", "Доход", "Новые пользователи", "Успешных платежей"])
         daily = (payload.get("charts") or {}).get("daily") or {}

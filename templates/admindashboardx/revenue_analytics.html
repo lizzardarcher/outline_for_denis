@@ -91,6 +91,22 @@
                 <div class="small text-secondary mt-1"><span id="admx-kpi-paid-among-new"><span class="admx-skeleton admx-skeleton-inline" aria-hidden="true"></span></span> / <span id="admx-kpi-new-users-period-2"><span class="admx-skeleton admx-skeleton-inline" aria-hidden="true"></span></span> с оплатой</div>
             </div></div>
         </div>
+        <div class="col-6 col-lg-4 col-xl-2">
+            <div class="card admx-card h-100"><div class="card-body py-3">
+                <div class="small text-secondary">Рекуррент на завтра (оценка)</div>
+                <div class="fs-5 fw-semibold" id="admx-kpi-expected-recurring-revenue"><span class="admx-skeleton admx-skeleton-inline" aria-hidden="true"></span></div>
+                <div class="small text-secondary mt-1"><span id="admx-kpi-expected-recurring-n"><span class="admx-skeleton admx-skeleton-inline" aria-hidden="true"></span></span> пользователей</div>
+                <div class="small text-secondary mt-2 lh-sm">Сегодня последний день по <code>subscription_expiration</code>, подписка активна, <code>permission_revoked=False</code>. Сумма — по последнему успешному входящему платежу (без истории — 0 ₽).</div>
+            </div></div>
+        </div>
+        <div class="col-6 col-lg-4 col-xl-2">
+            <div class="card admx-card h-100"><div class="card-body py-3">
+                <div class="small text-secondary">Истекшая подписка, метод есть</div>
+                <div class="fs-5 fw-semibold" id="admx-kpi-expired-paymethod-revenue"><span class="admx-skeleton admx-skeleton-inline" aria-hidden="true"></span></div>
+                <div class="small text-secondary mt-1"><span id="admx-kpi-expired-paymethod-n"><span class="admx-skeleton admx-skeleton-inline" aria-hidden="true"></span></span> пользователей</div>
+                <div class="small text-secondary mt-2 lh-sm"><code>subscription_expiration</code> &lt; сегодня, непустой <code>payment_method_id</code>, <code>permission_revoked=False</code>. Сумма — по последнему успешному входящему платежу (оценка).</div>
+            </div></div>
+        </div>
     </div>
 
     <div class="card admx-card mb-4">
@@ -133,6 +149,10 @@
                 <dd>Средний доход на платящего пользователя за выбранный период.</dd>
                 <dt>Автосписание</dt>
                 <dd>RoboKassa по <code>PreviousInvoiceID</code> и платежи с пометкой «рекуррент» в описании.</dd>
+                <dt>Рекуррент на завтра (оценка)</dt>
+                <dd>Пользователи с <code>subscription_expiration</code> = сегодня, активная подписка, без отмены автосписания. Сумма — сумма последних успешных входящих платежей (прогноз, не гарантия).</dd>
+                <dt>Истекшая подписка + метод оплаты</dt>
+                <dd><code>subscription_expiration</code> раньше сегодняшней даты, заполнен <code>payment_method_id</code>, <code>permission_revoked=False</code>. Сумма в карточке — сумма последних успешных входящих платежей по этим пользователям (оценка).</dd>
             </dl>
         </div>
     </div>
@@ -506,6 +526,10 @@
         setText('admx-kpi-autodebit-n', k.autodebit_n ?? 0);
         setText('admx-kpi-autodebit-revenue', fmtMoney(k.autodebit_revenue));
         setText('admx-kpi-payment-logs-n', k.payment_related_logs_n ?? 0);
+        setText('admx-kpi-expected-recurring-revenue', fmtMoney(k.expected_recurring_tomorrow_revenue));
+        setText('admx-kpi-expected-recurring-n', k.expected_recurring_tomorrow_n ?? 0);
+        setText('admx-kpi-expired-paymethod-revenue', fmtMoney(k.expired_sub_paymethod_not_revoked_revenue));
+        setText('admx-kpi-expired-paymethod-n', k.expired_sub_paymethod_not_revoked_n ?? 0);
         const d = payload.kpi_deltas || {};
         setDelta('admx-delta-revenue-period', d.revenue_period_pct);
         setDelta('admx-delta-payments-period-n', d.payments_period_n_pct);
