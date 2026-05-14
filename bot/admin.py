@@ -311,7 +311,7 @@ class TelegramUserAdmin(admin.ModelAdmin):
         # TransactionInline,
         # VpnKeyInline,
         # WithdrawalRequestInline,
-        # LogInline
+        LogInline
     ]
 
     def referral_link(self, obj):

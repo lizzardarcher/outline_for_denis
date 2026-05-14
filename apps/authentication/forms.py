@@ -11,6 +11,24 @@ from bot.models import TelegramUser, UserProfile
 
 User = get_user_model()
 
+# Синтетический TelegramUser.user_id для регистрации только через сайт (без реального TG).
+# Верхняя часть signed int32 — безопасно, если значение окажется в колонке PostgreSQL INTEGER.
+# Реальные Telegram user id уже могут попадать в этот диапазон; цикл ниже гарантирует только уникальность в БД.
+_POSTGRES_INT32_MAX = 2_147_483_647
+_SITE_SYNTHETIC_TG_USER_ID_MIN = 2_050_000_001
+_SITE_SYNTHETIC_TG_USER_ID_MAX = _POSTGRES_INT32_MAX
+_MAX_SYNTHETIC_ID_ATTEMPTS = 256
+
+
+def _allocate_site_synthetic_telegram_user_id() -> int:
+    for _ in range(_MAX_SYNTHETIC_ID_ATTEMPTS):
+        candidate = random.randint(_SITE_SYNTHETIC_TG_USER_ID_MIN, _SITE_SYNTHETIC_TG_USER_ID_MAX)
+        if not TelegramUser.objects.filter(user_id=candidate).exists():
+            return candidate
+    raise ValidationError(
+        'Не удалось выделить идентификатор для аккаунта. Повторите попытку позже или обратитесь в поддержку.'
+    )
+
 
 class UserRegistrationForm(forms.Form):
     email = forms.EmailField(
@@ -51,9 +69,9 @@ class UserRegistrationForm(forms.Form):
         password = self.cleaned_data['password']
         user = User.objects.create_user(username=username, email=email, password=password)
 
-        # Create Fake TG User
+        # Синтетический TelegramUser (сайт без реального TG): user_id в резерве int32 + уникальность в БД.
         tg_user = TelegramUser.objects.create(
-            user_id=random.randint(2345678909800, 9923456789000),
+            user_id=_allocate_site_synthetic_telegram_user_id(),
             username=username,
             subscription_status=False,
         )
