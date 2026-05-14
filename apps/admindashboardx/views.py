@@ -1,5 +1,6 @@
 from collections import defaultdict
 import csv
+import logging
 from datetime import datetime, timedelta
 from urllib.parse import urlencode
 from decimal import Decimal
@@ -42,7 +43,11 @@ from bot.models import (
     WithdrawalRequest,
 )
 from .tasks import initialize_server_task
-from .panel_metrics import fetch_both_panels
+from .panel_metrics import (
+    celerity_error_payload,
+    fetch_both_panels,
+    marzban_error_payload,
+)
 
 class ServerForm(forms.ModelForm):
     class Meta:
@@ -313,7 +318,12 @@ class AdminDashboardIndexView(DashboardBaseView):
         activity_users_bot = len(ids_bot)
         activity_users_day = len(ids_site | ids_bot)
 
-        marzban_panel, celerity_panel = fetch_both_panels()
+        try:
+            marzban_panel, celerity_panel = fetch_both_panels()
+        except Exception:
+            logging.getLogger(__name__).exception("AdminDashboardX index: panel metrics")
+            marzban_panel = marzban_error_payload("Внутренняя ошибка при опросе Marzban (см. логи сервера).")
+            celerity_panel = celerity_error_payload("Внутренняя ошибка при опросе Celerity (см. логи сервера).")
 
         return {
             "stats_year": today.year,
@@ -355,7 +365,7 @@ class AdminDashboardIndexDataView(DashboardBaseView, View):
     page_key = "index"
 
     def get(self, request, *args, **kwargs):
-        cache_key = "admx:index:data:v2"
+        cache_key = "admx:index:data:v3"
         payload = cache.get(cache_key)
         if payload is None:
             payload = AdminDashboardIndexView._build_payload()
@@ -1774,6 +1784,7 @@ class CountriesListView(DashboardBaseView):
     template_name = "admindashboardx/countries.html"
     page_title = "AdminDashboardX · Страны"
     page_key = "countries"
+
 
     def dispatch(self, request, *args, **kwargs):
         if self._is_support():

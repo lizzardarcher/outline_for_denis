@@ -6,6 +6,7 @@ from django.conf import settings
 from bot.main import django_orm
 from bot.models import TelegramBot
 
+
 class MarzbanAPI:
     """
     Класс для взаимодействия с API Marzban для управления пользователями.
@@ -28,8 +29,11 @@ class MarzbanAPI:
         }
 
     def get_access_token(self):
-        _username = TelegramBot.objects.all().first().vless_unane
-        _password = TelegramBot.objects.all().first().vless_pwd
+        bot = TelegramBot.objects.all().first()
+        if not bot or not bot.vless_unane or not bot.vless_pwd:
+            return None
+        _username = bot.vless_unane
+        _password = bot.vless_pwd
         url = 'https://mvless.ru/api/admin/token'
         headers = {
             'accept': 'application/json',
@@ -44,7 +48,7 @@ class MarzbanAPI:
             'client_secret': 'string'
         }
 
-        response = requests.post(url, headers=headers, data=data)
+        response = requests.post(url, headers=headers, data=data, timeout=12)
 
         if response.status_code == 200:
             # Если запрос успешен, возвращаем access_token

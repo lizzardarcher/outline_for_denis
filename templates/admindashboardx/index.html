@@ -2,7 +2,6 @@
 
 {% block title %} · Главная{% endblock %}
 
-
 {% block content %}
     <div id="admx-index-root" data-api-url="{% url 'admindashboardx:index_data' %}"></div>
     <div class="row g-3 mb-4">
@@ -423,7 +422,7 @@
         }
         api.fetchJsonWithRetry(apiUrl, {
             retries: 1,
-            timeoutMs: 10000,
+            timeoutMs: 45000,
             fetchOptions: { headers: {'X-Requested-With': 'XMLHttpRequest'} },
         }).then((data) => {
             setRetryState(false);

@@ -38,22 +38,13 @@ def celerity_error_payload(message: str) -> Dict[str, Any]:
     }
 
 
-def fetch_both_panels(timeout_each: float = 14.0) -> Tuple[Dict[str, Any], Dict[str, Any]]:
-    """Параллельно опрашивает Marzban и Celerity, чтобы не удваивать время ожидания главной."""
-    import concurrent.futures
+def fetch_both_panels() -> Tuple[Dict[str, Any], Dict[str, Any]]:
+    """
+    Последовательно опрашивает Marzban и Celerity в потоке запроса Django
+    (ORM Marzban нельзя вызывать из воркеров ThreadPoolExecutor).
+    """
+    return fetch_marzban_dashboard_metrics(), fetch_celerity_dashboard_metrics()
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
-        f_mb = pool.submit(fetch_marzban_dashboard_metrics)
-        f_ce = pool.submit(fetch_celerity_dashboard_metrics)
-        try:
-            mb = f_mb.result(timeout=timeout_each)
-        except concurrent.futures.TimeoutError:
-            mb = marzban_error_payload(f"Таймаут Marzban ({int(timeout_each)} с)")
-        try:
-            ce = f_ce.result(timeout=timeout_each)
-        except concurrent.futures.TimeoutError:
-            ce = celerity_error_payload(f"Таймаут Celerity ({int(timeout_each)} с)")
-    return mb, ce
 
 def format_bytes_human(n: Optional[int]) -> str:
     if n is None or n < 0:
