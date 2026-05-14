@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from django.contrib.auth.models import User
+from django.conf import settings
 from django.db import models
 
 
@@ -65,7 +65,11 @@ class TelegramUser(models.Model):
 
 
 class UserProfile(models.Model):
-    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='profile',
+    )
     telegram_user = models.OneToOneField(TelegramUser, on_delete=models.SET_NULL, null=True, blank=True,
                                          related_name='user_profile')
     site_password_generated = models.BooleanField(
@@ -248,6 +252,7 @@ class VpnKey(models.Model):
     class Meta:
         verbose_name = 'VPN Ключ'
         verbose_name_plural = 'VPN Ключи'
+
 
 class Server(models.Model):
     hosting = models.CharField(max_length=1000, blank=True, null=True, verbose_name='Хостинг')

@@ -97,9 +97,9 @@
     <p class="mb-1">
         {{ request.user.profile.telegram_user.subscription_expiration|default:"—" }}
         {% if request.user.profile.telegram_user.subscription_status %}
-            <span class="badge badge-success ml-1">Активна</span>
+            <span class="badge badge-success text-success ml-1">Активна</span>
         {% else %}
-            <span class="badge badge-warning ml-1">Неактивна</span>
+            <span class="badge badge-warning text-danger ml-1">Неактивна</span>
         {% endif %}
     </p>
     {% if request.user.profile.telegram_user.subscription_status and request.user.profile.telegram_user.subscription_expiration %}
@@ -113,7 +113,7 @@
 <div class="mb-3">
     <p class="small text-muted mb-1">Доход по реферальной программе</p>
     <p class="mb-0">
-        <span class="badge badge-secondary">
+        <span class="badge badge-secondary text-dark">
             {% if request.user.profile.telegram_user.income %}{{ request.user.profile.telegram_user.income }}{% else %}0.00{% endif %} ₽
         </span>
     </p>

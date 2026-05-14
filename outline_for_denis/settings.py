@@ -91,8 +91,8 @@ INSTALLED_APPS = [
     'outline_for_denis.apps.OutlineForDenisConfig',
     'jazzmin',
     'django.contrib.auth',
-    'django.contrib.admin',
     'apps.authentication',
+    'django.contrib.admin',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
@@ -141,6 +141,7 @@ JAZZMIN_SETTINGS = {
 
     "icons": {
         "auth": "fas fa-users-cog",
+        "authentication.user": "fas fa-user",
         "auth.user": "fas fa-user",
         "bot.Logging": "fa-regular fa-font-awesome",
 
@@ -269,6 +270,7 @@ DATABASES = {
     # }
 }
 
+
 CELERY_BROKER_URL = 'redis://localhost:6379/0'  # URL Redis брокера
 CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'  # URL для хранения результатов задач Celery
 CELERY_ACCEPT_CONTENT = ['application/json']  # Формат принимаемых сообщений
@@ -303,6 +305,9 @@ CACHES = {
         }
     }
 }
+
+# AUTH_USER_MODEL = 'authentication.User'
+
 
 AUTH_PASSWORD_VALIDATORS = [
     {

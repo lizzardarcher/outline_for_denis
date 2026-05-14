@@ -4,13 +4,9 @@ from django.db import models
 
 class User(AbstractUser):
     """
-    Пользователь сайта / админки (таблица authentication_user).
-    PK — bigint (BigAutoField), не совпадает с Telegram user_id.
-
-    M2M на auth.Group / auth.Permission с отдельными related_name, чтобы модель
-    не конфликтовала с django.contrib.auth.models.User до переключения AUTH_USER_MODEL.
+    Пользователь сайта и админки (AUTH_USER_MODEL).
+    PK — bigint (BigAutoField); Telegram id хранится только в bot.TelegramUser.user_id.
     """
-
 
     id = models.BigAutoField(primary_key=True)
 

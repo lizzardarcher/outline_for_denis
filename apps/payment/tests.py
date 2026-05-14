@@ -1,5 +1,5 @@
 from django.test import TestCase, Client
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
 from django.urls import reverse
 from django.utils import timezone
 from django.conf import settings
@@ -21,6 +21,9 @@ from apps.payment.views.robokassa import (
     RobokassaFailView,
     get_robokassa_payment_info,
 )
+
+
+User = get_user_model()
 
 
 class RobokassaMD5Test(TestCase):

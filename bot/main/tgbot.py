@@ -5,7 +5,6 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 from urllib.parse import urlencode
 
-
 import requests
 from yookassa import Configuration, Payment
 
@@ -17,7 +16,7 @@ from telebot.async_telebot import AsyncTeleBot
 from telebot.asyncio_storage import StateMemoryStorage
 from telebot.types import InlineKeyboardButton, InlineKeyboardMarkup
 
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
 
 from bot.models import TelegramBot, Prices, TelegramMessage, Logging, ReferralSettings
 from bot.models import TelegramUser, UserProfile, TelegramReferral, VpnKey, Server, Country, IncomeInfo, \
@@ -32,6 +31,8 @@ from bot.main.celerity_key_issue import issue_hysteria2_tls_for_user, try_delete
 from apps.mtproxy.services import can_use_mtproxy, issue_or_get_key, reissue_key, revoke_all_user_keys
 
 from bot.main.utils.utils import return_matches, robokassa_md5
+
+User = get_user_model()
 
 bot = AsyncTeleBot(token=TelegramBot.objects.all().first().token, state_storage=StateMemoryStorage())
 bot.parse_mode = 'HTML'
@@ -83,9 +84,8 @@ async def send_pending_messages():
 
 def _ensure_site_user_for_telegram_user(tg_user: TelegramUser) -> User:
     """
-    Django User.pk = Telegram user_id (как до фазы A). Связь с Telegram — UserProfile.
+    Связка TelegramUser ↔ User через UserProfile. PK User — BigAutoField, не Telegram id.
     """
-    uid = int(tg_user.user_id)
     try:
         profile = tg_user.user_profile
     except UserProfile.DoesNotExist:
@@ -93,24 +93,18 @@ def _ensure_site_user_for_telegram_user(tg_user: TelegramUser) -> User:
     if profile is not None:
         return profile.user
 
-    try:
-        django_user = User.objects.get(id=uid)
-    except User.DoesNotExist:
-        base_username = (tg_user.username or tg_user.first_name or str(uid)).strip() or str(uid)
-        django_username = base_username
-        counter = 1
-        while User.objects.filter(username=django_username).exists():
-            django_username = f"{base_username}_{counter}"
-            counter += 1
-        django_user = User.objects.create_user(
-            id=uid,
-            username=django_username,
-            first_name=tg_user.first_name or '',
-            last_name=tg_user.last_name or '',
-            email='',
-            password=User.objects.make_random_password(length=10),
-        )
+    base_username = tg_user.username or f"tg_{tg_user.user_id}"
+    username = base_username
+    counter = 1
+    while User.objects.filter(username=username).exists():
+        username = f"{base_username}_{counter}"
+        counter += 1
 
+    django_user = User.objects.create_user(
+        username=username,
+        email='',
+        password=User.objects.make_random_password(length=12),
+    )
     try:
         orphan = UserProfile.objects.get(user=django_user)
     except UserProfile.DoesNotExist:

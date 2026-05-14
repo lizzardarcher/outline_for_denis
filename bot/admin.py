@@ -2,7 +2,9 @@ import os
 
 from django.conf import settings
 from django.contrib import admin
-from django.contrib.auth.models import Group, User
+from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Group
+from django.contrib.admin.sites import NotRegistered
 from django.db.models import Q, Sum
 from django.utils import timezone
 from django.utils.html import format_html
@@ -11,6 +13,7 @@ from django_admin_inline_paginator.admin import TabularInlinePaginated
 
 from bot.models import *
 
+User = get_user_model()
 DEBUG = settings.DEBUG
 SUPPORT_ACCOUNT = settings.SUPPORT_ACCOUNT
 DEV_ACCOUNT = settings.DEV_ACCOUNT
@@ -18,7 +21,10 @@ admin.site.site_header = "Админ Панель"
 admin.site.site_title = "DomVPN BOT"
 admin.site.index_title = "Добро пожаловать в DomVPN BOT Админ Панель"
 admin.site.unregister(Group)
-admin.site.unregister(User)
+try:
+    admin.site.unregister(User)
+except NotRegistered:
+    pass
 admin.site.unregister(CrontabSchedule)
 admin.site.unregister(SolarSchedule)
 admin.site.unregister(ClockedSchedule)
@@ -341,7 +347,7 @@ class TelegramUserAdmin(admin.ModelAdmin):
         if request.user.username == SUPPORT_ACCOUNT:
             return False
         if not DEBUG:
-            return False
+            return True
         else:
             return True
 
@@ -688,6 +694,7 @@ class UserAdmin(BaseAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False
+
 
 
 @admin.register(Prices)

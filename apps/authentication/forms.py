@@ -1,7 +1,7 @@
 import random
 
 from django import forms
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
 from django.contrib.auth.forms import PasswordResetForm, SetPasswordForm, PasswordChangeForm, AuthenticationForm, \
     UsernameField
 from django.core.exceptions import ValidationError, ObjectDoesNotExist
@@ -9,8 +9,9 @@ from django_recaptcha.fields import ReCaptchaField
 
 from bot.models import TelegramUser, UserProfile
 
+User = get_user_model()
+
 # Синтетический TelegramUser.user_id для регистрации только через сайт (без реального TG).
-# Верхняя часть signed int32 — безопасно, если значение окажется в колонке PostgreSQL INTEGER.
 # Реальные Telegram user id уже могут попадать в этот диапазон; цикл ниже гарантирует только уникальность в БД.
 _POSTGRES_INT32_MAX = 2_147_483_647
 _SITE_SYNTHETIC_TG_USER_ID_MIN = 2_050_000_001
