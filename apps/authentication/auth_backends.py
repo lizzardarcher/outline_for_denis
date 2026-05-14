@@ -3,8 +3,8 @@ import hmac
 
 from django.conf import settings
 from django.contrib import messages
-from django.contrib.auth.models import User
 from django.contrib.auth.backends import BaseBackend
+from django.contrib.auth.models import User
 from django.core.exceptions import ObjectDoesNotExist
 
 from bot.models import TelegramUser, UserProfile
@@ -22,9 +22,10 @@ class TelegramBackend(BaseBackend):
             last_name = data.get('last_name') or ''
             photo_url = data.get('photo_url') or ''
 
+
             try:
                 tg_user = TelegramUser.objects.get(user_id=user_id)
-            except ObjectDoesNotExist as e:
+            except ObjectDoesNotExist:
                 tg_user = TelegramUser.objects.create(
                     user_id=user_id,
                     username=username,
@@ -36,7 +37,7 @@ class TelegramBackend(BaseBackend):
 
             try:
                 user = User.objects.get(id=user_id)
-            except ObjectDoesNotExist as e:
+            except ObjectDoesNotExist:
                 user = User.objects.create_user(
                     id=user_id,
                     username=username or first_name,
@@ -47,17 +48,16 @@ class TelegramBackend(BaseBackend):
 
             try:
                 profile = UserProfile.objects.get(user=user)
-            except ObjectDoesNotExist as e:
-                profile = UserProfile.objects.create(user=user, telegram_user=tg_user)
+            except ObjectDoesNotExist:
+                UserProfile.objects.create(user=user, telegram_user=tg_user)
             else:
                 profile.telegram_user = tg_user
                 profile.save()
 
-            return user  # Возвращаем django пользователя.
+            return user
         except Exception as e:
-            messages.info(request,f"Error during telegram authentication: {e}")
+            messages.info(request, f"Error during telegram authentication: {e}")
             return None
-
 
     def check_telegram_data(self, data):
         """ Проверка подписи телеграм виджета. """

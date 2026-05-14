@@ -1,15 +1,13 @@
 import random
 
 from django import forms
-from django.contrib.auth import get_user_model
+from django.contrib.auth.models import User
 from django.contrib.auth.forms import PasswordResetForm, SetPasswordForm, PasswordChangeForm, AuthenticationForm, \
     UsernameField
 from django.core.exceptions import ValidationError, ObjectDoesNotExist
 from django_recaptcha.fields import ReCaptchaField
 
 from bot.models import TelegramUser, UserProfile
-
-User = get_user_model()
 
 # Синтетический TelegramUser.user_id для регистрации только через сайт (без реального TG).
 # Верхняя часть signed int32 — безопасно, если значение окажется в колонке PostgreSQL INTEGER.
@@ -53,6 +51,7 @@ class UserRegistrationForm(forms.Form):
             raise ValidationError('Пользователь с таким email уже зарегистрирован.')
         return email
 
+
     def clean(self):
         cleaned_data = super().clean()
         password = cleaned_data.get('password')
@@ -85,7 +84,6 @@ class UserRegistrationForm(forms.Form):
             profile.save()
 
         return user
-
 
 class LoginForm(AuthenticationForm):
     username = UsernameField(widget=forms.TextInput(attrs={"class": "form-control", "placeholder": "Имя пользователя"}))

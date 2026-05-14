@@ -90,8 +90,9 @@ CRYPTOBOT_ASSET_BOT = os.getenv("CRYPTOBOT_ASSET_BOT", "USDT")
 INSTALLED_APPS = [
     'outline_for_denis.apps.OutlineForDenisConfig',
     'jazzmin',
-    'django.contrib.admin',
     'django.contrib.auth',
+    'django.contrib.admin',
+    'apps.authentication',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
@@ -101,7 +102,6 @@ INSTALLED_APPS = [
     'django_admin_inline_paginator',
     'fontawesomefree',
     'apps.admindashboardx',
-    'apps.authentication',
     'apps.home',
     'apps.dashboard',
     'apps.payment',

@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 from urllib.parse import urlencode
 
+
 import requests
 from yookassa import Configuration, Payment
 
@@ -82,25 +83,42 @@ async def send_pending_messages():
 
 def _ensure_site_user_for_telegram_user(tg_user: TelegramUser) -> User:
     """
-    Гарантирует наличие Django-пользователя, связанного с TelegramUser через UserProfile.
-    Возвращает объект User.
+    Django User.pk = Telegram user_id (как до фазы A). Связь с Telegram — UserProfile.
     """
-    profile = getattr(tg_user, 'user_profile', None)
-    if profile and profile.user:
+    uid = int(tg_user.user_id)
+    try:
+        profile = tg_user.user_profile
+    except UserProfile.DoesNotExist:
+        profile = None
+    if profile is not None:
         return profile.user
 
-    base_username = tg_user.username or f"tg_{tg_user.user_id}"
-    username = base_username
-    counter = 1
-    while User.objects.filter(username=username).exists():
-        username = f"{base_username}_{counter}"
-        counter += 1
+    try:
+        django_user = User.objects.get(id=uid)
+    except User.DoesNotExist:
+        base_username = (tg_user.username or tg_user.first_name or str(uid)).strip() or str(uid)
+        django_username = base_username
+        counter = 1
+        while User.objects.filter(username=django_username).exists():
+            django_username = f"{base_username}_{counter}"
+            counter += 1
+        django_user = User.objects.create_user(
+            id=uid,
+            username=django_username,
+            first_name=tg_user.first_name or '',
+            last_name=tg_user.last_name or '',
+            email='',
+            password=User.objects.make_random_password(length=10),
+        )
 
-    django_user = User.objects.create_user(
-        username=username,
-        email='',
-    )
-    UserProfile.objects.create(user=django_user, telegram_user=tg_user)
+    try:
+        orphan = UserProfile.objects.get(user=django_user)
+    except UserProfile.DoesNotExist:
+        UserProfile.objects.create(user=django_user, telegram_user=tg_user)
+    else:
+        orphan.telegram_user = tg_user
+        orphan.save(update_fields=['telegram_user'])
+
     return django_user
 
 

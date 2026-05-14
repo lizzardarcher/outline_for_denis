@@ -1,7 +1,8 @@
 import os
 
+from django.conf import settings
 from django.contrib import admin
-from django.contrib.auth.models import Group
+from django.contrib.auth.models import Group, User
 from django.db.models import Q, Sum
 from django.utils import timezone
 from django.utils.html import format_html
