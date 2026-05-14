@@ -6,6 +6,7 @@ from django.conf import settings
 from bot.main import django_orm
 from bot.models import TelegramBot
 
+
 class MarzbanAPI:
     """
     Класс для взаимодействия с API Marzban для управления пользователями.
