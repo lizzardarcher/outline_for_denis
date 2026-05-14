@@ -6,7 +6,6 @@ from django.conf import settings
 from bot.main import django_orm
 from bot.models import TelegramBot
 
-
 class MarzbanAPI:
     """
     Класс для взаимодействия с API Marzban для управления пользователями.
@@ -153,14 +152,14 @@ class MarzbanAPI:
         success, result = self._make_request("DELETE", f"/user/{username}")
         return success, result
 
-    def list_users(self):
+    def list_users(self, offset=0, limit=500):
         """
-        Получает список всех пользователей.
+        Получает страницу списка пользователей (Marzban: query offset/limit).
 
         Returns:
-            tuple: (bool, list) - (Успешно ли получен список, список пользователей или сообщение об ошибке)
+            tuple: (bool, dict|list|str) — тело ответа; при пагинации обычно dict с ключами users и total.
         """
-        success, result = self._make_request("GET", "/users")
+        success, result = self._make_request("GET", f"/users?offset={int(offset)}&limit={int(limit)}")
         return success, result
 
     def add_node(self, ip, name, port=62050):

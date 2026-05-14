@@ -2,6 +2,7 @@
 
 {% block title %} · Главная{% endblock %}
 
+
 {% block content %}
     <div id="admx-index-root" data-api-url="{% url 'admindashboardx:index_data' %}"></div>
     <div class="row g-3 mb-4">
@@ -56,7 +57,22 @@
                             <span class="fw-semibold" id="admx-idx-users-day"><span class="admx-skeleton admx-skeleton-inline" aria-hidden="true"></span></span>
                         </li>
                     </ul>
-                    <div class="admx-kpi-foot mt-2 small">По дате регистрации (join_date)</div>
+                    <div class="small text-secondary mt-2 mb-1">Активность по логам (сегодня, разные пользователи)</div>
+                    <ul class="list-unstyled small mb-0 admx-stat-breakdown">
+                        <li class="d-flex justify-content-between py-1 border-top border-secondary border-opacity-25">
+                            <span class="text-secondary">Всего активных</span>
+                            <span class="fw-semibold" id="admx-idx-activity-day"><span class="admx-skeleton admx-skeleton-inline" aria-hidden="true"></span></span>
+                        </li>
+                        <li class="d-flex justify-content-between py-1 border-top border-secondary border-opacity-25">
+                            <span class="text-secondary">На сайте</span>
+                            <span class="fw-semibold" id="admx-idx-activity-site"><span class="admx-skeleton admx-skeleton-inline" aria-hidden="true"></span></span>
+                        </li>
+                        <li class="d-flex justify-content-between py-1 border-top border-secondary border-opacity-25">
+                            <span class="text-secondary">В боте</span>
+                            <span class="fw-semibold" id="admx-idx-activity-bot"><span class="admx-skeleton admx-skeleton-inline" aria-hidden="true"></span></span>
+                        </li>
+                    </ul>
+                    <div class="admx-kpi-foot mt-2 small">Регистрации — по <code>join_date</code>; активность — по записям в журнале с привязкой к пользователю (см. глоссарий).</div>
                 </div>
             </div>
         </div>
@@ -106,6 +122,65 @@
         </div>
     </div>
 
+    <div class="row g-3 mb-4">
+        <div class="col-12">
+            <div class="card admx-card h-100">
+                <div class="card-header d-flex align-items-center justify-content-between flex-wrap gap-2">
+                    <span>Marzban и C³ Celerity</span>
+                    <span class="small text-secondary">Данные с панелей управления (кэш до 1 мин.)</span>
+                </div>
+                <div class="card-body py-3">
+                    <div class="row g-4">
+                        <div class="col-md-6">
+                            <div class="small text-secondary text-uppercase mb-2">Marzban</div>
+                            <div class="small text-danger mb-2 d-none" id="admx-idx-mbz-err"></div>
+                            <ul class="list-unstyled small mb-0 admx-stat-breakdown">
+                                <li class="d-flex justify-content-between py-1 border-top border-secondary border-opacity-25">
+                                    <span class="text-secondary">Учётных записей в панели</span>
+                                    <span class="fw-semibold" id="admx-idx-mbz-users"><span class="admx-skeleton admx-skeleton-inline" aria-hidden="true"></span></span>
+                                </li>
+                                <li class="d-flex justify-content-between py-1 border-top border-secondary border-opacity-25">
+                                    <span class="text-secondary">Со статусом active</span>
+                                    <span class="fw-semibold" id="admx-idx-mbz-active"><span class="admx-skeleton admx-skeleton-inline" aria-hidden="true"></span></span>
+                                </li>
+                                <li class="d-flex justify-content-between py-1 border-top border-secondary border-opacity-25">
+                                    <span class="text-secondary">Онлайн за 24 ч <span class="text-secondary opacity-75">(online_at)</span></span>
+                                    <span class="fw-semibold" id="admx-idx-mbz-online"><span class="admx-skeleton admx-skeleton-inline" aria-hidden="true"></span></span>
+                                </li>
+                                <li class="d-flex justify-content-between py-1 border-top border-secondary border-opacity-25">
+                                    <span class="text-secondary">Сумма used_traffic</span>
+                                    <span class="fw-semibold" id="admx-idx-mbz-traffic"><span class="admx-skeleton admx-skeleton-inline" aria-hidden="true"></span></span>
+                                </li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="small text-secondary text-uppercase mb-2">C³ Celerity</div>
+                            <div class="small text-danger mb-2 d-none" id="admx-idx-cel-err"></div>
+                            <ul class="list-unstyled small mb-0 admx-stat-breakdown">
+                                <li class="d-flex justify-content-between py-1 border-top border-secondary border-opacity-25">
+                                    <span class="text-secondary">Пользователей в панели</span>
+                                    <span class="fw-semibold" id="admx-idx-cel-users"><span class="admx-skeleton admx-skeleton-inline" aria-hidden="true"></span></span>
+                                </li>
+                                <li class="d-flex justify-content-between py-1 border-top border-secondary border-opacity-25">
+                                    <span class="text-secondary">Включено (enabled)</span>
+                                    <span class="fw-semibold" id="admx-idx-cel-enabled"><span class="admx-skeleton admx-skeleton-inline" aria-hidden="true"></span></span>
+                                </li>
+                                <li class="d-flex justify-content-between py-1 border-top border-secondary border-opacity-25">
+                                    <span class="text-secondary">Онлайн / агрегат <span class="text-secondary opacity-75">(GET /stats, если есть)</span></span>
+                                    <span class="fw-semibold" id="admx-idx-cel-online"><span class="admx-skeleton admx-skeleton-inline" aria-hidden="true"></span></span>
+                                </li>
+                                <li class="d-flex justify-content-between py-1 border-top border-secondary border-opacity-25">
+                                    <span class="text-secondary">Трафик (stats или сумма tx+rx)</span>
+                                    <span class="fw-semibold" id="admx-idx-cel-traffic"><span class="admx-skeleton admx-skeleton-inline" aria-hidden="true"></span></span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="card admx-card mb-4">
         <div class="card-header">Мини-глоссарий метрик</div>
         <div class="card-body py-3">
@@ -116,6 +191,10 @@
                 <dd>Все записи в таблице транзакций, включая разные статусы и направления.</dd>
                 <dt>Списания</dt>
                 <dd>Количество заявок на вывод средств по периодам.</dd>
+                <dt>Активность по логам</dt>
+                <dd>За календарный сегодня: число разных пользователей с записями в журнале. «На сайте» — категория <code>web</code>. «В боте» — категория <code>bot</code>, действия в боте в <code>vpn</code> с тегом <code>[BOT]</code>, платежные шаги в <code>payment</code> с <code>[BOT]</code> (без строк <code>[CELERY]</code>). «Всего» — объединение множеств без двойного счёта.</dd>
+                <dt>Marzban / Celerity на главной</dt>
+                <dd>Запросы к API панелей: Marzban — список пользователей и сумма <code>used_traffic</code>, онлайн по полю <code>online_at</code> за последние 24 часа. Celerity — <code>GET /stats</code> (если панель отдаёт агрегаты) и список пользователей для суммы <code>traffic.tx+rx</code> и числа <code>enabled</code>.</dd>
             </dl>
         </div>
     </div>
@@ -358,6 +437,40 @@
             setText('admx-idx-users-total', data.users_total ?? 0);
             setText('admx-idx-users-month', data.users_month ?? 0);
             setText('admx-idx-users-day', data.users_day ?? 0);
+            setText('admx-idx-activity-day', data.activity_users_day ?? 0);
+            setText('admx-idx-activity-site', data.activity_users_site ?? 0);
+            setText('admx-idx-activity-bot', data.activity_users_bot ?? 0);
+            const mbz = data.marzban_panel || {};
+            const mbzErr = document.getElementById('admx-idx-mbz-err');
+            if (mbzErr) {
+                if (mbz.ok) {
+                    mbzErr.classList.add('d-none');
+                    mbzErr.textContent = '';
+                } else {
+                    mbzErr.classList.remove('d-none');
+                    mbzErr.textContent = mbz.error || 'Нет ответа от Marzban';
+                }
+            }
+            setText('admx-idx-mbz-users', mbz.ok ? String(mbz.users_total ?? '—') : '—');
+            setText('admx-idx-mbz-active', mbz.ok ? String(mbz.users_active ?? '—') : '—');
+            setText('admx-idx-mbz-online', mbz.ok ? String(mbz.online_24h ?? '—') : '—');
+            setText('admx-idx-mbz-traffic', mbz.ok ? (mbz.traffic_human || '—') : '—');
+            const cel = data.celerity_panel || {};
+            const celErr = document.getElementById('admx-idx-cel-err');
+            if (celErr) {
+                if (cel.ok) {
+                    celErr.classList.add('d-none');
+                    celErr.textContent = '';
+                } else {
+                    celErr.classList.remove('d-none');
+                    celErr.textContent = cel.error || 'Нет ответа от Celerity';
+                }
+            }
+            setText('admx-idx-cel-users', cel.ok ? String(cel.users_total ?? '—') : '—');
+            setText('admx-idx-cel-enabled', cel.ok ? String(cel.users_enabled ?? '—') : '—');
+            const celOn = (cel.online_hint != null && cel.online_hint !== undefined) ? String(cel.online_hint) : '—';
+            setText('admx-idx-cel-online', cel.ok ? celOn : '—');
+            setText('admx-idx-cel-traffic', cel.ok ? (cel.traffic_human || '—') : '—');
             setText('admx-idx-tx-total', data.tx_count_total ?? 0);
             setText('admx-idx-tx-month', data.tx_count_month ?? 0);
             setText('admx-idx-tx-day', data.tx_count_day ?? 0);

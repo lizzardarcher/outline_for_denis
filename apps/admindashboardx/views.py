@@ -42,6 +42,7 @@ from bot.models import (
     WithdrawalRequest,
 )
 from .tasks import initialize_server_task
+from .panel_metrics import fetch_both_panels
 
 class ServerForm(forms.ModelForm):
     class Meta:
@@ -292,6 +293,28 @@ class AdminDashboardIndexView(DashboardBaseView):
         since = now - timedelta(days=period_days)
         kpi_error_logs = Logging.objects.filter(datetime__gte=since, log_level__in=error_levels).count()
 
+        bot_activity_q = (
+            Q(category="bot")
+            | (
+                Q(category="vpn")
+                & Q(message__icontains="[BOT]")
+                & ~Q(message__icontains="[CELERY]")
+            )
+            | (
+                Q(category="payment")
+                & Q(message__icontains="[BOT]")
+                & ~Q(message__icontains="[CELERY]")
+            )
+        )
+        log_today = Logging.objects.filter(datetime__date=today, user_id__isnull=False)
+        ids_site = set(log_today.filter(category="web").values_list("user_id", flat=True).distinct())
+        ids_bot = set(log_today.filter(bot_activity_q).values_list("user_id", flat=True).distinct())
+        activity_users_site = len(ids_site)
+        activity_users_bot = len(ids_bot)
+        activity_users_day = len(ids_site | ids_bot)
+
+        marzban_panel, celerity_panel = fetch_both_panels()
+
         return {
             "stats_year": today.year,
             "period_days": period_days,
@@ -309,6 +332,11 @@ class AdminDashboardIndexView(DashboardBaseView):
             "wd_count_total": wd_row["wd_count_total"],
             "wd_count_month": wd_row["wd_count_month"],
             "wd_count_day": wd_row["wd_count_day"],
+            "activity_users_day": activity_users_day,
+            "activity_users_site": activity_users_site,
+            "activity_users_bot": activity_users_bot,
+            "marzban_panel": marzban_panel,
+            "celerity_panel": celerity_panel,
         }
 
     def get_context_data(self, **kwargs):
@@ -327,7 +355,7 @@ class AdminDashboardIndexDataView(DashboardBaseView, View):
     page_key = "index"
 
     def get(self, request, *args, **kwargs):
-        cache_key = "admx:index:data:v1"
+        cache_key = "admx:index:data:v2"
         payload = cache.get(cache_key)
         if payload is None:
             payload = AdminDashboardIndexView._build_payload()
@@ -400,7 +428,6 @@ def _admx_build_revenue_insights(
     payment_related_logs_n,
 ):
     bullets = []
-
 
     if corr_daily is not None:
         strength = _admx_corr_strength_label(corr_daily)
