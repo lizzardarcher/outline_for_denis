@@ -17,8 +17,10 @@
         <div>
             <h2 class="h5 mb-1">Доходы и пользователи</h2>
             <div class="small text-secondary">
-                Окно: <span id="admx-period-range"><span class="admx-skeleton admx-skeleton-inline" aria-hidden="true"></span></span>
-                · IncomeInfo (снимок): <strong id="admx-income-snapshot"><span class="admx-skeleton admx-skeleton-inline" aria-hidden="true"></span></strong>
+                Период: <span id="admx-period-range"><span class="admx-skeleton admx-skeleton-inline"
+                                                           aria-hidden="true"></span></span>
+                || Общее: <strong id="admx-income-snapshot"><span class="admx-skeleton admx-skeleton-inline"
+                                                                  aria-hidden="true"></span></strong>
             </div>
         </div>
         <form method="get" class="d-flex flex-wrap align-items-center gap-2">
@@ -28,131 +30,111 @@
                     <option value="{{ d }}" {% if range_days == d %}selected{% endif %}>{{ d }}</option>
                 {% endfor %}
             </select>
-            <label class="small text-secondary mb-0" for="id_payment_system">ПС</label>
-            <select name="payment_system" id="id_payment_system" class="form-select form-select-sm" style="width: auto;">
-                <option value="">Все</option>
-                {% for item in available_payment_systems %}
-                    <option value="{{ item.value }}" {% if selected_payment_system == item.value %}selected{% endif %}>{{ item.label }}</option>
-                {% endfor %}
-            </select>
-            <label class="small text-secondary mb-0" for="id_autodebit_mode">Автосписания</label>
-            <select name="autodebit_mode" id="id_autodebit_mode" class="form-select form-select-sm" style="width: auto;">
-                <option value="all" {% if selected_autodebit_mode == 'all' %}selected{% endif %}>Все</option>
-                <option value="only" {% if selected_autodebit_mode == 'only' %}selected{% endif %}>Только авто</option>
-                <option value="exclude" {% if selected_autodebit_mode == 'exclude' %}selected{% endif %}>Без авто</option>
-            </select>
-            <a class="btn btn-sm btn-outline-light" id="admx-export-csv-btn" href="{% url 'admindashboardx:revenue_analytics_export_csv' %}">Экспорт CSV</a>
-            <noscript><button type="submit" class="btn btn-sm btn-outline-light">OK</button></noscript>
+            <noscript>
+                <button type="submit" class="btn btn-sm btn-outline-light">OK</button>
+            </noscript>
         </form>
     </div>
 
     <div class="row g-3 mb-4">
         <div class="col-6 col-lg-4 col-xl-2">
-            <div class="card admx-card h-100"><div class="card-body py-3">
-                <div class="small text-secondary">Доход за период</div>
-                <div class="fs-5 fw-semibold" id="admx-kpi-revenue-period"><span class="admx-skeleton admx-skeleton-inline" aria-hidden="true"></span></div>
-                <div class="small mt-1 text-secondary" id="admx-delta-revenue-period">к пред. периоду: <span class="admx-skeleton admx-skeleton-inline" aria-hidden="true"></span></div>
-            </div></div>
-        </div>
-        <div class="col-6 col-lg-4 col-xl-2">
-            <div class="card admx-card h-100"><div class="card-body py-3">
-                <div class="small text-secondary">Успешных платежей</div>
-                <div class="fs-5 fw-semibold" id="admx-kpi-payments-period-n"><span class="admx-skeleton admx-skeleton-inline" aria-hidden="true"></span></div>
-                <div class="small mt-1 text-secondary" id="admx-delta-payments-period-n">к пред. периоду: <span class="admx-skeleton admx-skeleton-inline" aria-hidden="true"></span></div>
-            </div></div>
-        </div>
-        <div class="col-6 col-lg-4 col-xl-2">
-            <div class="card admx-card h-100"><div class="card-body py-3">
-                <div class="small text-secondary">Новых пользователей</div>
-                <div class="fs-5 fw-semibold" id="admx-kpi-new-users-period"><span class="admx-skeleton admx-skeleton-inline" aria-hidden="true"></span></div>
-                <div class="small mt-1 text-secondary" id="admx-delta-new-users-period">к пред. периоду: <span class="admx-skeleton admx-skeleton-inline" aria-hidden="true"></span></div>
-            </div></div>
-        </div>
-        <div class="col-6 col-lg-4 col-xl-2">
-            <div class="card admx-card h-100"><div class="card-body py-3">
-                <div class="small text-secondary">Плативших за период</div>
-                <div class="fs-5 fw-semibold" id="admx-kpi-payers-period"><span class="admx-skeleton admx-skeleton-inline" aria-hidden="true"></span></div>
-                <div class="small text-secondary mt-1">ARPU ≈ <span id="admx-kpi-arpu-period"><span class="admx-skeleton admx-skeleton-inline" aria-hidden="true"></span></span></div>
-                <div class="small mt-1 text-secondary" id="admx-delta-arpu-period">ARPU к пред. периоду: <span class="admx-skeleton admx-skeleton-inline" aria-hidden="true"></span></div>
-            </div></div>
-        </div>
-        <div class="col-6 col-lg-4 col-xl-2">
-            <div class="card admx-card h-100"><div class="card-body py-3">
-                <div class="small text-secondary">Конверсия (все время)</div>
-                <div class="fs-5 fw-semibold" id="admx-kpi-conversion-all"><span class="admx-skeleton admx-skeleton-inline" aria-hidden="true"></span></div>
-                <div class="small text-secondary mt-1"><span id="admx-kpi-paid-among-all"><span class="admx-skeleton admx-skeleton-inline" aria-hidden="true"></span></span> / <span id="admx-kpi-users-total"><span class="admx-skeleton admx-skeleton-inline" aria-hidden="true"></span></span> оплатили</div>
-            </div></div>
-        </div>
-        <div class="col-6 col-lg-4 col-xl-2">
-            <div class="card admx-card h-100"><div class="card-body py-3">
-                <div class="small text-secondary">Когорта периода</div>
-                <div class="fs-5 fw-semibold" id="admx-kpi-cohort-conversion"><span class="admx-skeleton admx-skeleton-inline" aria-hidden="true"></span></div>
-                <div class="small text-secondary mt-1"><span id="admx-kpi-paid-among-new"><span class="admx-skeleton admx-skeleton-inline" aria-hidden="true"></span></span> / <span id="admx-kpi-new-users-period-2"><span class="admx-skeleton admx-skeleton-inline" aria-hidden="true"></span></span> с оплатой</div>
-            </div></div>
-        </div>
-        <div class="col-6 col-lg-4 col-xl-2">
-            <div class="card admx-card h-100"><div class="card-body py-3">
-                <div class="small text-secondary">Рекуррент на завтра (оценка)</div>
-                <div class="fs-5 fw-semibold" id="admx-kpi-expected-recurring-revenue"><span class="admx-skeleton admx-skeleton-inline" aria-hidden="true"></span></div>
-                <div class="small text-secondary mt-1"><span id="admx-kpi-expected-recurring-n"><span class="admx-skeleton admx-skeleton-inline" aria-hidden="true"></span></span> пользователей</div>
-                <div class="small text-secondary mt-2 lh-sm">Сегодня последний день по <code>subscription_expiration</code>, подписка активна, <code>permission_revoked=False</code>. Сумма — по последнему успешному входящему платежу (без истории — 0 ₽).</div>
-            </div></div>
-        </div>
-        <div class="col-6 col-lg-4 col-xl-2">
-            <div class="card admx-card h-100"><div class="card-body py-3">
-                <div class="small text-secondary">Истекшая подписка, метод есть</div>
-                <div class="fs-5 fw-semibold" id="admx-kpi-expired-paymethod-revenue"><span class="admx-skeleton admx-skeleton-inline" aria-hidden="true"></span></div>
-                <div class="small text-secondary mt-1"><span id="admx-kpi-expired-paymethod-n"><span class="admx-skeleton admx-skeleton-inline" aria-hidden="true"></span></span> пользователей</div>
-                <div class="small text-secondary mt-2 lh-sm"><code>subscription_expiration</code> &lt; сегодня, непустой <code>payment_method_id</code>, <code>permission_revoked=False</code>. Сумма — по последнему успешному входящему платежу (оценка).</div>
-            </div></div>
-        </div>
-    </div>
-
-    <div class="card admx-card mb-4">
-        <div class="card-header">Соотношение: новые пользователи и положительные транзакции по дням</div>
-        <div class="card-body">
-            <div class="admx-chart-wrap position-relative">
-                <div id="admx-loader-users-tx" class="admx-skeleton admx-skeleton-chart" aria-hidden="true"></div>
-                <canvas id="admxUsersTxDaily"></canvas>
+            <div class="card admx-card h-100">
+                <div class="card-body py-3">
+                    <div class="small text-secondary">Доход за период</div>
+                    <div class="fs-5 fw-semibold" id="admx-kpi-revenue-period"><span
+                            class="admx-skeleton admx-skeleton-inline" aria-hidden="true"></span></div>
+                    <div class="small mt-1 text-secondary" id="admx-delta-revenue-period">к пред. периоду: <span
+                            class="admx-skeleton admx-skeleton-inline" aria-hidden="true"></span></div>
+                </div>
             </div>
         </div>
-    </div>
-
-    <div class="card admx-card mb-4">
-        <div class="card-header">Автовыводы по данным периода</div>
-        <div class="card-body py-3">
-            <ul class="small mb-0 ps-3 admx-insights-list" id="admx-insights-list">
-                <li class="mb-2 text-secondary"><span class="admx-skeleton admx-skeleton-sm me-2 d-inline-block align-middle" aria-hidden="true"></span>Загрузка...</li>
-            </ul>
+        <div class="col-6 col-lg-4 col-xl-2">
+            <div class="card admx-card h-100">
+                <div class="card-body py-3">
+                    <div class="small text-secondary">Успешных платежей</div>
+                    <div class="fs-5 fw-semibold" id="admx-kpi-payments-period-n"><span
+                            class="admx-skeleton admx-skeleton-inline" aria-hidden="true"></span></div>
+                    <div class="small mt-1 text-secondary" id="admx-delta-payments-period-n">к пред. периоду: <span
+                            class="admx-skeleton admx-skeleton-inline" aria-hidden="true"></span></div>
+                </div>
+            </div>
         </div>
-    </div>
-
-    <div class="card admx-card mb-4">
-        <div class="card-header">Алерты периода</div>
-        <div class="card-body py-3">
-            <ul class="small mb-0 ps-3" id="admx-alerts-list">
-                <li class="mb-2 text-secondary"><span class="admx-skeleton admx-skeleton-sm me-2 d-inline-block align-middle" aria-hidden="true"></span>Загрузка...</li>
-            </ul>
+        <div class="col-6 col-lg-4 col-xl-2">
+            <div class="card admx-card h-100">
+                <div class="card-body py-3">
+                    <div class="small text-secondary">Новых пользователей</div>
+                    <div class="fs-5 fw-semibold" id="admx-kpi-new-users-period"><span
+                            class="admx-skeleton admx-skeleton-inline" aria-hidden="true"></span></div>
+                    <div class="small mt-1 text-secondary" id="admx-delta-new-users-period">к пред. периоду: <span
+                            class="admx-skeleton admx-skeleton-inline" aria-hidden="true"></span></div>
+                </div>
+            </div>
         </div>
-    </div>
-
-    <div class="card admx-card mb-4">
-        <div class="card-header">Мини-глоссарий метрик</div>
-        <div class="card-body py-3">
-            <dl class="admx-glossary small mb-0">
-                <dt>Положительная транзакция</dt>
-                <dd>Транзакция со статусом <code>succeeded</code> или <code>paid=True</code> в выбранном окне.</dd>
-                <dt>Когортная конверсия</dt>
-                <dd>Доля новых пользователей периода, у которых есть хотя бы одна положительная транзакция.</dd>
-                <dt>ARPU</dt>
-                <dd>Средний доход на платящего пользователя за выбранный период.</dd>
-                <dt>Автосписание</dt>
-                <dd>RoboKassa по <code>PreviousInvoiceID</code> и платежи с пометкой «рекуррент» в описании.</dd>
-                <dt>Рекуррент на завтра (оценка)</dt>
-                <dd>Пользователи с <code>subscription_expiration</code> = сегодня, активная подписка, без отмены автосписания. Сумма — сумма последних успешных входящих платежей (прогноз, не гарантия).</dd>
-                <dt>Истекшая подписка + метод оплаты</dt>
-                <dd><code>subscription_expiration</code> раньше сегодняшней даты, заполнен <code>payment_method_id</code>, <code>permission_revoked=False</code>. Сумма в карточке — сумма последних успешных входящих платежей по этим пользователям (оценка).</dd>
-            </dl>
+        <div class="col-6 col-lg-4 col-xl-2">
+            <div class="card admx-card h-100">
+                <div class="card-body py-3">
+                    <div class="small text-secondary">Плативших за период</div>
+                    <div class="fs-5 fw-semibold" id="admx-kpi-payers-period"><span
+                            class="admx-skeleton admx-skeleton-inline" aria-hidden="true"></span></div>
+                    <div class="small text-secondary mt-1">Среднее с одного юзера ≈ <span
+                            id="admx-kpi-arpu-period"><span class="admx-skeleton admx-skeleton-inline"
+                                                            aria-hidden="true"></span></span></div>
+                    <div class="small mt-1 text-secondary" id="admx-delta-arpu-period">ARPU к пред. периоду: <span
+                            class="admx-skeleton admx-skeleton-inline" aria-hidden="true"></span></div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-lg-4 col-xl-2">
+            <div class="card admx-card h-100">
+                <div class="card-body py-3">
+                    <div class="small text-secondary">Конверсия (все время)</div>
+                    <div class="fs-5 fw-semibold" id="admx-kpi-conversion-all"><span
+                            class="admx-skeleton admx-skeleton-inline" aria-hidden="true"></span></div>
+                    <div class="small text-secondary mt-1"><span id="admx-kpi-paid-among-all"><span
+                            class="admx-skeleton admx-skeleton-inline" aria-hidden="true"></span></span> / <span
+                            id="admx-kpi-users-total"><span class="admx-skeleton admx-skeleton-inline"
+                                                            aria-hidden="true"></span></span> оплатили
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-lg-4 col-xl-2">
+            <div class="card admx-card h-100">
+                <div class="card-body py-3">
+                    <div class="small text-secondary">Конверсия (периода)</div>
+                    <div class="fs-5 fw-semibold" id="admx-kpi-cohort-conversion"><span
+                            class="admx-skeleton admx-skeleton-inline" aria-hidden="true"></span></div>
+                    <div class="small text-secondary mt-1"><span id="admx-kpi-paid-among-new"><span
+                            class="admx-skeleton admx-skeleton-inline" aria-hidden="true"></span></span> / <span
+                            id="admx-kpi-new-users-period-2"><span class="admx-skeleton admx-skeleton-inline"
+                                                                   aria-hidden="true"></span></span> с оплатой
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-lg-4 col-xl-2">
+            <div class="card admx-card h-100">
+                <div class="card-body py-3">
+                    <div class="small text-secondary">Автоплатежи на завтра (оценка)</div>
+                    <div class="fs-5 fw-semibold" id="admx-kpi-expected-recurring-revenue"><span
+                            class="admx-skeleton admx-skeleton-inline" aria-hidden="true"></span></div>
+                    <div class="small text-secondary mt-1"><span id="admx-kpi-expected-recurring-n"><span
+                            class="admx-skeleton admx-skeleton-inline" aria-hidden="true"></span></span> пользователей
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-lg-4 col-xl-2">
+            <div class="card admx-card h-100">
+                <div class="card-body py-3">
+                    <div class="small text-secondary">Общее предполагаемое автосписание</div>
+                    <div class="fs-5 fw-semibold" id="admx-kpi-expired-paymethod-revenue"><span
+                            class="admx-skeleton admx-skeleton-inline" aria-hidden="true"></span></div>
+                    <div class="small text-secondary mt-1"><span id="admx-kpi-expired-paymethod-n"><span
+                            class="admx-skeleton admx-skeleton-inline" aria-hidden="true"></span></span> пользователей
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -168,6 +150,7 @@
                 </div>
             </div>
         </div>
+
         <div class="col-12 col-xl-4">
             <div class="card admx-card h-100">
                 <div class="card-header">Доход по платёжным системам</div>
@@ -182,20 +165,37 @@
     </div>
 
     <div class="card admx-card mb-4">
-        <div class="card-header">Автосписания по платёжным системам</div>
+        <div class="card-header">Автовыводы по данным периода</div>
+        <div class="card-body py-3">
+            <ul class="small mb-0 ps-3 admx-insights-list" id="admx-insights-list">
+                <li class="mb-2 text-secondary"><span
+                        class="admx-skeleton admx-skeleton-sm me-2 d-inline-block align-middle"
+                        aria-hidden="true"></span>Загрузка...
+                </li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="card admx-card mb-4">
+        <div class="card-header">Алерты периода</div>
+        <div class="card-body py-3">
+            <ul class="small mb-0 ps-3" id="admx-alerts-list">
+                <li class="mb-2 text-secondary"><span
+                        class="admx-skeleton admx-skeleton-sm me-2 d-inline-block align-middle"
+                        aria-hidden="true"></span>Загрузка...
+                </li>
+            </ul>
+        </div>
+    </div>
+
+
+
+    <div class="card admx-card mb-4">
+        <div class="card-header">Соотношение: новые пользователи и положительные транзакции по дням</div>
         <div class="card-body">
-            <p class="small text-secondary mb-3">
-                Учитываются успешные входящие платежи: RoboKassa — с непустым <code>PreviousInvoiceID</code>;
-                ЮKassa и др. — если в описании есть «рекуррент» (в т.ч. автоплатежи из Celery).
-                За период всего: <strong id="admx-kpi-autodebit-n"><span class="admx-skeleton admx-skeleton-inline" aria-hidden="true"></span></strong> шт. на <strong id="admx-kpi-autodebit-revenue"><span class="admx-skeleton admx-skeleton-inline" aria-hidden="true"></span></strong>.
-            </p>
-            <div class="table-responsive">
-                <table class="table table-dark table-sm align-middle mb-0 admx-table">
-                    <thead><tr><th>Система</th><th class="text-end">Шт.</th><th class="text-end">Сумма</th></tr></thead>
-                    <tbody id="admx-recurring-by-ps-body">
-                    <tr><td colspan="3" class="text-center text-secondary"><span class="admx-skeleton admx-skeleton-sm me-2 d-inline-block align-middle" aria-hidden="true"></span>Загрузка...</td></tr>
-                    </tbody>
-                </table>
+            <div class="admx-chart-wrap position-relative">
+                <div id="admx-loader-users-tx" class="admx-skeleton admx-skeleton-chart" aria-hidden="true"></div>
+                <canvas id="admxUsersTxDaily"></canvas>
             </div>
         </div>
     </div>
@@ -204,7 +204,8 @@
         <div class="card-header d-flex flex-wrap justify-content-between gap-2 align-items-center">
             <span>Платёжные системы: успехи, отказы, ожидание</span>
             {% if request.user.is_superuser %}
-                <a class="btn btn-sm btn-outline-light" href="{% url 'admindashboardx:users_analytics_export_xlsx' %}">Экспорт когорт пользователей (Excel)</a>
+                <a class="btn btn-sm btn-outline-light" href="{% url 'admindashboardx:users_analytics_export_xlsx' %}">Экспорт
+                    когорт пользователей (Excel)</a>
             {% endif %}
         </div>
         <div class="table-responsive">
@@ -220,7 +221,12 @@
                 </tr>
                 </thead>
                 <tbody id="admx-by-ps-body">
-                <tr><td colspan="6" class="text-center text-secondary"><span class="admx-skeleton admx-skeleton-sm me-2 d-inline-block align-middle" aria-hidden="true"></span>Загрузка...</td></tr>
+                <tr>
+                    <td colspan="6" class="text-center text-secondary"><span
+                            class="admx-skeleton admx-skeleton-sm me-2 d-inline-block align-middle"
+                            aria-hidden="true"></span>Загрузка...
+                    </td>
+                </tr>
                 </tbody>
             </table>
         </div>
@@ -231,12 +237,25 @@
             <div class="card admx-card h-100">
                 <div class="card-header">Основные ошибки в логах (WARNING / FATAL)</div>
                 <div class="card-body py-2">
-                    <p class="small text-secondary mb-2">Категория «Платежи» за период: <strong id="admx-kpi-payment-logs-n"><span class="admx-skeleton admx-skeleton-inline" aria-hidden="true"></span></strong> записей.</p>
+                    <p class="small text-secondary mb-2">Категория «Платежи» за период: <strong
+                            id="admx-kpi-payment-logs-n"><span class="admx-skeleton admx-skeleton-inline"
+                                                               aria-hidden="true"></span></strong> записей.</p>
                     <div class="table-responsive">
                         <table class="table table-dark table-sm align-middle mb-0 admx-table">
-                            <thead><tr><th>Уровень</th><th>Категория</th><th class="text-end">Кол-во</th></tr></thead>
+                            <thead>
+                            <tr>
+                                <th>Уровень</th>
+                                <th>Категория</th>
+                                <th class="text-end">Кол-во</th>
+                            </tr>
+                            </thead>
                             <tbody id="admx-log-issues-body">
-                            <tr><td colspan="3" class="text-center text-secondary"><span class="admx-skeleton admx-skeleton-sm me-2 d-inline-block align-middle" aria-hidden="true"></span>Загрузка...</td></tr>
+                            <tr>
+                                <td colspan="3" class="text-center text-secondary"><span
+                                        class="admx-skeleton admx-skeleton-sm me-2 d-inline-block align-middle"
+                                        aria-hidden="true"></span>Загрузка...
+                                </td>
+                            </tr>
                             </tbody>
                         </table>
                     </div>
@@ -249,14 +268,27 @@
                 <div class="card-header">Последние неуспешные платежи за период</div>
                 <div class="table-responsive">
                     <table class="table table-dark table-sm align-middle mb-0 admx-table">
-                        <thead><tr><th>Время</th><th>ПС</th><th>Сумма</th><th>Статус</th></tr></thead>
+                        <thead>
+                        <tr>
+                            <th>Время</th>
+                            <th>ПС</th>
+                            <th>Сумма</th>
+                            <th>Статус</th>
+                        </tr>
+                        </thead>
                         <tbody id="admx-failed-recent-body">
-                        <tr><td colspan="4" class="text-center text-secondary"><span class="admx-skeleton admx-skeleton-sm me-2 d-inline-block align-middle" aria-hidden="true"></span>Загрузка...</td></tr>
+                        <tr>
+                            <td colspan="4" class="text-center text-secondary"><span
+                                    class="admx-skeleton admx-skeleton-sm me-2 d-inline-block align-middle"
+                                    aria-hidden="true"></span>Загрузка...
+                            </td>
+                        </tr>
                         </tbody>
                     </table>
                 </div>
                 <div class="card-body pt-2 border-top border-secondary border-opacity-25">
-                    <a class="btn btn-sm btn-outline-light" href="{% url 'admindashboardx:transactions' %}">Все транзакции</a>
+                    <a class="btn btn-sm btn-outline-light" href="{% url 'admindashboardx:transactions' %}">Все
+                        транзакции</a>
                 </div>
             </div>
         </div>
@@ -265,420 +297,432 @@
 {% endblock %}
 
 {% block extrascript %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-<script>
-(function () {
-    const textMuted = '#abb5c7';
-    const grid = 'rgba(255,255,255,0.06)';
-    const legendColor = '#e8edf7';
-    const root = document.getElementById('admx-revenue-root');
-    if (!root) return;
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script>
+        (function () {
+            const textMuted = '#abb5c7';
+            const grid = 'rgba(255,255,255,0.06)';
+            const legendColor = '#e8edf7';
+            const root = document.getElementById('admx-revenue-root');
+            if (!root) return;
 
-    const apiUrl = root.getAttribute('data-api-url');
-    const exportCsvBaseUrl = root.getAttribute('data-export-csv-url') || '';
-    const txListUrl = root.getAttribute('data-tx-detail-base') || '';
-    const daysSelect = document.getElementById('id_days');
-    const paymentSystemSelect = document.getElementById('id_payment_system');
-    const autodebitModeSelect = document.getElementById('id_autodebit_mode');
-    const exportCsvBtn = document.getElementById('admx-export-csv-btn');
+            const apiUrl = root.getAttribute('data-api-url');
+            const exportCsvBaseUrl = root.getAttribute('data-export-csv-url') || '';
+            const txListUrl = root.getAttribute('data-tx-detail-base') || '';
+            const daysSelect = document.getElementById('id_days');
+            const paymentSystemSelect = document.getElementById('id_payment_system');
+            const autodebitModeSelect = document.getElementById('id_autodebit_mode');
+            const exportCsvBtn = document.getElementById('admx-export-csv-btn');
 
-    const fmtMoney = (value) => `${Number(value || 0).toLocaleString('ru-RU', {minimumFractionDigits: 2, maximumFractionDigits: 2})} ₽`;
-    const fmtPct = (value) => `${Number(value || 0).toFixed(1)}%`;
-    const setText = (id, value) => {
-        const el = document.getElementById(id);
-        if (el) el.textContent = value;
-    };
-    const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (m) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;', "'": '&#39;'}[m]));
-    const fmtDelta = (value) => (value === null || value === undefined ? '—' : `${value >= 0 ? '+' : ''}${Number(value).toFixed(1)}%`);
-    const setDelta = (id, value) => {
-        const el = document.getElementById(id);
-        if (!el) return;
-        if (value === null || value === undefined) {
-            el.innerHTML = 'к пред. периоду: <span class="text-secondary">н/д</span>';
-            return;
-        }
-        const cls = value >= 0 ? 'text-success' : 'text-danger';
-        el.innerHTML = `к пред. периоду: <span class="${cls}">${fmtDelta(value)}</span>`;
-    };
-    const renderRows = (tbodyId, rowsHtml, emptyColspan, emptyText) => {
-        const tbody = document.getElementById(tbodyId);
-        if (!tbody) return;
-        tbody.innerHTML = rowsHtml.length ? rowsHtml.join('') : `<tr><td colspan="${emptyColspan}" class="text-center text-secondary">${emptyText}</td></tr>`;
-    };
-    const hideLoader = (id) => {
-        const el = document.getElementById(id);
-        if (el) el.style.display = 'none';
-    };
-    const showLoader = (id) => {
-        const el = document.getElementById(id);
-        if (el) el.style.display = '';
-    };
-    const setRetryState = (show, filters) => {
-        const hostId = 'admx-revenue-retry-host';
-        let host = document.getElementById(hostId);
-        if (!host) {
-            host = document.createElement('div');
-            host.id = hostId;
-            host.className = 'mt-3';
-            const anchor = document.getElementById('admx-insights-list');
-            if (anchor && anchor.parentElement) anchor.parentElement.appendChild(host);
-        }
-        if (!host) return;
-        host.innerHTML = show
-            ? '<button type="button" class="btn btn-sm btn-outline-light" id="admx-revenue-retry-btn">Повторить</button>'
-            : '';
-        if (show) {
-            const btn = document.getElementById('admx-revenue-retry-btn');
-            if (btn) btn.addEventListener('click', () => loadData(filters, 1));
-        }
-    };
-    const renderLoadingRows = () => {
-        renderRows('admx-recurring-by-ps-body', [], 3, '<span class="admx-skeleton admx-skeleton-sm me-2 d-inline-block align-middle" aria-hidden="true"></span>Загрузка...');
-        renderRows('admx-by-ps-body', [], 6, '<span class="admx-skeleton admx-skeleton-sm me-2 d-inline-block align-middle" aria-hidden="true"></span>Загрузка...');
-        renderRows('admx-log-issues-body', [], 3, '<span class="admx-skeleton admx-skeleton-sm me-2 d-inline-block align-middle" aria-hidden="true"></span>Загрузка...');
-        renderRows('admx-failed-recent-body', [], 4, '<span class="admx-skeleton admx-skeleton-sm me-2 d-inline-block align-middle" aria-hidden="true"></span>Загрузка...');
-        const alertsEl = document.getElementById('admx-alerts-list');
-        if (alertsEl) alertsEl.innerHTML = '<li class="mb-2 text-secondary"><span class="admx-skeleton admx-skeleton-sm me-2 d-inline-block align-middle" aria-hidden="true"></span>Загрузка...</li>';
-    };
+            const fmtMoney = (value) => `${Number(value || 0).toLocaleString('ru-RU', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            })} ₽`;
+            const fmtPct = (value) => `${Number(value || 0).toFixed(1)}%`;
+            const setText = (id, value) => {
+                const el = document.getElementById(id);
+                if (el) el.textContent = value;
+            };
+            const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (m) => ({
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#39;'
+            }[m]));
+            const fmtDelta = (value) => (value === null || value === undefined ? '-' : `${value >= 0 ? '+' : ''}${Number(value).toFixed(1)}%`);
+            const setDelta = (id, value) => {
+                const el = document.getElementById(id);
+                if (!el) return;
+                if (value === null || value === undefined) {
+                    el.innerHTML = 'к пред. периоду: <span class="text-secondary">н/д</span>';
+                    return;
+                }
+                const cls = value >= 0 ? 'text-success' : 'text-danger';
+                el.innerHTML = `к пред. периоду: <span class="${cls}">${fmtDelta(value)}</span>`;
+            };
+            const renderRows = (tbodyId, rowsHtml, emptyColspan, emptyText) => {
+                const tbody = document.getElementById(tbodyId);
+                if (!tbody) return;
+                tbody.innerHTML = rowsHtml.length ? rowsHtml.join('') : `<tr><td colspan="${emptyColspan}" class="text-center text-secondary">${emptyText}</td></tr>`;
+            };
+            const hideLoader = (id) => {
+                const el = document.getElementById(id);
+                if (el) el.style.display = 'none';
+            };
+            const showLoader = (id) => {
+                const el = document.getElementById(id);
+                if (el) el.style.display = '';
+            };
+            const setRetryState = (show, filters) => {
+                const hostId = 'admx-revenue-retry-host';
+                let host = document.getElementById(hostId);
+                if (!host) {
+                    host = document.createElement('div');
+                    host.id = hostId;
+                    host.className = 'mt-3';
+                    const anchor = document.getElementById('admx-insights-list');
+                    if (anchor && anchor.parentElement) anchor.parentElement.appendChild(host);
+                }
+                if (!host) return;
+                host.innerHTML = show
+                    ? '<button type="button" class="btn btn-sm btn-outline-light" id="admx-revenue-retry-btn">Повторить</button>'
+                    : '';
+                if (show) {
+                    const btn = document.getElementById('admx-revenue-retry-btn');
+                    if (btn) btn.addEventListener('click', () => loadData(filters, 1));
+                }
+            };
+            const renderLoadingRows = () => {
+                renderRows('admx-recurring-by-ps-body', [], 3, '<span class="admx-skeleton admx-skeleton-sm me-2 d-inline-block align-middle" aria-hidden="true"></span>Загрузка...');
+                renderRows('admx-by-ps-body', [], 6, '<span class="admx-skeleton admx-skeleton-sm me-2 d-inline-block align-middle" aria-hidden="true"></span>Загрузка...');
+                renderRows('admx-log-issues-body', [], 3, '<span class="admx-skeleton admx-skeleton-sm me-2 d-inline-block align-middle" aria-hidden="true"></span>Загрузка...');
+                renderRows('admx-failed-recent-body', [], 4, '<span class="admx-skeleton admx-skeleton-sm me-2 d-inline-block align-middle" aria-hidden="true"></span>Загрузка...');
+                const alertsEl = document.getElementById('admx-alerts-list');
+                if (alertsEl) alertsEl.innerHTML = '<li class="mb-2 text-secondary"><span class="admx-skeleton admx-skeleton-sm me-2 d-inline-block align-middle" aria-hidden="true"></span>Загрузка...</li>';
+            };
 
-    let mixChart = null;
-    let psChart = null;
-    let usersTxChart = null;
+            let mixChart = null;
+            let psChart = null;
+            let usersTxChart = null;
 
-    function renderCharts(payload) {
-        const daily = (payload.charts || {}).daily || {};
-        const psData = (payload.charts || {}).payment_system_revenue || {};
-        const usersTxData = (payload.charts || {}).users_vs_positive_tx || {};
+            function renderCharts(payload) {
+                const daily = (payload.charts || {}).daily || {};
+                const psData = (payload.charts || {}).payment_system_revenue || {};
+                const usersTxData = (payload.charts || {}).users_vs_positive_tx || {};
 
-        const ctxMix = document.getElementById('admxMixDaily');
-        if (ctxMix && daily.labels && daily.labels.length) {
-            if (mixChart) mixChart.destroy();
-            mixChart = new Chart(ctxMix, {
-                type: 'bar',
-                data: {
-                    labels: daily.labels,
-                    datasets: [
-                        {
-                            type: 'bar',
-                            label: 'Доход, ₽',
-                            data: daily.revenue,
-                            backgroundColor: 'rgba(124, 156, 255, 0.42)',
-                            borderColor: 'rgba(124, 156, 255, 0.85)',
-                            borderWidth: 1,
-                            yAxisID: 'y',
-                            order: 2,
+                const ctxMix = document.getElementById('admxMixDaily');
+                if (ctxMix && daily.labels && daily.labels.length) {
+                    if (mixChart) mixChart.destroy();
+                    mixChart = new Chart(ctxMix, {
+                        type: 'bar',
+                        data: {
+                            labels: daily.labels,
+                            datasets: [
+                                {
+                                    type: 'bar',
+                                    label: 'Доход, ₽',
+                                    data: daily.revenue,
+                                    backgroundColor: 'rgba(124, 156, 255, 0.42)',
+                                    borderColor: 'rgba(124, 156, 255, 0.85)',
+                                    borderWidth: 1,
+                                    yAxisID: 'y',
+                                    order: 2,
+                                },
+                                {
+                                    type: 'line',
+                                    label: 'Новые пользователи',
+                                    data: daily.new_users,
+                                    borderColor: '#6fd3a9',
+                                    backgroundColor: 'rgba(111, 211, 169, 0.15)',
+                                    tension: 0.25,
+                                    fill: false,
+                                    yAxisID: 'y1',
+                                    order: 1,
+                                    pointRadius: 2,
+                                },
+                            ],
                         },
-                        {
-                            type: 'line',
-                            label: 'Новые пользователи',
-                            data: daily.new_users,
-                            borderColor: '#6fd3a9',
-                            backgroundColor: 'rgba(111, 211, 169, 0.15)',
-                            tension: 0.25,
-                            fill: false,
-                            yAxisID: 'y1',
-                            order: 1,
-                            pointRadius: 2,
-                        },
-                    ],
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    interaction: { mode: 'index', intersect: false },
-                    plugins: {
-                        legend: { labels: { color: legendColor } },
-                        tooltip: {
-                            callbacks: {
-                                footer: (items) => {
-                                    const i = items[0].dataIndex;
-                                    const n = daily.payments_n[i];
-                                    return 'Успешных платежей: ' + n;
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            interaction: {mode: 'index', intersect: false},
+                            plugins: {
+                                legend: {labels: {color: legendColor}},
+                                tooltip: {
+                                    callbacks: {
+                                        footer: (items) => {
+                                            const i = items[0].dataIndex;
+                                            const n = daily.payments_n[i];
+                                            return 'Успешных платежей: ' + n;
+                                        },
+                                    },
+                                },
+                            },
+                            scales: {
+                                x: {ticks: {color: textMuted, maxTicksLimit: 18}, grid: {color: grid}},
+                                y: {
+                                    position: 'left',
+                                    ticks: {color: '#7c9cff'},
+                                    grid: {color: grid},
+                                    title: {display: true, text: 'Доход (₽)', color: textMuted},
+                                },
+                                y1: {
+                                    position: 'right',
+                                    grid: {drawOnChartArea: false},
+                                    ticks: {color: '#6fd3a9', precision: 0},
+                                    title: {display: true, text: 'Новые пользователи', color: textMuted},
                                 },
                             },
                         },
-                    },
-                    scales: {
-                        x: { ticks: { color: textMuted, maxTicksLimit: 18 }, grid: { color: grid } },
-                        y: {
-                            position: 'left',
-                            ticks: { color: '#7c9cff' },
-                            grid: { color: grid },
-                            title: { display: true, text: 'Доход (₽)', color: textMuted },
-                        },
-                        y1: {
-                            position: 'right',
-                            grid: { drawOnChartArea: false },
-                            ticks: { color: '#6fd3a9', precision: 0 },
-                            title: { display: true, text: 'Новые пользователи', color: textMuted },
-                        },
-                    },
-                },
-            });
-        }
-        hideLoader('admx-loader-mix');
+                    });
+                }
+                hideLoader('admx-loader-mix');
 
-        const donutOpts = {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: { legend: { position: 'bottom', labels: { color: legendColor, boxWidth: 12 } } },
-        };
-        const ctxPs = document.getElementById('admxPsDonut');
-        if (ctxPs && psData.labels && psData.labels.length) {
-            if (psChart) psChart.destroy();
-            psChart = new Chart(ctxPs, {
-                type: 'doughnut',
-                data: {
-                    labels: psData.labels,
-                    datasets: [{
-                        data: psData.values,
-                        backgroundColor: psData.colors && psData.colors.length === psData.labels.length
-                            ? psData.colors
-                            : psData.labels.map((_, i) => ['#7c9cff','#6fd3a9','#f0ad4e','#e06666','#b794f6'][i % 5]),
-                    }],
-                },
-                options: donutOpts,
-            });
-        }
-        hideLoader('admx-loader-ps');
-
-        const ctxUsersTx = document.getElementById('admxUsersTxDaily');
-        if (ctxUsersTx && usersTxData.labels && usersTxData.labels.length) {
-            if (usersTxChart) usersTxChart.destroy();
-            usersTxChart = new Chart(ctxUsersTx, {
-                type: 'bar',
-                data: {
-                    labels: usersTxData.labels,
-                    datasets: [
-                        {
-                            type: 'bar',
-                            label: 'Новые пользователи',
-                            data: usersTxData.new_users,
-                            backgroundColor: 'rgba(111, 211, 169, 0.45)',
-                            borderColor: '#6fd3a9',
-                            borderWidth: 1,
-                            yAxisID: 'y',
-                        },
-                        {
-                            type: 'bar',
-                            label: 'Положительные транзакции',
-                            data: usersTxData.positive_tx_n,
-                            backgroundColor: 'rgba(124, 156, 255, 0.38)',
-                            borderColor: '#7c9cff',
-                            borderWidth: 1,
-                            yAxisID: 'y',
-                        },
-                        {
-                            type: 'line',
-                            label: 'Пользователи / полож. транзакция',
-                            data: usersTxData.users_per_positive_tx,
-                            borderColor: '#f0ad4e',
-                            backgroundColor: 'rgba(240, 173, 78, 0.2)',
-                            yAxisID: 'y1',
-                            spanGaps: true,
-                            tension: 0.2,
-                            pointRadius: 2,
-                        },
-                    ],
-                },
-                options: {
+                const donutOpts = {
                     responsive: true,
                     maintainAspectRatio: false,
-                    interaction: { mode: 'index', intersect: false },
-                    plugins: { legend: { labels: { color: legendColor } } },
-                    scales: {
-                        x: { ticks: { color: textMuted, maxTicksLimit: 18 }, grid: { color: grid } },
-                        y: {
-                            position: 'left',
-                            ticks: { color: '#6fd3a9', precision: 0 },
-                            grid: { color: grid },
-                            title: { display: true, text: 'Количество', color: textMuted },
+                    plugins: {legend: {position: 'bottom', labels: {color: legendColor, boxWidth: 12}}},
+                };
+                const ctxPs = document.getElementById('admxPsDonut');
+                if (ctxPs && psData.labels && psData.labels.length) {
+                    if (psChart) psChart.destroy();
+                    psChart = new Chart(ctxPs, {
+                        type: 'doughnut',
+                        data: {
+                            labels: psData.labels,
+                            datasets: [{
+                                data: psData.values,
+                                backgroundColor: psData.colors && psData.colors.length === psData.labels.length
+                                    ? psData.colors
+                                    : psData.labels.map((_, i) => ['#7c9cff', '#6fd3a9', '#f0ad4e', '#e06666', '#b794f6'][i % 5]),
+                            }],
                         },
-                        y1: {
-                            position: 'right',
-                            grid: { drawOnChartArea: false },
-                            ticks: { color: '#f0ad4e' },
-                            title: { display: true, text: 'Соотношение', color: textMuted },
+                        options: donutOpts,
+                    });
+                }
+                hideLoader('admx-loader-ps');
+
+                const ctxUsersTx = document.getElementById('admxUsersTxDaily');
+                if (ctxUsersTx && usersTxData.labels && usersTxData.labels.length) {
+                    if (usersTxChart) usersTxChart.destroy();
+                    usersTxChart = new Chart(ctxUsersTx, {
+                        type: 'bar',
+                        data: {
+                            labels: usersTxData.labels,
+                            datasets: [
+                                {
+                                    type: 'bar',
+                                    label: 'Новые пользователи',
+                                    data: usersTxData.new_users,
+                                    backgroundColor: 'rgba(111, 211, 169, 0.45)',
+                                    borderColor: '#6fd3a9',
+                                    borderWidth: 1,
+                                    yAxisID: 'y',
+                                },
+                                {
+                                    type: 'bar',
+                                    label: 'Положительные транзакции',
+                                    data: usersTxData.positive_tx_n,
+                                    backgroundColor: 'rgba(124, 156, 255, 0.38)',
+                                    borderColor: '#7c9cff',
+                                    borderWidth: 1,
+                                    yAxisID: 'y',
+                                },
+                                {
+                                    type: 'line',
+                                    label: 'Пользователи / полож. транзакция',
+                                    data: usersTxData.users_per_positive_tx,
+                                    borderColor: '#f0ad4e',
+                                    backgroundColor: 'rgba(240, 173, 78, 0.2)',
+                                    yAxisID: 'y1',
+                                    spanGaps: true,
+                                    tension: 0.2,
+                                    pointRadius: 2,
+                                },
+                            ],
                         },
-                    },
-                },
-            });
-        }
-        hideLoader('admx-loader-users-tx');
-    }
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            interaction: {mode: 'index', intersect: false},
+                            plugins: {legend: {labels: {color: legendColor}}},
+                            scales: {
+                                x: {ticks: {color: textMuted, maxTicksLimit: 18}, grid: {color: grid}},
+                                y: {
+                                    position: 'left',
+                                    ticks: {color: '#6fd3a9', precision: 0},
+                                    grid: {color: grid},
+                                    title: {display: true, text: 'Количество', color: textMuted},
+                                },
+                                y1: {
+                                    position: 'right',
+                                    grid: {drawOnChartArea: false},
+                                    ticks: {color: '#f0ad4e'},
+                                    title: {display: true, text: 'Соотношение', color: textMuted},
+                                },
+                            },
+                        },
+                    });
+                }
+                hideLoader('admx-loader-users-tx');
+            }
 
-    function renderData(payload) {
-        const k = payload.kpis || {};
-        setText('admx-period-range', `${payload.period_start || '—'} — ${payload.period_end || '—'}`);
-        setText('admx-income-snapshot', fmtMoney(k.income_snapshot));
-        setText('admx-kpi-revenue-period', fmtMoney(k.revenue_period));
-        setText('admx-kpi-payments-period-n', k.payments_period_n ?? 0);
-        setText('admx-kpi-new-users-period', k.new_users_period ?? 0);
-        setText('admx-kpi-new-users-period-2', k.new_users_period ?? 0);
-        setText('admx-kpi-payers-period', k.payers_period ?? 0);
-        setText('admx-kpi-arpu-period', fmtMoney(k.arpu_period));
-        setText('admx-kpi-conversion-all', fmtPct(k.conversion_all_pct));
-        setText('admx-kpi-users-total', k.users_total ?? 0);
-        setText('admx-kpi-paid-among-all', k.paying_users_all ?? 0);
-        setText('admx-kpi-cohort-conversion', fmtPct(k.cohort_conversion_pct));
-        setText('admx-kpi-paid-among-new', k.paid_among_new ?? 0);
-        setText('admx-kpi-autodebit-n', k.autodebit_n ?? 0);
-        setText('admx-kpi-autodebit-revenue', fmtMoney(k.autodebit_revenue));
-        setText('admx-kpi-payment-logs-n', k.payment_related_logs_n ?? 0);
-        setText('admx-kpi-expected-recurring-revenue', fmtMoney(k.expected_recurring_tomorrow_revenue));
-        setText('admx-kpi-expected-recurring-n', k.expected_recurring_tomorrow_n ?? 0);
-        setText('admx-kpi-expired-paymethod-revenue', fmtMoney(k.expired_sub_paymethod_not_revoked_revenue));
-        setText('admx-kpi-expired-paymethod-n', k.expired_sub_paymethod_not_revoked_n ?? 0);
-        const d = payload.kpi_deltas || {};
-        setDelta('admx-delta-revenue-period', d.revenue_period_pct);
-        setDelta('admx-delta-payments-period-n', d.payments_period_n_pct);
-        setDelta('admx-delta-new-users-period', d.new_users_period_pct);
-        setDelta('admx-delta-arpu-period', d.arpu_period_pct);
+            function renderData(payload) {
+                const k = payload.kpis || {};
+                setText('admx-period-range', `${payload.period_start || '-'} - ${payload.period_end || '-'}`);
+                setText('admx-income-snapshot', fmtMoney(k.income_snapshot));
+                setText('admx-kpi-revenue-period', fmtMoney(k.revenue_period));
+                setText('admx-kpi-payments-period-n', k.payments_period_n ?? 0);
+                setText('admx-kpi-new-users-period', k.new_users_period ?? 0);
+                setText('admx-kpi-new-users-period-2', k.new_users_period ?? 0);
+                setText('admx-kpi-payers-period', k.payers_period ?? 0);
+                setText('admx-kpi-arpu-period', fmtMoney(k.arpu_period));
+                setText('admx-kpi-conversion-all', fmtPct(k.conversion_all_pct));
+                setText('admx-kpi-users-total', k.users_total ?? 0);
+                setText('admx-kpi-paid-among-all', k.paying_users_all ?? 0);
+                setText('admx-kpi-cohort-conversion', fmtPct(k.cohort_conversion_pct));
+                setText('admx-kpi-paid-among-new', k.paid_among_new ?? 0);
+                setText('admx-kpi-autodebit-n', k.autodebit_n ?? 0);
+                setText('admx-kpi-autodebit-revenue', fmtMoney(k.autodebit_revenue));
+                setText('admx-kpi-payment-logs-n', k.payment_related_logs_n ?? 0);
+                setText('admx-kpi-expected-recurring-revenue', fmtMoney(k.expected_recurring_tomorrow_revenue));
+                setText('admx-kpi-expected-recurring-n', k.expected_recurring_tomorrow_n ?? 0);
+                setText('admx-kpi-expired-paymethod-revenue', fmtMoney(k.expired_sub_paymethod_not_revoked_revenue));
+                setText('admx-kpi-expired-paymethod-n', k.expired_sub_paymethod_not_revoked_n ?? 0);
+                const d = payload.kpi_deltas || {};
+                setDelta('admx-delta-revenue-period', d.revenue_period_pct);
+                setDelta('admx-delta-payments-period-n', d.payments_period_n_pct);
+                setDelta('admx-delta-new-users-period', d.new_users_period_pct);
+                setDelta('admx-delta-arpu-period', d.arpu_period_pct);
 
-        const insightsEl = document.getElementById('admx-insights-list');
-        if (insightsEl) {
-            const insights = payload.revenue_insights || [];
-            insightsEl.innerHTML = insights.length
-                ? insights.map((line) => `<li class="mb-2">${escapeHtml(line)}</li>`).join('')
-                : '<li class="mb-2 text-secondary">Недостаточно данных</li>';
-        }
-        const alertsEl = document.getElementById('admx-alerts-list');
-        if (alertsEl) {
-            const alerts = payload.alerts || [];
-            const escAttr = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
-            alertsEl.innerHTML = alerts.length
-                ? alerts.map((a) => {
-                    const levelClass = a.level === 'critical' ? 'text-danger' : (a.level === 'warning' ? 'text-warning' : 'text-success');
-                    const actions = (a.actions || []).map((x) => `<a class="btn btn-sm btn-outline-light ms-1 mb-1" href="${escAttr(x.url)}">${escapeHtml(x.label || '')}</a>`).join('');
-                    return `<li class="mb-2"><span class="${levelClass} fw-semibold">${escapeHtml(a.title || 'Алерт')}:</span> ${escapeHtml(a.message || '')}${actions ? `<div class="mt-1">${actions}</div>` : ''}</li>`;
-                }).join('')
-                : '<li class="mb-2 text-secondary">Нет алертов</li>';
-        }
+                const insightsEl = document.getElementById('admx-insights-list');
+                if (insightsEl) {
+                    const insights = payload.revenue_insights || [];
+                    insightsEl.innerHTML = insights.length
+                        ? insights.map((line) => `<li class="mb-2">${escapeHtml(line)}</li>`).join('')
+                        : '<li class="mb-2 text-secondary">Недостаточно данных</li>';
+                }
+                const alertsEl = document.getElementById('admx-alerts-list');
+                if (alertsEl) {
+                    const alerts = payload.alerts || [];
+                    const escAttr = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+                    alertsEl.innerHTML = alerts.length
+                        ? alerts.map((a) => {
+                            const levelClass = a.level === 'critical' ? 'text-danger' : (a.level === 'warning' ? 'text-warning' : 'text-success');
+                            const actions = (a.actions || []).map((x) => `<a class="btn btn-sm btn-outline-light ms-1 mb-1" href="${escAttr(x.url)}">${escapeHtml(x.label || '')}</a>`).join('');
+                            return `<li class="mb-2"><span class="${levelClass} fw-semibold">${escapeHtml(a.title || 'Алерт')}:</span> ${escapeHtml(a.message || '')}${actions ? `<div class="mt-1">${actions}</div>` : ''}</li>`;
+                        }).join('')
+                        : '<li class="mb-2 text-secondary">Нет алертов</li>';
+                }
 
-        renderRows(
-            'admx-recurring-by-ps-body',
-            (payload.recurring_by_ps || []).map((row) => `<tr><td>${escapeHtml(row.label)}</td><td class="text-end">${row.count}</td><td class="text-end">${fmtMoney(row.revenue)}</td></tr>`),
-            3,
-            'Нет данных за период'
-        );
-        renderRows(
-            'admx-by-ps-body',
-            (payload.by_payment_system || []).map((row) => {
-                const successRate = row.success_rate === null || row.success_rate === undefined ? '—' : fmtPct(row.success_rate);
-                return `<tr><td>${escapeHtml(row.label)}</td><td class="text-end">${fmtMoney(row.revenue)}</td><td class="text-end">${row.ok_count}</td><td class="text-end">${row.failed_count}</td><td class="text-end">${row.pending_count}</td><td class="text-end">${successRate}</td></tr>`;
-            }),
-            6,
-            'Нет успешных платежей за период'
-        );
-        renderRows(
-            'admx-log-issues-body',
-            (payload.log_issues || []).map((row) => `<tr><td>${escapeHtml(row.level)}</td><td>${escapeHtml(row.category_label)}</td><td class="text-end">${row.n}</td></tr>`),
-            3,
-            'Нет записей'
-        );
-        renderRows(
-            'admx-failed-recent-body',
-            (payload.failed_recent || []).map((tx) => `<tr><td><a class="link-light" href="${txListUrl}${tx.id}/">${escapeHtml(tx.timestamp)}</a></td><td>${escapeHtml(tx.payment_system)}</td><td>${Number(tx.amount || 0).toLocaleString('ru-RU', {minimumFractionDigits: 2, maximumFractionDigits: 2})} ${escapeHtml(tx.currency || 'RUB')}</td><td>${escapeHtml(tx.status)}</td></tr>`),
-            4,
-            'Нет данных'
-        );
+                renderRows(
+                    'admx-recurring-by-ps-body',
+                    (payload.recurring_by_ps || []).map((row) => `<tr><td>${escapeHtml(row.label)}</td><td class="text-end">${row.count}</td><td class="text-end">${fmtMoney(row.revenue)}</td></tr>`),
+                    3,
+                    'Нет данных за период'
+                );
+                renderRows(
+                    'admx-by-ps-body',
+                    (payload.by_payment_system || []).map((row) => {
+                        const successRate = row.success_rate === null || row.success_rate === undefined ? '-' : fmtPct(row.success_rate);
+                        return `<tr><td>${escapeHtml(row.label)}</td><td class="text-end">${fmtMoney(row.revenue)}</td><td class="text-end">${row.ok_count}</td><td class="text-end">${row.failed_count}</td><td class="text-end">${row.pending_count}</td><td class="text-end">${successRate}</td></tr>`;
+                    }),
+                    6,
+                    'Нет успешных платежей за период'
+                );
+                renderRows(
+                    'admx-log-issues-body',
+                    (payload.log_issues || []).map((row) => `<tr><td>${escapeHtml(row.level)}</td><td>${escapeHtml(row.category_label)}</td><td class="text-end">${row.n}</td></tr>`),
+                    3,
+                    'Нет записей'
+                );
+                renderRows(
+                    'admx-failed-recent-body',
+                    (payload.failed_recent || []).map((tx) => `<tr><td><a class="link-light" href="${txListUrl}${tx.id}/">${escapeHtml(tx.timestamp)}</a></td><td>${escapeHtml(tx.payment_system)}</td><td>${Number(tx.amount || 0).toLocaleString('ru-RU', {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2
+                    })} ${escapeHtml(tx.currency || 'RUB')}</td><td>${escapeHtml(tx.status)}</td></tr>`),
+                    4,
+                    'Нет данных'
+                );
 
-        renderCharts(payload);
-    }
+                renderCharts(payload);
+            }
 
-    function getFiltersFromUrlOrForm() {
-        const url = new URL(window.location.href);
-        const fromUrl = Number(url.searchParams.get('days'));
-        const days = Number.isFinite(fromUrl) && fromUrl > 0
-            ? fromUrl
-            : (Number(daysSelect && daysSelect.value) || 90);
-        const payment_system = (url.searchParams.get('payment_system') ?? (paymentSystemSelect ? paymentSystemSelect.value : '')).trim();
-        const autodebit_mode = (url.searchParams.get('autodebit_mode') ?? (autodebitModeSelect ? autodebitModeSelect.value : 'all')).trim() || 'all';
-        return {days, payment_system, autodebit_mode};
-    }
+            function getFiltersFromUrlOrForm() {
+                const url = new URL(window.location.href);
+                const fromUrl = Number(url.searchParams.get('days'));
+                const days = Number.isFinite(fromUrl) && fromUrl > 0
+                    ? fromUrl
+                    : (Number(daysSelect && daysSelect.value) || 90);
+                const payment_system = (url.searchParams.get('payment_system') ?? (paymentSystemSelect ? paymentSystemSelect.value : '')).trim();
+                const autodebit_mode = (url.searchParams.get('autodebit_mode') ?? (autodebitModeSelect ? autodebitModeSelect.value : 'all')).trim() || 'all';
+                return {days, payment_system, autodebit_mode};
+            }
 
-    function updateFiltersInUrl(filters) {
-        const {days, payment_system, autodebit_mode} = filters;
-        const fromSelect = Number(daysSelect && daysSelect.value);
-        const url = new URL(window.location.href);
-        url.searchParams.set('days', String(days || (Number.isFinite(fromSelect) ? fromSelect : 90)));
-        if (payment_system) url.searchParams.set('payment_system', payment_system);
-        else url.searchParams.delete('payment_system');
-        if (autodebit_mode && autodebit_mode !== 'all') url.searchParams.set('autodebit_mode', autodebit_mode);
-        else url.searchParams.delete('autodebit_mode');
-        history.replaceState(null, '', url.toString());
-    }
+            function updateFiltersInUrl(filters) {
+                const {days, payment_system, autodebit_mode} = filters;
+                const fromSelect = Number(daysSelect && daysSelect.value);
+                const url = new URL(window.location.href);
+                url.searchParams.set('days', String(days || (Number.isFinite(fromSelect) ? fromSelect : 90)));
+                if (payment_system) url.searchParams.set('payment_system', payment_system);
+                else url.searchParams.delete('payment_system');
+                if (autodebit_mode && autodebit_mode !== 'all') url.searchParams.set('autodebit_mode', autodebit_mode);
+                else url.searchParams.delete('autodebit_mode');
+                history.replaceState(null, '', url.toString());
+            }
 
-    function updateExportLink(filters) {
-        if (!exportCsvBtn || !exportCsvBaseUrl) return;
-        const params = new URLSearchParams();
-        params.set('days', String(filters.days || 90));
-        if (filters.payment_system) params.set('payment_system', filters.payment_system);
-        if (filters.autodebit_mode && filters.autodebit_mode !== 'all') params.set('autodebit_mode', filters.autodebit_mode);
-        exportCsvBtn.href = `${exportCsvBaseUrl}?${params.toString()}`;
-    }
+            function updateExportLink(filters) {
+                if (!exportCsvBtn || !exportCsvBaseUrl) return;
+                const params = new URLSearchParams();
+                params.set('days', String(filters.days || 90));
+                if (filters.payment_system) params.set('payment_system', filters.payment_system);
+                if (filters.autodebit_mode && filters.autodebit_mode !== 'all') params.set('autodebit_mode', filters.autodebit_mode);
+                exportCsvBtn.href = `${exportCsvBaseUrl}?${params.toString()}`;
+            }
 
-    function loadData(filters, retriesLeft) {
-        const params = new URLSearchParams();
-        params.set('days', String(filters.days || 90));
-        if (filters.payment_system) params.set('payment_system', filters.payment_system);
-        if (filters.autodebit_mode && filters.autodebit_mode !== 'all') params.set('autodebit_mode', filters.autodebit_mode);
-        const reqUrl = `${apiUrl}?${params.toString()}`;
-        showLoader('admx-loader-mix');
-        showLoader('admx-loader-ps');
-        showLoader('admx-loader-users-tx');
-        renderLoadingRows();
-        const api = window.AdmxApi;
-        if (!api || typeof api.fetchJsonWithRetry !== 'function') {
-            setText('admx-period-range', 'ошибка загрузки');
-            const insightsEl = document.getElementById('admx-insights-list');
-            if (insightsEl) insightsEl.innerHTML = '<li class="mb-2 text-danger">Данные временно недоступны</li>';
-            setRetryState(true, filters);
-            hideLoader('admx-loader-mix');
-            hideLoader('admx-loader-ps');
-            hideLoader('admx-loader-users-tx');
-            return;
-        }
-        api.fetchJsonWithRetry(reqUrl, {
-            retries: retriesLeft != null ? retriesLeft : 1,
-            timeoutMs: 10000,
-            fetchOptions: { headers: {'X-Requested-With': 'XMLHttpRequest'} },
-        }).then((payload) => {
-            setRetryState(false, filters);
-            renderData(payload);
-        }).catch(() => {
-            setText('admx-period-range', 'ошибка загрузки');
-            const insightsEl = document.getElementById('admx-insights-list');
-            if (insightsEl) insightsEl.innerHTML = '<li class="mb-2 text-danger">Данные временно недоступны</li>';
-            setRetryState(true, filters);
-            hideLoader('admx-loader-mix');
-            hideLoader('admx-loader-ps');
-            hideLoader('admx-loader-users-tx');
-        });
-    }
+            function loadData(filters, retriesLeft) {
+                const params = new URLSearchParams();
+                params.set('days', String(filters.days || 90));
+                if (filters.payment_system) params.set('payment_system', filters.payment_system);
+                if (filters.autodebit_mode && filters.autodebit_mode !== 'all') params.set('autodebit_mode', filters.autodebit_mode);
+                const reqUrl = `${apiUrl}?${params.toString()}`;
+                showLoader('admx-loader-mix');
+                showLoader('admx-loader-ps');
+                showLoader('admx-loader-users-tx');
+                renderLoadingRows();
+                const api = window.AdmxApi;
+                if (!api || typeof api.fetchJsonWithRetry !== 'function') {
+                    setText('admx-period-range', 'ошибка загрузки');
+                    const insightsEl = document.getElementById('admx-insights-list');
+                    if (insightsEl) insightsEl.innerHTML = '<li class="mb-2 text-danger">Данные временно недоступны</li>';
+                    setRetryState(true, filters);
+                    hideLoader('admx-loader-mix');
+                    hideLoader('admx-loader-ps');
+                    hideLoader('admx-loader-users-tx');
+                    return;
+                }
+                api.fetchJsonWithRetry(reqUrl, {
+                    retries: retriesLeft != null ? retriesLeft : 1,
+                    timeoutMs: 10000,
+                    fetchOptions: {headers: {'X-Requested-With': 'XMLHttpRequest'}},
+                }).then((payload) => {
+                    setRetryState(false, filters);
+                    renderData(payload);
+                }).catch(() => {
+                    setText('admx-period-range', 'ошибка загрузки');
+                    const insightsEl = document.getElementById('admx-insights-list');
+                    if (insightsEl) insightsEl.innerHTML = '<li class="mb-2 text-danger">Данные временно недоступны</li>';
+                    setRetryState(true, filters);
+                    hideLoader('admx-loader-mix');
+                    hideLoader('admx-loader-ps');
+                    hideLoader('admx-loader-users-tx');
+                });
+            }
 
-    const initialFilters = getFiltersFromUrlOrForm();
-    if (daysSelect) {
-        daysSelect.value = String(initialFilters.days);
-    }
-    if (paymentSystemSelect) paymentSystemSelect.value = initialFilters.payment_system;
-    if (autodebitModeSelect) autodebitModeSelect.value = initialFilters.autodebit_mode;
-    const onFiltersChanged = () => {
-        const filters = {
-            days: Number(daysSelect && daysSelect.value) || 90,
-            payment_system: (paymentSystemSelect && paymentSystemSelect.value) || '',
-            autodebit_mode: (autodebitModeSelect && autodebitModeSelect.value) || 'all',
-        };
-        updateFiltersInUrl(filters);
-        updateExportLink(filters);
-        loadData(filters, 1);
-    };
-    if (daysSelect) daysSelect.addEventListener('change', onFiltersChanged);
-    if (paymentSystemSelect) paymentSystemSelect.addEventListener('change', onFiltersChanged);
-    if (autodebitModeSelect) autodebitModeSelect.addEventListener('change', onFiltersChanged);
-    updateFiltersInUrl(initialFilters);
-    updateExportLink(initialFilters);
-    loadData(initialFilters, 1);
-})();
-</script>
+            const initialFilters = getFiltersFromUrlOrForm();
+            if (daysSelect) {
+                daysSelect.value = String(initialFilters.days);
+            }
+            if (paymentSystemSelect) paymentSystemSelect.value = initialFilters.payment_system;
+            if (autodebitModeSelect) autodebitModeSelect.value = initialFilters.autodebit_mode;
+            const onFiltersChanged = () => {
+                const filters = {
+                    days: Number(daysSelect && daysSelect.value) || 90,
+                    payment_system: (paymentSystemSelect && paymentSystemSelect.value) || '',
+                    autodebit_mode: (autodebitModeSelect && autodebitModeSelect.value) || 'all',
+                };
+                updateFiltersInUrl(filters);
+                updateExportLink(filters);
+                loadData(filters, 1);
+            };
+            if (daysSelect) daysSelect.addEventListener('change', onFiltersChanged);
+            if (paymentSystemSelect) paymentSystemSelect.addEventListener('change', onFiltersChanged);
+            if (autodebitModeSelect) autodebitModeSelect.addEventListener('change', onFiltersChanged);
+            updateFiltersInUrl(initialFilters);
+            updateExportLink(initialFilters);
+            loadData(initialFilters, 1);
+        })();
+    </script>
 {% endblock %}

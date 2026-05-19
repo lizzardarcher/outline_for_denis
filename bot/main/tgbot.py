@@ -687,7 +687,15 @@ async def callback_query_handlers(call):
                                     )
                                 else:
                                     try_delete_celerity_user(user.user_id)
-                                    MarzbanAPI().delete_user(username=str(user.user_id))
+                                    try:
+                                        MarzbanAPI().delete_user(username=str(user.user_id))
+                                    except:
+                                        await bot.send_message(
+                                            call.message.chat.id,
+                                            "Данный протокол временно недоступен. Пожалуйста выберите другой. Приносим извинения за временные неудобства.",
+                                            reply_markup=markup.start(user=user),
+                                        )
+                                        return
                                     await asyncio.sleep(2)
                                     await bot.delete_message(wait_msg.chat.id, wait_msg.message_id)
 

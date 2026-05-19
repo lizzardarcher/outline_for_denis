@@ -71,8 +71,10 @@ def issue_hysteria2_tls_for_user(
     """
     uid = str(int(telegram_user_id))
     api = CelerityAPI()
-
-    MarzbanAPI().delete_user(uid)
+    try:
+        MarzbanAPI().delete_user(uid)
+    except:
+        pass
     ok_del, _ = api.delete_user(uid)
     if not ok_del:
         pass

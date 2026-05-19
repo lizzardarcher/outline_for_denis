@@ -71,7 +71,6 @@
                             <span class="fw-semibold" id="admx-idx-activity-bot"><span class="admx-skeleton admx-skeleton-inline" aria-hidden="true"></span></span>
                         </li>
                     </ul>
-                    <div class="admx-kpi-foot mt-2 small">Регистрации — по <code>join_date</code>; активность — по записям в журнале с привязкой к пользователю (см. глоссарий).</div>
                 </div>
             </div>
         </div>
@@ -118,22 +117,6 @@
                     </div>
                 </div>
             </div>
-        </div>
-    </div>
-
-    <div class="card admx-card mb-4">
-        <div class="card-header">Мини-глоссарий метрик</div>
-        <div class="card-body py-3">
-            <dl class="admx-glossary small mb-0">
-                <dt>Доход проекта</dt>
-                <dd>Текущее сводное значение из <code>IncomeInfo</code>, отдельно от расчетов за периоды.</dd>
-                <dt>Транзакции</dt>
-                <dd>Все записи в таблице транзакций, включая разные статусы и направления.</dd>
-                <dt>Списания</dt>
-                <dd>Количество заявок на вывод средств по периодам.</dd>
-                <dt>Активность по логам</dt>
-                <dd>За календарный сегодня: число разных пользователей с записями в журнале. «На сайте» — категория <code>web</code>. «В боте» — категория <code>bot</code>, действия в боте в <code>vpn</code> с тегом <code>[BOT]</code>, платежные шаги в <code>payment</code> с <code>[BOT]</code> (без строк <code>[CELERY]</code>). «Всего» — объединение множеств без двойного счёта.</dd>
-            </dl>
         </div>
     </div>
 
@@ -314,7 +297,7 @@
                         <a class="btn btn-outline-light text-start" href="{% url 'admindashboardx:logs' %}">
                             <i class="bi bi-journal-text me-2"></i>Журнал логов
                         </a>
-                        <div class="small text-secondary mt-1">За последние <span id="admx-idx-period-days">{{ period_days }}</span> дн.: предупреждений и ошибок — <span id="admx-idx-error-logs"><span class="admx-skeleton admx-skeleton-inline" aria-hidden="true"></span></span></div>
+                        <div class="small text-secondary mt-1">За последние <span id="admx-idx-period-days">{{ period_days }}</span> дн.: предупреждений и ошибок - <span id="admx-idx-error-logs"><span class="admx-skeleton admx-skeleton-inline" aria-hidden="true"></span></span></div>
                     </div>
                 </div>
             </div>
@@ -365,7 +348,7 @@
             fetchOptions: { headers: {'X-Requested-With': 'XMLHttpRequest'} },
         }).then((data) => {
             setRetryState(false);
-            setText('admx-idx-stats-year', data.stats_year ?? '—');
+            setText('admx-idx-stats-year', data.stats_year ?? '-');
             setText('admx-idx-period-days', data.period_days ?? 30);
             setText('admx-idx-error-logs', data.kpi_error_logs ?? 0);
             setText('admx-idx-revenue-total', fmtMoney(data.revenue_project_total));

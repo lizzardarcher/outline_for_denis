@@ -568,9 +568,22 @@ class VpnKey(BaseAdmin):
     #     return False
 
 
+@admin.action(description='MB: is_activated_vless = True')
+def set_is_activated_vless_true(modeladmin, request, queryset):
+    updated = queryset.update(is_activated_vless=True)
+    modeladmin.message_user(request, f'Флаг MB включён у {updated} сервер(ов).')
+
+
+@admin.action(description='MB: is_activated_vless = False')
+def set_is_activated_vless_false(modeladmin, request, queryset):
+    updated = queryset.update(is_activated_vless=False)
+    modeladmin.message_user(request, f'Флаг MB снят у {updated} сервер(ов).')
+
 
 @admin.register(Server)
 class ServerAdmin(BaseAdmin):
+
+    actions = [set_is_activated_vless_true, set_is_activated_vless_false]
 
     def get_key_generated(self, obj):
         if 0 < obj.keys_generated <= 100:

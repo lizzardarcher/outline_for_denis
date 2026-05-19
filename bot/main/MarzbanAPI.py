@@ -34,7 +34,7 @@ class MarzbanAPI:
             return None
         _username = bot.vless_unane
         _password = bot.vless_pwd
-        url = 'https://mvless.ru/api/admin/token'
+        url = f'{settings.MARZBAN_API}/admin/token'
         headers = {
             'accept': 'application/json',
             'Content-Type': 'application/x-www-form-urlencoded'

@@ -4,3 +4,5 @@
 db.sqlite3
 /bot/main/vless/conf.py
 /utils/xray_configs_no_git/
+/docs/secrets/*.pem
+/docs/secrets/*.key

@@ -440,21 +440,6 @@ def _admx_build_revenue_insights(
 
 
     n_days = len(series_daily)
-    if n_days >= 14:
-        mid = n_days // 2
-        r1 = sum(series_daily[i]["revenue"] for i in range(mid))
-        r2 = sum(series_daily[i]["revenue"] for i in range(mid, n_days))
-        if r1 > 0:
-            ch = (r2 - r1) / r1 * 100
-            half1 = series_daily[0]["date"]
-            half2 = series_daily[mid]["date"]
-            bullets.append(
-                f"Доход: вторая половина периода ({half2} …) к первой ({half1} …) — изменение ≈ {ch:+.1f}% по сумме дневных поступлений."
-            )
-        u1 = sum(series_daily[i]["new_users"] for i in range(mid))
-        u2 = sum(series_daily[i]["new_users"] for i in range(mid, n_days))
-        if u1 or u2:
-            bullets.append(f"Новые пользователи: первая половина {int(u1)}, вторая {int(u2)}.")
 
     if len(rev_series) >= 14:
         tail = 7
@@ -464,18 +449,6 @@ def _admx_build_revenue_insights(
             bullets.append(
                 f"Средний дневной доход: последние {tail} дн. ≈ {a:.0f} ₽/день, предыдущие {tail} дн. ≈ {b:.0f} ₽/день ({((a - b) / b * 100):+.1f}%)."
             )
-
-    if revenue_period > 0 and autodebit_n > 0:
-        share = autodebit_revenue / revenue_period * 100
-        bullets.append(
-            f"Доля автосписаний в доходе периода ≈ {share:.1f}% ({autodebit_n} из {payments_period_n} успешных платежей)."
-        )
-
-    if by_ps and revenue_period > 0:
-        top = by_ps[0]
-        share_top = top["revenue"] / revenue_period * 100
-        if share_top >= 45:
-            bullets.append(f"Концентрация: «{top['label']}» даёт ≈ {share_top:.1f}% успешного дохода за период.")
 
     delta = float(cohort_conversion_pct - conversion_all_pct)
     if new_users_period > 0 and abs(delta) >= 8:
@@ -488,10 +461,6 @@ def _admx_build_revenue_insights(
                 "Когорта окна конвертируется ниже среднего по базе — имеет смысл проверить источники трафика и онбординг."
             )
 
-    if payment_related_logs_n >= 15:
-        bullets.append(
-            f"Много предупреждений/ошибок по платежам в логах за период ({payment_related_logs_n}) — загляните в раздел логов и таблицу ниже."
-        )
     elif payment_related_logs_n >= 5:
         bullets.append(f"В логах за период {payment_related_logs_n} записей WARNING/FATAL по категории «Платежи».")
 

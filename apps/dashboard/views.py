@@ -177,115 +177,127 @@ class CreateNewKeyView(LoginRequiredMixin, TemplateView):
         user_profile = get_object_or_404(UserProfile, user=request.user)
         user = user_profile.telegram_user
 
-        if protocol == 'outline':
+        try:
 
-            server = Server.objects.filter(is_active=True, is_activated_vless=True, country=country,
-                                           keys_generated__lte=KEY_LIMIT).order_by('keys_generated').first()
-            if not server:
-                messages.error(request, f"Ошибка создания ключа! Нет доступных серверов для страны '{country.name}'.")
-                return redirect('profile')
+            if protocol == 'outline':
 
-            VpnKey.objects.filter(user=user).delete()  # Удаляем все предыдущие ключи
-            try_delete_celerity_user(user.user_id)
+                server = Server.objects.filter(is_active=True, is_activated_vless=True, country=country,
+                                               keys_generated__lte=KEY_LIMIT).order_by('keys_generated').first()
+                if not server:
+                    messages.error(request, f"Ошибка создания ключа! Нет доступных серверов для страны '{country.name}'.")
+                    return redirect('profile')
 
-            MarzbanAPI().create_user(username=str(user.user_id))  # Генерируем новый ключ vless
-            success, result = MarzbanAPI().get_user(username=str(user.user_id))
-            links = result['links']
-            key = "---"
+                VpnKey.objects.filter(user=user).delete()  # Удаляем все предыдущие ключи
+                try_delete_celerity_user(user.user_id)
 
-            for link in links:
-                if server.ip_address in link and "ss://" in link:
-                    key = link
-                    break
+                MarzbanAPI().create_user(username=str(user.user_id))  # Генерируем новый ключ vless
+                success, result = MarzbanAPI().get_user(username=str(user.user_id))
+                links = result['links']
+                key = "---"
 
-            VpnKey.objects.create(server=server, user=user, key_id=user.user_id,
-                                  name=str(user.user_id), password=str(user.user_id),
-                                  port=1040, method='ss', access_url=key, protocol='outline')
+                for link in links:
+                    if server.ip_address in link and "ss://" in link:
+                        key = link
+                        break
 
-            messages.success(request, f'Новый ключ создан!')
-            Logging.objects.create(category="web", log_level=" INFO",
-                                   message=f'[WEB] [Новый ключ создан] [outline] [{server.hosting}] [{server.country.name_for_app}]',
-                                   datetime=datetime.now(), user=self.request.user.profile.telegram_user)
+                VpnKey.objects.create(server=server, user=user, key_id=user.user_id,
+                                      name=str(user.user_id), password=str(user.user_id),
+                                      port=1040, method='ss', access_url=key, protocol='outline')
 
-
-        elif protocol == 'vless':
-
-            server = Server.objects.filter(is_active=True, is_activated_vless=True, country=country,
-                                           keys_generated__lte=KEY_LIMIT).order_by('keys_generated').first()
-            if not server:
-                messages.error(request, f"Ошибка создания ключа! Нет доступных серверов для страны '{country.name}'.")
-                return redirect('profile')
-
-            VpnKey.objects.filter(user=user).delete()  # Удаляем все предыдущие ключи
-            try_delete_celerity_user(user.user_id)
-
-            MarzbanAPI().create_user(username=str(user.user_id))  # Генерируем новый ключ vless
-            success, result = MarzbanAPI().get_user(username=str(user.user_id))
-            links = result['links']
-            key = "---"
-            for link in links:
-
-                if server.ip_address in link and "vless://" in link:
-                    key = link
-                    break
-
-            VpnKey.objects.create(server=server, user=user, key_id=user.user_id,
-                                  name=str(user.user_id), password=str(user.user_id),
-                                  port=1040, method='vless', access_url=key, protocol='vless')
-
-            messages.success(request, f'Новый ключ создан!')
-            Logging.objects.create(category="web", log_level=" INFO",
-                                   message=f'[WEB] [Новый ключ создан] [vless] [{server.hosting}] [{server.country.name_for_app}]',
-                                   datetime=datetime.now(), user=self.request.user.profile.telegram_user)
+                messages.success(request, f'Новый ключ создан!')
+                Logging.objects.create(category="web", log_level=" INFO",
+                                       message=f'[WEB] [Новый ключ создан] [outline] [{server.hosting}] [{server.country.name_for_app}]',
+                                       datetime=datetime.now(), user=self.request.user.profile.telegram_user)
 
 
-        elif protocol == 'hysteria2':
-            server = Server.objects.filter(
-                is_active=True,
-                is_c3celeryty_activated=True,
-                country=country,
-                keys_generated__lte=KEY_LIMIT,
-            ).order_by('keys_generated').first()
-            if not server:
-                messages.error(
-                    request,
-                    f"Ошибка создания ключа! Нет доступных серверов Hysteria2 для страны '{country.name}'.",
+            elif protocol == 'vless':
+
+                server = Server.objects.filter(is_active=True, is_activated_vless=True, country=country,
+                                               keys_generated__lte=KEY_LIMIT).order_by('keys_generated').first()
+                if not server:
+                    messages.error(request, f"Ошибка создания ключа! Нет доступных серверов для страны '{country.name}'.")
+                    return redirect('profile')
+
+                VpnKey.objects.filter(user=user).delete()  # Удаляем все предыдущие ключи
+                try_delete_celerity_user(user.user_id)
+
+                MarzbanAPI().create_user(username=str(user.user_id))  # Генерируем новый ключ vless
+                success, result = MarzbanAPI().get_user(username=str(user.user_id))
+                links = result['links']
+                key = "---"
+                for link in links:
+
+                    if server.ip_address in link and "vless://" in link:
+                        key = link
+                        break
+
+                VpnKey.objects.create(server=server, user=user, key_id=user.user_id,
+                                      name=str(user.user_id), password=str(user.user_id),
+                                      port=1040, method='vless', access_url=key, protocol='vless')
+
+                messages.success(request, f'Новый ключ создан!')
+                Logging.objects.create(category="web", log_level=" INFO",
+                                       message=f'[WEB] [Новый ключ создан] [vless] [{server.hosting}] [{server.country.name_for_app}]',
+                                       datetime=datetime.now(), user=self.request.user.profile.telegram_user)
+
+
+            elif protocol == 'hysteria2':
+                server = Server.objects.filter(
+                    is_active=True,
+                    is_c3celeryty_activated=True,
+                    country=country,
+                    keys_generated__lte=KEY_LIMIT,
+                ).order_by('keys_generated').first()
+                if not server:
+                    messages.error(
+                        request,
+                        f"Ошибка создания ключа! Нет доступных серверов Hysteria2 для страны '{country.name}'.",
+                    )
+                    return redirect('profile')
+
+                VpnKey.objects.filter(user=user).delete()
+
+                ok, result = issue_hysteria2_tls_for_user(
+                    telegram_user_id=user.user_id,
+                    display_username=(user.username or str(user.user_id)),
+                    server_ip=(server.ip_address or "").strip(),
                 )
-                return redirect('profile')
+                if not ok:
+                    messages.error(request, f'Ошибка создания ключа Hysteria2: {result}')
+                    return redirect('profile')
 
-            VpnKey.objects.filter(user=user).delete()
-
-            ok, result = issue_hysteria2_tls_for_user(
-                telegram_user_id=user.user_id,
-                display_username=(user.username or str(user.user_id)),
-                server_ip=(server.ip_address or "").strip(),
-            )
-            if not ok:
-                messages.error(request, f'Ошибка создания ключа Hysteria2: {result}')
-                return redirect('profile')
-
-            key = result
-            VpnKey.objects.create(
-                server=server,
-                user=user,
-                key_id=user.user_id,
-                name=str(user.user_id),
-                password=str(user.user_id),
-                port=443,
-                method='hysteria2',
-                access_url=key,
-                protocol='hysteria2',
-            )
-            messages.success(request, f'Новый ключ создан!')
+                key = result
+                VpnKey.objects.create(
+                    server=server,
+                    user=user,
+                    key_id=user.user_id,
+                    name=str(user.user_id),
+                    password=str(user.user_id),
+                    port=443,
+                    method='hysteria2',
+                    access_url=key,
+                    protocol='hysteria2',
+                )
+                messages.success(request, f'Новый ключ создан!')
+                Logging.objects.create(
+                    category="web",
+                    log_level=" INFO",
+                    message=f'[WEB] [Новый ключ создан] [hysteria2] [{server.hosting}] [{server.country.name_for_app}]',
+                    datetime=datetime.now(),
+                    user=self.request.user.profile.telegram_user,
+                )
+        except Exception as e:
             Logging.objects.create(
                 category="web",
-                log_level=" INFO",
-                message=f'[WEB] [Новый ключ создан] [hysteria2] [{server.hosting}] [{server.country.name_for_app}]',
+                log_level=" FATAL",
+                message=f'[WEB] [ошибка создания ключа] [{protocol}] [{e}]',
                 datetime=datetime.now(),
                 user=self.request.user.profile.telegram_user,
             )
-
+            messages.error(request, 'Ошибка создания ключа! На сервере возникли проблемы технического характера. Попробуйте позже или выберите другой протокол')
+            return redirect('profile')
         return redirect('profile')
+
 
 
 class UpdateSubscriptionView(LoginRequiredMixin, TemplateView):
