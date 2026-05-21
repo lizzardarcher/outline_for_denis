@@ -253,7 +253,6 @@ class VpnKey(models.Model):
         verbose_name = 'VPN Ключ'
         verbose_name_plural = 'VPN Ключи'
 
-
 class Server(models.Model):
     hosting = models.CharField(max_length=1000, blank=True, null=True, verbose_name='Хостинг')
     ip_address = models.CharField(max_length=1000, blank=True, null=True, verbose_name='IP Address')
@@ -417,6 +416,7 @@ LOG_CATEGORY = (
     ('other', 'Прочее'),
 )
 
+
 class Logging(models.Model):
     log_level = models.CharField(max_length=50, null=True, blank=True, choices=LOG_LEVEL, verbose_name='LOG LEVEL')
     category = models.CharField(
@@ -458,15 +458,18 @@ class TelegramMessage(models.Model):
     """
     STATUS_CHOICES = (
         ('sent', 'Отправлено'),
+        ('sending', 'Отправляется'),
+        ('cancelled', 'Отменено'),
         ('not_sent', 'Не отправлено'),
     )
+
 
     text = models.TextField(verbose_name='Текст сообщения')
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='Дата создания')
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='not_sent', verbose_name='Статус рассылки')
     send_to_subscribed = models.BooleanField(default=False, verbose_name='Отправить подписанным')
     send_to_notsubscribed = models.BooleanField(default=False, verbose_name='Отправить не подписанным')
-    counter = models.PositiveIntegerField(default=0, verbose_name='Отправлено пользователям')
+    counter = models.PositiveIntegerField(default=0, verbose_name='Обработано пользователей')
 
     def __str__(self):
         return f"Сообщение от {self.created_at.strftime('%Y-%m-%d %H:%M:%S')} [{self.status}] [Отправлено: {str(self.counter)} пользователям]"

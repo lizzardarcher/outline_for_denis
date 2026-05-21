@@ -163,6 +163,7 @@ def update_total_income(*args, **kwargs):
     income_info.save()
     return None
 
+
 @shared_task
 def update_user_subscription_status():
 
@@ -208,12 +209,11 @@ def update_user_subscription_status():
 def message_sender():
     messages = TelegramMessage.objects.filter(status='not_sent')
     bot = TeleBot(token=TelegramBot.objects.all().first().token)
-    _markup = InlineKeyboardMarkup().add(InlineKeyboardButton(text=f'💡 Управление VPN', callback_data=f'manage'))
-    counter = 0
+    _markup = InlineKeyboardMarkup().add(
+        InlineKeyboardButton(text='💡 Управление VPN', callback_data='manage'),
+    )
     for message in messages:
-
         users = []
-
         if message.send_to_subscribed:
             users += TelegramUser.objects.filter(subscription_status=True)
         elif message.send_to_notsubscribed:
@@ -221,18 +221,19 @@ def message_sender():
         else:
             users += TelegramUser.objects.all()
 
+        counter = 0
         for user in users:
             try:
                 bot.send_message(chat_id=user.user_id, text=message.text, reply_markup=_markup)
                 counter += 1
                 message.counter = counter
-                message.save()
-            except Exception as e:
-                ...
+                message.save(update_fields=['counter'])
+            except Exception:
+                pass
 
         message.status = 'sent'
         message.counter = counter
-        message.save()
+        message.save(update_fields=['status', 'counter'])
 
 
 @shared_task

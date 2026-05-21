@@ -60,14 +60,13 @@ async def send_pending_messages():
         counter = 0
         for message in messages:
 
-            users = []
 
             if message.send_to_subscribed:
-                users += TelegramUser.objects.filter(subscription_status=True)
-            elif message.send_to_notsubscribed:
-                users += TelegramUser.objects.filter(subscription_status=False)
+                users = TelegramUser.objects.filter(subscription_status=True)
+            if message.send_to_notsubscribed:
+                users = TelegramUser.objects.filter(subscription_status=False)
             else:
-                users += TelegramUser.objects.all()
+                users = TelegramUser.objects.all()
 
             for user in users:
                 try:
@@ -75,7 +74,7 @@ async def send_pending_messages():
                     counter += 1
                     message.counter = counter
                     message.save()
-                    await asyncio.sleep(0.2)
+                    await asyncio.sleep(0.03)
                 except Exception as e:
                     ...
 

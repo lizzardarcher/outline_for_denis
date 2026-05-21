@@ -315,8 +315,8 @@ class TelegramUserAdmin(admin.ModelAdmin):
     ordering = ('-subscription_status', '-join_date',)
     empty_value_display = '---'
     inlines = [
-        # TransactionInline,
-        # VpnKeyInline,
+        TransactionInline,
+        VpnKeyInline,
         # WithdrawalRequestInline,
         LogInline
     ]
@@ -756,13 +756,13 @@ class TelegramMessageAdmin(BaseAdmin):
     readonly_fields = ('status', 'counter')
 
     def has_change_permission(self, request, obj=None):
-        return False
+        return True
 
     def has_add_permission(self, request):
         return True
 
     def has_delete_permission(self, request, obj=None):
-        return False
+        return True
 
 
 @admin.register(SiteNotification)

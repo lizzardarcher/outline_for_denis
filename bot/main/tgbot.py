@@ -49,39 +49,6 @@ def update_sub_status(user: TelegramUser):
         TelegramUser.objects.filter(user_id=user.user_id).update(subscription_status=True)
 
 
-async def send_pending_messages():
-    while True:
-
-        messages = TelegramMessage.objects.filter(status='not_sent')
-        counter = 0
-        for message in messages:
-
-            users = []
-
-            if message.send_to_subscribed:
-                users += TelegramUser.objects.filter(subscription_status=True)
-            elif message.send_to_notsubscribed:
-                users += TelegramUser.objects.filter(subscription_status=False)
-            else:
-                users += TelegramUser.objects.all()
-
-            for user in users:
-                try:
-                    await bot.send_message(chat_id=user.user_id, text=message.text, reply_markup=markup.for_sender())
-                    counter += 1
-                    message.counter = counter
-                    message.save()
-                    await asyncio.sleep(0.2)
-                except Exception as e:
-                    ...
-
-            message.status = 'sent'
-            message.counter = counter
-            message.save()
-
-        await asyncio.sleep(15)
-
-
 def _ensure_site_user_for_telegram_user(tg_user: TelegramUser) -> User:
     """
     Связка TelegramUser ↔ User через UserProfile. PK User — BigAutoField, не Telegram id.
@@ -128,6 +95,35 @@ def _generate_and_set_site_password(django_user: User) -> str:
     django_user.set_password(password)
     django_user.save()
     return password
+
+
+async def send_pending_messages():
+    while True:
+
+        messages = TelegramMessage.objects.filter(status='not_sent')
+        counter = 0
+        for message in messages:
+
+
+            users = TelegramUser.objects.all()
+
+            for user in users:
+                try:
+                    await bot.send_message(chat_id=user.user_id, text=message.text, reply_markup=markup.for_sender())
+                    counter += 1
+                    if counter % 1000 == 0:
+                        message.counter = counter
+                        message.save()
+                    await asyncio.sleep(0.01)
+                except Exception as e:
+                    ...
+
+            message.status = 'sent'
+            message.counter = counter
+            message.save()
+
+        await asyncio.sleep(15)
+
 
 @bot.message_handler(commands=['getlogin'])
 async def getlogin(message):
@@ -1391,7 +1387,6 @@ async def callback_query_handlers(call):
                                            reply_markup=markup.start(user=user))
         except:
             ...
-
 
 if __name__ == '__main__':
     bot.add_custom_filter(asyncio_filters.StateFilter(bot))
