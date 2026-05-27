@@ -312,8 +312,28 @@ class AdminDashboardIndexView(DashboardBaseView):
         activity_users_bot = len(ids_bot)
         activity_users_day = len(ids_site | ids_bot)
 
+        _months_ru = (
+            "",
+            "январь",
+            "февраль",
+            "март",
+            "апрель",
+            "май",
+            "июнь",
+            "июль",
+            "август",
+            "сентябрь",
+            "октябрь",
+            "ноябрь",
+            "декабрь",
+        )
+        stats_month_label = f"{_months_ru[today.month]} {today.year}"
+        stats_day_label = today.strftime("%d.%m.%Y")
+
         return {
             "stats_year": today.year,
+            "stats_month": stats_month_label,
+            "stats_day": stats_day_label,
             "period_days": period_days,
             "kpi_error_logs": kpi_error_logs,
             "revenue_project_total": float(revenue_project_total),
@@ -350,7 +370,7 @@ class AdminDashboardIndexDataView(DashboardBaseView, View):
     page_key = "index"
 
     def get(self, request, *args, **kwargs):
-        cache_key = "admx:index:data:v4"
+        cache_key = "admx:index:data:v5"
         payload = cache.get(cache_key)
         if payload is None:
             payload = AdminDashboardIndexView._build_payload()
@@ -910,6 +930,7 @@ class RevenueAnalyticsView(DashboardBaseView):
             )
         total_failed = sum(int(x["failed_count"]) for x in by_ps)
         total_ok = sum(int(x["ok_count"]) for x in by_ps)
+
         if total_ok + total_failed >= 20:
             fail_rate = (total_failed / (total_ok + total_failed)) * 100
             if fail_rate >= 15:

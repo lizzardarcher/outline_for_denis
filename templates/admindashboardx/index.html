@@ -2,6 +2,7 @@
 
 {% block title %} · Главная{% endblock %}
 
+
 {% block content %}
     <div id="admx-index-root" data-api-url="{% url 'admindashboardx:index_data' %}"></div>
     <div class="row g-3 mb-4">
@@ -19,11 +20,11 @@
                             <span class="fw-semibold" id="admx-idx-revenue-year"><span class="admx-skeleton admx-skeleton-inline" aria-hidden="true"></span></span>
                         </li>
                         <li class="d-flex justify-content-between py-1 border-top border-secondary border-opacity-25">
-                            <span class="text-secondary">За месяц </span>
+                            <span class="text-secondary">За месяц (<span id="admx-idx-stats-month"><span class="admx-skeleton admx-skeleton-inline" aria-hidden="true"></span></span>)</span>
                             <span class="fw-semibold" id="admx-idx-revenue-month"><span class="admx-skeleton admx-skeleton-inline" aria-hidden="true"></span></span>
                         </li>
                         <li class="d-flex justify-content-between py-1 border-top border-secondary border-opacity-25">
-                            <span class="text-secondary">Сегодня</span>
+                            <span class="text-secondary">Сегодня (<span id="admx-idx-stats-day"><span class="admx-skeleton admx-skeleton-inline" aria-hidden="true"></span></span>)</span>
                             <span class="fw-semibold" id="admx-idx-revenue-day"><span class="admx-skeleton admx-skeleton-inline" aria-hidden="true"></span></span>
                         </li>
                     </ul>
@@ -348,6 +349,8 @@
         }).then((data) => {
             setRetryState(false);
             setText('admx-idx-stats-year', data.stats_year ?? '-');
+            setText('admx-idx-stats-month', data.stats_month ?? '-');
+            setText('admx-idx-stats-day', data.stats_day ?? '-');
             setText('admx-idx-period-days', data.period_days ?? 30);
             setText('admx-idx-error-logs', data.kpi_error_logs ?? 0);
             setText('admx-idx-revenue-total', fmtMoney(data.revenue_project_total));

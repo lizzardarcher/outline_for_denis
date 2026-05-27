@@ -1,8 +1,9 @@
+import json
 import traceback
 from datetime import datetime, timedelta
 from decimal import Decimal
 import hashlib
-from urllib.parse import urlencode
+from urllib.parse import urlencode, quote
 import xml.etree.ElementTree as ET
 
 import requests
@@ -130,6 +131,24 @@ class CreateRobokassaPaymentView(LoginRequiredMixin, View):
             inv_id = transaction.id  # будем использовать как InvId в RoboKassa
 
             # 2) Формируем ссылку RoboKassa
+            # Формируем Receipt
+            receipt = {
+                "sno": "usn_income",  # или "osn", зависит от вашей СНО
+                "items": [
+                    {
+                        "name": f"Подписка DomVPN на {days} дн.",
+                        "quantity": 1,
+                        "sum": int(amount_decimal),  # в копейках
+                        "payment_method": "full_payment",
+                        "payment_object": "service",
+                        "tax": "vat0"
+                    }
+                ]
+            }
+
+            # URL-кодируем Receipt перед включением в подпись
+            receipt_url_encoded = quote(json.dumps(receipt, separators=(',', ':')), safe='')
+
             merchant_login = settings.ROBOKASSA_MERCHANT_LOGIN_SITE
             password_1 = settings.ROBOKASSA_PASSWORD_1_SITE
             base_url = getattr(
@@ -141,8 +160,13 @@ class CreateRobokassaPaymentView(LoginRequiredMixin, View):
 
             out_sum_str = f"{amount_decimal:.2f}"
 
+            # signature = robokassa_md5(
+            #     f"{merchant_login}:{out_sum_str}:{inv_id}:{password_1}"
+            # )
+
+            # Подпись теперь включает Receipt
             signature = robokassa_md5(
-                f"{merchant_login}:{out_sum_str}:{inv_id}:{password_1}"
+                f"{merchant_login}:{out_sum_str}:{inv_id}:{receipt_url_encoded}:{password_1}"
             )
 
             success_url = request.build_absolute_uri(
@@ -151,6 +175,17 @@ class CreateRobokassaPaymentView(LoginRequiredMixin, View):
             fail_url = request.build_absolute_uri(
                 reverse('robokassa_fail')
             )
+
+            # params = {
+            #     'MerchantLogin': merchant_login,
+            #     'OutSum': out_sum_str,
+            #     'InvId': str(inv_id),
+            #     'Description': f'Подписка DomVPN на {days} дн.',
+            #     'SignatureValue': signature,
+            #     'SuccessURL': success_url,
+            #     'FailURL': fail_url,
+            #     'Recurring': 'true',
+            # }
 
             params = {
                 'MerchantLogin': merchant_login,
@@ -161,9 +196,8 @@ class CreateRobokassaPaymentView(LoginRequiredMixin, View):
                 'SuccessURL': success_url,
                 'FailURL': fail_url,
                 'Recurring': 'true',
+                'Receipt': receipt_url_encoded,  # ← добавлено
             }
-            if is_test:
-                params['IsTest'] = '1'
 
             redirect_url = f"{base_url}?{urlencode(params)}"
 

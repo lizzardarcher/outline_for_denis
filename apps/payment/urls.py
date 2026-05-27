@@ -1,6 +1,7 @@
 from django.urls import path
 from .views import ukassa, robokassa, cryptobot, report
 
+
 urlpatterns = [
 
     # YOOKASSA

@@ -1,9 +1,10 @@
 import asyncio
+import json
 import random
 import traceback
 from datetime import datetime, timedelta
 from decimal import Decimal
-from urllib.parse import urlencode
+from urllib.parse import urlencode, quote
 
 import requests
 from yookassa import Configuration, Payment
@@ -929,6 +930,25 @@ async def callback_query_handlers(call):
                                 inv_id = transaction.id  # InvId для RobokassaBotResultView
 
                                 # 2) Формируем ссылку RoboKassa для бота
+
+                                # Формируем Receipt
+                                receipt = {
+                                    "sno": "usn_income",  # или "osn", зависит от вашей СНО
+                                    "items": [
+                                        {
+                                            "name": f"Подписка DomVPN на {days} дн.",
+                                            "quantity": 1,
+                                            "sum": int(amount_decimal),  # в копейках
+                                            "payment_method": "full_payment",
+                                            "payment_object": "service",
+                                            "tax": "vat0"
+                                        }
+                                    ]
+                                }
+
+                                # URL-кодируем Receipt перед включением в подпись
+                                receipt_url_encoded = quote(json.dumps(receipt, separators=(',', ':')), safe='')
+
                                 merchant_login = settings.ROBOKASSA_MERCHANT_LOGIN_BOT
                                 password_1 = settings.ROBOKASSA_PASSWORD_1_BOT
                                 base_url = getattr(
@@ -936,18 +956,31 @@ async def callback_query_handlers(call):
                                     'ROBOKASSA_BOT_ENDPOINT',
                                     'https://auth.robokassa.ru/Merchant/Index.aspx',
                                 )
-                                is_test = getattr(settings, 'ROBOKASSA_BOT_IS_TEST', False)
 
                                 out_sum_str = f"{amount_decimal:.2f}"
+
+                                # signature = robokassa_md5(
+                                #     f"{merchant_login}:{out_sum_str}:{inv_id}:{password_1}"
+                                # )
+
+                                # Подпись теперь включает Receipt
                                 signature = robokassa_md5(
-                                    f"{merchant_login}:{out_sum_str}:{inv_id}:{password_1}"
+                                    f"{merchant_login}:{out_sum_str}:{inv_id}:{receipt_url_encoded}:{password_1}"
                                 )
 
-                                # URL успеха/ошибки для пользователя — можно вернуть его в бота,
-                                # но основная логика уже в ResultURL (RobokassaBotResultView),
-                                # так что достаточно указать, например, ссылку на бота:
                                 success_url = f"https://t.me/{BOT_USERNAME}?start"
                                 fail_url = f"https://t.me/{BOT_USERNAME}?start"
+
+                                # params = {
+                                #     'MerchantLogin': merchant_login,
+                                #     'OutSum': out_sum_str,
+                                #     'InvId': str(inv_id),
+                                #     'Description': f'Подписка DomVPN на {days} дн.',
+                                #     'SignatureValue': signature,
+                                #     'SuccessURL': success_url,
+                                #     'FailURL': fail_url,
+                                #     'Recurring': 'true',
+                                # }
 
                                 params = {
                                     'MerchantLogin': merchant_login,
@@ -958,9 +991,8 @@ async def callback_query_handlers(call):
                                     'SuccessURL': success_url,
                                     'FailURL': fail_url,
                                     'Recurring': 'true',
+                                    'Receipt': receipt_url_encoded,  # ← добавлено
                                 }
-                                if is_test:
-                                    params['IsTest'] = '1'
 
                                 redirect_url = f"{base_url}?{urlencode(params)}"
 
