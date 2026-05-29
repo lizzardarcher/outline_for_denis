@@ -196,7 +196,7 @@ class CreateRobokassaPaymentView(LoginRequiredMixin, View):
                 'SuccessURL': success_url,
                 'FailURL': fail_url,
                 'Recurring': 'true',
-                'Receipt': receipt_url_encoded,  # ← добавлено
+                'Receipt': receipt_url_encoded,
             }
 
             redirect_url = f"{base_url}?{urlencode(params)}"

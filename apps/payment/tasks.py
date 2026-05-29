@@ -1,8 +1,11 @@
+import json
 import traceback
+import urllib
 from datetime import timedelta, datetime
 from decimal import Decimal
 import hashlib
 import xml.etree.ElementTree as ET
+from urllib.parse import quote
 
 import requests
 from celery import shared_task
@@ -795,23 +798,52 @@ def robokassa_md5(s: str) -> str:
 
 def post_robokassa_bot_recurring_invoice(*, merchant_login: str, password_1: str, invoice_id: int,
                                          previous_invoice_id: str, out_sum: Decimal, description: str,
-                                         is_test: bool, ) -> tuple[bool, str]:
+                                         is_test: bool) -> tuple[bool, str]:
     """
-    Дочерний рекуррентный счёт. PreviousInvoiceID не входит в SignatureValue (док. RoboKassa).
-    Подпись: MD5(MerchantLogin:OutSum:InvoiceID:Password1).
+    Отправка рекуррентного платежа в Робокассу с чеком по 54-ФЗ.
+
+    Receipt ВХОДИТ В ПОДПИСЬ [web:31]:
+    Подпись: MD5(MerchantLogin:OutSum:InvId:Receipt:Password1)
+    Receipt нужно URL-кодировать ПЕРЕД добавлением в строку для подписи [web:31].
     """
     out_sum_str = f'{out_sum:.2f}'
-    signature = robokassa_md5(f'{merchant_login}:{out_sum_str}:{invoice_id}:{password_1}')
+
+    receipt = {
+        "sno": "usn_income",
+        "items": [
+            {
+                "name": (description or "Услуга DomVPN")[:100],
+                "quantity": 1,
+                "sum": float(out_sum),  # в рублях [web:31]
+                "payment_method": "full_payment",
+                "payment_object": "service",
+                "tax": "vat0"
+            }
+        ]
+    }
+
+    import urllib.parse
+
+    # Receipt URL-кодировать ПЕРЕД добавлением в строку для подписи [web:31]
+    receipt_json = json.dumps(receipt, ensure_ascii=False)
+    receipt_encoded = urllib.parse.quote(receipt_json, safe='')
+
+    # Подпись с Receipt [web:31]: MerchantLogin:OutSum:InvId:Receipt:Password1
+    signature = robokassa_md5(f'{merchant_login}:{out_sum_str}:{invoice_id}:{receipt_encoded}:{password_1}')
+
     data = {
         'MerchantLogin': merchant_login,
         'InvoiceID': str(invoice_id),
         'PreviousInvoiceID': str(previous_invoice_id),
         'OutSum': out_sum_str,
-        'Description': (description or 'Подписка DomVPN')[:100],
+        'Description': (description or 'Услуга DomVPN')[:100],
         'SignatureValue': signature,
+        'Receipt': receipt_encoded,  # URL-кодированный Receipt [web:31]
     }
+
     if is_test:
         data['IsTest'] = '1'
+
     resp = requests.post(ROBOKASSA_RECURRING_URL, data=data, timeout=60)
     text = (resp.text or '').strip()
     ok = resp.ok and text.upper().startswith('OK')
@@ -1122,6 +1154,7 @@ def robokassa_bot_attempt_recurring_payment():
                 Logging.objects.create(
                     category="payment",
                     log_level="INFO",
+                    message=f'Платежный запрос на автосписание Робокасса Бот отправлен успешно',
                     datetime=datetime.now(),
                     user=user
                 )
@@ -1132,6 +1165,7 @@ def robokassa_bot_attempt_recurring_payment():
                 Logging.objects.create(
                     category="payment",
                     log_level="WARNING",
+                    message=f'Списание {body}',
                     datetime=datetime.now(),
                     user=user,
                 )
@@ -1140,6 +1174,7 @@ def robokassa_bot_attempt_recurring_payment():
             Logging.objects.create(
                 category="payment",
                 log_level="FATAL",
+                message=f'{e}',
                 datetime=datetime.now(),
                 user=user,
             )
@@ -1235,6 +1270,7 @@ def robokassa_site_attempt_recurring_payment():
                 Logging.objects.create(
                     category="payment",
                     log_level="INFO",
+                    message=f'Платежный запрос на автосписание Робокасса Бот отправлен успешно',
                     datetime=datetime.now(),
                     user=user,
                 )
@@ -1245,6 +1281,7 @@ def robokassa_site_attempt_recurring_payment():
                 Logging.objects.create(
                     category="payment",
                     log_level="WARNING",
+                    message=f'Списание {body}',
                     datetime=datetime.now(),
                     user=user,
                 )
@@ -1253,6 +1290,7 @@ def robokassa_site_attempt_recurring_payment():
             Logging.objects.create(
                 category="payment",
                 log_level="FATAL",
+                message=f'{e}',
                 datetime=datetime.now(),
                 user=user,
             )
