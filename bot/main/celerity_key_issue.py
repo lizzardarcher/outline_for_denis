@@ -56,6 +56,32 @@ def pick_hysteria2_tls_uri(subscription_text: str, server_ip: str) -> Optional[s
     return None
 
 
+def pick_hysteria2_hopping_uri(subscription_text: str, server_ip: str) -> Optional[str]:
+    """
+    Ищет строку с hysteria2:// для server_ip, у которой есть параметр mport
+    (port hopping), и возвращает эту строку целиком.
+    Пример возвращаемой строки:
+        hysteria2://444444444414:13a9a90b9c144315aba982d1@45.129.143.54:443?mport=443,8443,2096&insecure=1&alpn=h3#KVMKA%20NL13%20TLS
+    Если такой строки нет — возвращает None.
+    """
+    ip = (server_ip or "").strip()
+    if not ip:
+        return None
+
+    for raw in subscription_text.splitlines():
+        line = raw.strip()
+        if not line or "hysteria2://" not in line:
+            continue
+        if ip not in line:
+            continue
+
+        # Ищем строку с port hopping (параметр mport=)
+        if "mport=" not in line.lower():
+            continue
+
+        return line
+
+    return None
 
 def issue_hysteria2_tls_for_user(
     *,
@@ -108,7 +134,8 @@ def issue_hysteria2_tls_for_user(
     if not isinstance(sub, str) or not sub.strip():
         return False, "Пустой ответ подписки (?format=uri)"
 
-    uri = pick_hysteria2_tls_uri(sub, server_ip)
+    # uri = pick_hysteria2_tls_uri(sub, server_ip)
+    uri = pick_hysteria2_hopping_uri(sub, server_ip)
     if not uri:
         return False, (
             f"Не найдена строка hysteria2:// (TLS) для IP {server_ip!r} в подписке. "
