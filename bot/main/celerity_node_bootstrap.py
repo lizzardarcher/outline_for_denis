@@ -4,6 +4,7 @@ Celerity (C³): создание ноды в панели (POST /nodes при н
 """
 from __future__ import annotations
 
+
 import json
 from typing import Any, Callable, Optional, Tuple
 
@@ -11,6 +12,7 @@ from django.conf import settings
 
 from bot.main.CelerityAPI import CelerityAPI
 from bot.main.celerity_key_issue import _celerity_group_id
+from bot.main.hysteria_tls_meta import try_sync_hysteria_tls_meta_after_setup
 from bot.models import Server
 
 _SERVER_PASSWORD_PLACEHOLDERS = frozenset(("", "<PASSWORD>"))
@@ -181,6 +183,7 @@ def bootstrap_celerity_for_server(
         _emit("ERROR", f"setup_node: {data!r}")
         return False, f"setup_node: {data!r}"
 
+    try_sync_hysteria_tls_meta_after_setup(server, log_fn=_emit)
     mark_server_c3_activated(server)
     detail = ""
     if isinstance(data, dict) and data.get("logs"):

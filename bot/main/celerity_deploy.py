@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-
 """
 C³ CELERITY: создание ноды в панели (при необходимости) и автоматическая установка ПО (POST /nodes/:id/setup).
 
@@ -50,6 +49,7 @@ if __name__ == "__main__":
 from bot.main import django_orm  # noqa: E402  # django.setup() при импорте
 
 from bot.main.CelerityAPI import CelerityAPI  # noqa: E402
+from bot.main.hysteria_tls_meta import try_sync_hysteria_tls_meta_after_setup  # noqa: E402
 from bot.models import Server  # noqa: E402
 from django.conf import settings  # noqa: E402
 
@@ -268,6 +268,7 @@ def _build_queryset(
 
 def _mark_server_c3_done(server: Server) -> None:
     if hasattr(Server, "is_c3celeryty_activated"):
+        try_sync_hysteria_tls_meta_after_setup(server, log_fn=lambda level, msg: _log(f"[{level}] {msg}"))
         server.is_c3celeryty_activated = True
         server.save(update_fields=["is_c3celeryty_activated"])
         _log(f"В БД выставлено is_c3celeryty_activated=True для pk={server.pk}")

@@ -31,7 +31,6 @@ admin.site.unregister(ClockedSchedule)
 admin.site.unregister(IntervalSchedule)
 admin.site.unregister(PeriodicTask)
 
-
 class BaseAdmin(admin.ModelAdmin):
 
     def has_permission(self, request, obj=None, permissions_to_check=None):
@@ -580,29 +579,34 @@ def set_is_activated_vless_false(modeladmin, request, queryset):
     modeladmin.message_user(request, f'Флаг MB снят у {updated} сервер(ов).')
 
 
-@admin.register(Server)
-class ServerAdmin(BaseAdmin):
-
-    actions = [set_is_activated_vless_true, set_is_activated_vless_false]
-
-    def get_key_generated(self, obj):
-        if 0 < obj.keys_generated <= 100:
-            return format_html('<b style="color:green;">%s</b>' % obj.keys_generated)
-        elif 100 < obj.keys_generated <= 150:
-            return format_html('<b style="color:yellow;">%s</b>' % obj.keys_generated)
-        elif obj.keys_generated > 150:
-            return format_html('<b style="color:red;">%s</b>' % obj.keys_generated)
-
-    get_key_generated.allow_tags = True
-    get_key_generated.short_description = 'Всего ключей'
-
-    list_display = (
-        'hosting', 'ip_address', 'user', 'password', 'rental_price', 'max_keys', 'get_key_generated', 'is_active',
-        'country', 'created_at', 'is_activated_vless', 'is_c3celeryty_activated')
-    list_display_links = ('hosting',)
-    fields = ( 'hosting', 'ip_address', 'user', 'password', 'rental_price', 'max_keys', 'is_active', 'country', 'created_at', 'is_c3celeryty_activated')
-    readonly_fields = ('max_keys', 'created_at',)
-    ordering = ('country', 'ip_address')
+# @admin.register(Server)
+# class ServerAdmin(BaseAdmin):
+#
+#     actions = [set_is_activated_vless_true, set_is_activated_vless_false]
+#
+#     def get_key_generated(self, obj):
+#         if 0 < obj.keys_generated <= 100:
+#             return format_html('<b style="color:green;">%s</b>' % obj.keys_generated)
+#         elif 100 < obj.keys_generated <= 150:
+#             return format_html('<b style="color:yellow;">%s</b>' % obj.keys_generated)
+#         elif obj.keys_generated > 150:
+#             return format_html('<b style="color:red;">%s</b>' % obj.keys_generated)
+#
+#     get_key_generated.allow_tags = True
+#     get_key_generated.short_description = 'Всего ключей'
+#
+#     list_display = (
+#         'hosting', 'ip_address', 'user', 'password', 'rental_price', 'max_keys', 'get_key_generated', 'is_active',
+#         'country', 'created_at', 'is_activated_vless', 'is_c3celeryty_activated',
+#         'hysteria_tls_sni', 'hysteria_pin_sha256')
+#     list_display_links = ('hosting',)
+#     fields = (
+#         'hosting', 'ip_address', 'user', 'password', 'rental_price', 'max_keys', 'is_active', 'country',
+#         'created_at', 'is_c3celeryty_activated',
+#         'hysteria_tls_sni', 'hysteria_pin_sha256', 'hysteria_cert_synced_at',
+#     )
+#     readonly_fields = ('max_keys', 'created_at', 'hysteria_cert_synced_at')
+#     ordering = ('country', 'ip_address')
 
 
 @admin.register(Country)

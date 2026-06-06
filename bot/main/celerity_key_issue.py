@@ -3,15 +3,20 @@
 
 Политика: перед созданием нового ключа — удаление пользователя в Marzban и в Celerity,
 затем POST /users в Celerity (как на сайте для других протоколов).
+
+Подписка Celerity отдаёт hopping + insecure=1; для Happ (sing-box/Xray ≥1.13) URI
+переписывается: pinSHA256 и SNI с /etc/hysteria/cert.pem, insecure убирается.
 """
 from __future__ import annotations
 
 from typing import Any, Optional, Tuple
+from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 from django.conf import settings
 
 from bot.main.CelerityAPI import CelerityAPI
 from bot.main.MarzbanAPI import MarzbanAPI
+from bot.models import Server
 
 
 def try_delete_celerity_user(telegram_user_id) -> None:
@@ -34,6 +39,33 @@ def _celerity_group_id(api: CelerityAPI) -> str:
     if not ok2:
         raise RuntimeError(f"Celerity: группа «{name}» не найдена: {gid!r}")
     return gid
+
+
+def sanitize_hysteria2_uri_for_happ(
+    uri: str,
+    *,
+    sni: str,
+    pin_sha256: str,
+) -> str:
+    """
+    Убирает insecure/allowInsecure, подставляет sni и pinSHA256 (hex uppercase).
+    Сохраняет mport, alpn, obfs и прочие параметры Celerity.
+    """
+    pin = (pin_sha256 or "").replace(":", "").strip().upper()
+    sni_val = (sni or "").strip()
+    if not pin or not sni_val:
+        raise ValueError("sni и pin_sha256 обязательны для sanitize_hysteria2_uri_for_happ")
+
+    parsed = urlparse(uri)
+    query = dict(parse_qsl(parsed.query, keep_blank_values=True))
+    query.pop("insecure", None)
+    query.pop("allowInsecure", None)
+    query["sni"] = sni_val
+    query["pinSHA256"] = pin
+    if "alpn" not in query:
+        query["alpn"] = "h3"
+
+    return urlunparse(parsed._replace(query=urlencode(query)))
 
 
 def pick_hysteria2_tls_uri(subscription_text: str, server_ip: str) -> Optional[str]:
@@ -60,9 +92,6 @@ def pick_hysteria2_hopping_uri(subscription_text: str, server_ip: str) -> Option
     """
     Ищет строку с hysteria2:// для server_ip, у которой есть параметр mport
     (port hopping), и возвращает эту строку целиком.
-    Пример возвращаемой строки:
-        hysteria2://444444444414:13a9a90b9c144315aba982d1@45.129.143.54:443?mport=443,8443,2096&insecure=1&alpn=h3#KVMKA%20NL13%20TLS
-    Если такой строки нет — возвращает None.
     """
     ip = (server_ip or "").strip()
     if not ip:
@@ -74,14 +103,27 @@ def pick_hysteria2_hopping_uri(subscription_text: str, server_ip: str) -> Option
             continue
         if ip not in line:
             continue
-
-        # Ищем строку с port hopping (параметр mport=)
         if "mport=" not in line.lower():
             continue
-
         return line
 
     return None
+
+
+def _server_for_hysteria_issue(server_ip: str) -> Optional[Server]:
+    ip = (server_ip or "").strip()
+    if not ip:
+        return None
+    return (
+        Server.objects.filter(
+            ip_address=ip,
+            is_c3celeryty_activated=True,
+        )
+        .order_by("pk")
+        .first()
+    )
+
+
 
 def issue_hysteria2_tls_for_user(
     *,
@@ -90,7 +132,8 @@ def issue_hysteria2_tls_for_user(
     server_ip: str,
 ) -> Tuple[bool, Any]:
     """
-    Удаляет пользователя в Marzban и Celerity, создаёт в Celerity, отдаёт одну TLS-ссылку.
+    Удаляет пользователя в Marzban и Celerity, создаёт в Celerity, отдаёт одну hopping-ссылку
+    с pinSHA256/SNI для Happ (без insecure=1).
 
     Returns:
         (True, uri: str) или (False, сообщение_об_ошибке)
@@ -99,7 +142,7 @@ def issue_hysteria2_tls_for_user(
     api = CelerityAPI()
     try:
         MarzbanAPI().delete_user(uid)
-    except:
+    except Exception:
         pass
     ok_del, _ = api.delete_user(uid)
     if not ok_del:
@@ -134,14 +177,29 @@ def issue_hysteria2_tls_for_user(
     if not isinstance(sub, str) or not sub.strip():
         return False, "Пустой ответ подписки (?format=uri)"
 
-    # uri = pick_hysteria2_tls_uri(sub, server_ip)
     uri = pick_hysteria2_hopping_uri(sub, server_ip)
     if not uri:
+        uri = pick_hysteria2_tls_uri(sub, server_ip)
+    if not uri:
         return False, (
-            f"Не найдена строка hysteria2:// (TLS) для IP {server_ip!r} в подписке. "
+            f"Не найдена строка hysteria2:// для IP {server_ip!r} в подписке. "
             "Проверьте ноды Celerity и группу пользователя."
         )
 
+    server = _server_for_hysteria_issue(server_ip)
+    if not server or not server.hysteria_pin_sha256 or not server.hysteria_tls_sni:
+        return False, (
+            f"Нода {server_ip}: нет hysteria TLS pin/SNI в БД. "
+            "Выполните: python manage.py sync_hysteria_tls_meta"
+        )
+
+    try:
+        uri = sanitize_hysteria2_uri_for_happ(
+            uri,
+            sni=server.hysteria_tls_sni,
+            pin_sha256=server.hysteria_pin_sha256,
+        )
+    except ValueError as e:
+        return False, str(e)
+
     return True, uri
-
-

@@ -273,6 +273,26 @@ class Server(models.Model):
         verbose_name='C3 Celeryty',
         help_text='Нода Hysteria2 в панели C3 Celeryty настроена и готова к выдаче ключей.',
     )
+    hysteria_tls_sni = models.CharField(
+        max_length=255,
+        blank=True,
+        default='',
+        verbose_name='Hysteria TLS SNI',
+        help_text='CN из /etc/hysteria/cert.pem (для Happ и клиентов без insecure=1).',
+    )
+    hysteria_pin_sha256 = models.CharField(
+        max_length=64,
+        blank=True,
+        default='',
+        verbose_name='Hysteria pinSHA256',
+        help_text='SHA-256 fingerprint cert.pem, hex без двоеточий.',
+    )
+    hysteria_cert_synced_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name='Hysteria cert sync',
+        help_text='Когда последний раз снимали pin/SNI по SSH.',
+    )
 
     def __str__(self):
         return f"{self.hosting} ({self.created_at}) {self.country.name}"
@@ -450,6 +470,7 @@ class Prices(models.Model):
     class Meta:
         verbose_name = 'Цена'
         verbose_name_plural = 'Цены'
+
 
 
 class TelegramMessage(models.Model):
