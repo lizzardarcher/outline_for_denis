@@ -5,7 +5,6 @@
 """
 from __future__ import annotations
 
-
 from typing import Callable, List, Optional, Tuple, TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -118,3 +117,169 @@ def delete_server_from_panels(server: Server) -> None:
             f"Celerity deleted={ce_deleted} failed={ce_failed}"
         ),
     )
+
+
+def collect_known_server_ips() -> set:
+    """IP-адреса всех Server в админке (непустые, без пробелов по краям)."""
+    ips = set()
+    for raw in (
+        Server.objects.exclude(ip_address__isnull=True)
+        .exclude(ip_address="")
+        .values_list("ip_address", flat=True)
+    ):
+        needle = (raw or "").strip()
+        if needle:
+            ips.add(needle)
+    return ips
+
+
+def iter_marzban_panel_nodes(api=None):
+    from bot.main.MarzbanAPI import MarzbanAPI
+
+    marzban = api or MarzbanAPI()
+    ok, data = marzban.list_nodes()
+    if not ok:
+        raise RuntimeError(f"Marzban list_nodes: {data!r}")
+
+    for item in data:
+        if not isinstance(item, dict):
+            continue
+        raw_id = item.get("id")
+        ip = str(item.get("address") or item.get("ip") or "").strip()
+        if raw_id is None or not ip:
+            continue
+        yield {
+            "id": int(raw_id),
+            "ip": ip,
+            "name": str(item.get("name") or "").strip(),
+        }
+
+
+def iter_celerity_panel_nodes(api=None):
+    from bot.main.CelerityAPI import CelerityAPI
+
+    celerity = api or CelerityAPI()
+    ok, data = celerity.list_nodes()
+    if not ok:
+        raise RuntimeError(f"Celerity list_nodes: {data!r}")
+    if not isinstance(data, list):
+        raise RuntimeError(f"Celerity list_nodes: неожиданный ответ {type(data).__name__}")
+
+    for item in data:
+        if not isinstance(item, dict):
+            continue
+        ip = str(item.get("ip") or "").strip()
+        node_id = CelerityAPI._extract_group_id(item)
+        if not ip or not node_id:
+            continue
+        yield {
+            "id": node_id,
+            "ip": ip,
+            "name": str(item.get("name") or "").strip(),
+            "type": str(item.get("type") or "hysteria").strip(),
+        }
+
+
+def find_orphan_panel_nodes(
+    known_ips=None,
+    *,
+    marzban_api=None,
+    celerity_api=None,
+    include_marzban=True,
+    include_celerity=True,
+):
+    """
+    Ноды в панелях, IP которых нет ни у одного Server в Django.
+
+    Returns:
+        (marzban_orphans, celerity_orphans) — списки dict с полями id, ip, name.
+    """
+    known = known_ips if known_ips is not None else collect_known_server_ips()
+
+    marzban_orphans = []
+    if include_marzban:
+        for node in iter_marzban_panel_nodes(marzban_api):
+            if node["ip"] not in known:
+                marzban_orphans.append(node)
+
+    celerity_orphans = []
+    if include_celerity:
+        for node in iter_celerity_panel_nodes(celerity_api):
+            if node["ip"] not in known:
+                celerity_orphans.append(node)
+
+    return marzban_orphans, celerity_orphans
+
+
+def delete_orphan_panel_nodes(
+    *,
+    dry_run=False,
+    include_marzban=True,
+    include_celerity=True,
+    marzban_api=None,
+    celerity_api=None,
+) -> dict:
+    """
+    Удаляет из Marzban/Celerity ноды, IP которых отсутствует в Server.
+
+    Returns:
+        dict со счётчиками и списками orphan-нод.
+    """
+    from bot.main.CelerityAPI import CelerityAPI
+    from bot.main.MarzbanAPI import MarzbanAPI
+
+    marzban_orphans, celerity_orphans = find_orphan_panel_nodes(
+        marzban_api=marzban_api,
+        celerity_api=celerity_api,
+        include_marzban=include_marzban,
+        include_celerity=include_celerity,
+    )
+
+    result = {
+        "marzban_orphans": marzban_orphans,
+        "celerity_orphans": celerity_orphans,
+        "marzban_deleted": 0,
+        "marzban_failed": 0,
+        "celerity_deleted": 0,
+        "celerity_failed": 0,
+        "dry_run": dry_run,
+    }
+
+    if dry_run:
+        return result
+
+    if marzban_orphans:
+        marzban = marzban_api or MarzbanAPI()
+        for node in marzban_orphans:
+            label = f"{node['name'] or node['ip']} ({node['ip']})"
+            deleted, failed = _delete_nodes_by_ids(
+                "Marzban",
+                label,
+                [node["id"]],
+                marzban.delete_node,
+            )
+            result["marzban_deleted"] += deleted
+            result["marzban_failed"] += failed
+
+    if celerity_orphans:
+        celerity = celerity_api or CelerityAPI()
+        for node in celerity_orphans:
+            label = f"{node['name'] or node['ip']} ({node['ip']}) type={node.get('type', '')}"
+            deleted, failed = _delete_nodes_by_ids(
+                "Celerity",
+                label,
+                [node["id"]],
+                celerity.delete_node,
+            )
+            result["celerity_deleted"] += deleted
+            result["celerity_failed"] += failed
+
+    _log(
+        "INFO",
+        (
+            "[Orphan cleanup] "
+            f"Marzban deleted={result['marzban_deleted']} failed={result['marzban_failed']}, "
+            f"Celerity deleted={result['celerity_deleted']} failed={result['celerity_failed']}"
+        ),
+    )
+    return result

@@ -177,20 +177,18 @@ def issue_hysteria2_tls_for_user(
     if not isinstance(sub, str) or not sub.strip():
         return False, "Пустой ответ подписки (?format=uri)"
 
-    uri = pick_hysteria2_hopping_uri(sub, server_ip)
+    uri = pick_hysteria2_tls_uri(sub, server_ip)
     if not uri:
-        uri = pick_hysteria2_tls_uri(sub, server_ip)
+        uri = pick_hysteria2_hopping_uri(sub, server_ip)
     if not uri:
         return False, (
             f"Не найдена строка hysteria2:// для IP {server_ip!r} в подписке. "
-            "Проверьте ноды Celerity и группу пользователя."
         )
 
     server = _server_for_hysteria_issue(server_ip)
     if not server or not server.hysteria_pin_sha256 or not server.hysteria_tls_sni:
         return False, (
             f"Нода {server_ip}: нет hysteria TLS pin/SNI в БД. "
-            "Выполните: python manage.py sync_hysteria_tls_meta"
         )
 
     try:
