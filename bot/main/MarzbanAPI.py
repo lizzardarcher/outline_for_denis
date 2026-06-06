@@ -3,7 +3,6 @@ import json
 
 from django.conf import settings
 
-from bot.main import django_orm
 from bot.models import TelegramBot
 
 
@@ -165,6 +164,67 @@ class MarzbanAPI:
         """
         success, result = self._make_request("GET", "/users")
         return success, result
+
+    def list_nodes(self):
+        """
+        GET /nodes — список нод Marzban.
+
+        Returns:
+            tuple: (bool, list | str) — успех и список нод или сообщение об ошибке.
+        """
+        success, result = self._make_request("GET", "/nodes")
+        if not success:
+            return False, result
+        if isinstance(result, list):
+            return True, result
+        if isinstance(result, dict):
+            for key in ("nodes", "items", "data"):
+                inner = result.get(key)
+                if isinstance(inner, list):
+                    return True, inner
+        return False, f"Неожиданный ответ list_nodes: {type(result).__name__}"
+
+    def find_node_ids_by_ip(self, ip: str):
+        """
+        Ищет id нод Marzban по IP (поле address).
+
+        Returns:
+            tuple: (bool, list[int] | str)
+        """
+        needle = (ip or "").strip()
+        if not needle:
+            return False, "Пустой ip"
+        if not self.api_token:
+            return False, "Нет API-токена Marzban"
+
+        ok, data = self.list_nodes()
+        if not ok:
+            return False, data
+
+        node_ids = []
+        for item in data:
+            if not isinstance(item, dict):
+                continue
+            addr = str(item.get("address") or item.get("ip") or "").strip()
+            if addr != needle:
+                continue
+            raw_id = item.get("id")
+            if raw_id is not None:
+                node_ids.append(int(raw_id))
+        if not node_ids:
+            return False, f"Нода Marzban с ip={needle!r} не найдена"
+        return True, node_ids
+
+    def delete_node(self, node_id):
+        """
+        DELETE /node/:node_id — удаление ноды из Marzban.
+
+        Returns:
+            tuple: (bool, None | str)
+        """
+        if not self.api_token:
+            return False, "Нет API-токена Marzban"
+        return self._make_request("DELETE", f"/node/{int(node_id)}")
 
     def add_node(self, ip, name, port=62050):
         node = {

@@ -2,6 +2,7 @@ import json
 from typing import Any, Dict, Mapping, Optional
 from urllib.parse import quote
 
+
 import requests
 from django.conf import settings
 
@@ -135,12 +136,12 @@ class CelerityAPI:
         return self._make_request("GET", "/nodes", params=params)
 
 
-    def find_node_id_by_ip(self, ip: str, node_type: Optional[str] = None):
+    def find_node_ids_by_ip(self, ip: str, node_type: Optional[str] = None):
         """
-        Ищет _id ноды по IP (и опционально type: hysteria или xray).
+        Ищет _id всех нод по IP (и опционально type: hysteria или xray).
 
         Returns:
-            (True, node_id_str) или (False, error_message)
+            (True, list[node_id_str]) или (False, error_message)
         """
         needle = (ip or "").strip()
         if not needle:
@@ -152,7 +153,7 @@ class CelerityAPI:
         if not isinstance(data, list):
             return False, f"Неожиданный ответ list_nodes: {type(data).__name__}"
 
-        candidates = []
+        node_ids = []
         for n in data:
             if not isinstance(n, dict):
                 continue
@@ -161,24 +162,39 @@ class CelerityAPI:
             ntype = n.get("type") or "hysteria"
             if node_type is not None and ntype != node_type:
                 continue
-            candidates.append(n)
+            nid = self._extract_group_id(n)
+            if nid:
+                node_ids.append(nid)
 
-        if not candidates:
+        if not node_ids:
             return False, f"Нода с ip={needle!r} не найдена (type filter={node_type!r})"
-        if len(candidates) > 1:
-            return False, (
-                f"Несколько нод с ip={needle!r}: {len(candidates)}. Уточните node_type или удалите дубликаты."
-            )
+        return True, node_ids
 
-        nid = self._extract_group_id(candidates[0])
-        if not nid:
-            return False, "У записи ноды нет _id"
-        return True, nid
+    def find_node_id_by_ip(self, ip: str, node_type: Optional[str] = None):
+        """
+        Ищет _id ноды по IP (и опционально type: hysteria или xray).
+
+        Returns:
+            (True, node_id_str) или (False, error_message)
+        """
+        ok, data = self.find_node_ids_by_ip(ip, node_type=node_type)
+        if not ok:
+            return False, data
+        if len(data) > 1:
+            return False, (
+                f"Несколько нод с ip={ip!r}: {len(data)}. Уточните node_type или удалите дубликаты."
+            )
+        return True, data[0]
 
     def get_node(self, node_id: str):
         """GET /nodes/:id"""
         nid = quote(str(node_id), safe="")
         return self._make_request("GET", f"/nodes/{nid}")
+
+    def delete_node(self, node_id: str):
+        """DELETE /nodes/:id"""
+        nid = quote(str(node_id), safe="")
+        return self._make_request("DELETE", f"/nodes/{nid}")
 
     def create_node(self, data: dict):
         """

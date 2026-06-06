@@ -6,3 +6,6 @@ class BotConfig(AppConfig):
     name = 'bot'
     verbose_name = 'VPN BOT'
 
+    def ready(self):
+        import bot.signals  # noqa: F401
+
