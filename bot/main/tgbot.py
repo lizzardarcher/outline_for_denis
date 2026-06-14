@@ -1201,7 +1201,8 @@ async def callback_query_handlers(call):
                                               user=user)
 
                             site_domain = settings.DOMAIN
-                            login_url = f"{site_domain}/auth/accounts/login/"
+                            proxy_domain = settings.PROXY_DOMAIN
+                            login_url = f"{proxy_domain}"
 
                             if not profile.site_password_generated:
                                 password = _generate_and_set_site_password(django_user)
@@ -1221,7 +1222,7 @@ async def callback_query_handlers(call):
                                     f"Логин: <code>{django_user.username}</code>\n\n"
                                     f"Сайт: {login_url}\n\n"
                                     "Пароль уже был выдан ранее.\n"
-                                    "Если вы его забыли — нажмите кнопку «Изменить пароль на сайте», "
+                                    "Если вы его забыли - нажмите кнопку «Изменить пароль на сайте», "
                                     "и мы сгенерируем новый."
                                 )
 
@@ -1240,7 +1241,10 @@ async def callback_query_handlers(call):
                         profile = tg_user.user_profile
 
                         site_domain = settings.DOMAIN
-                        login_url = f"{site_domain}/auth/accounts/login/"
+                        proxy_domain = settings.PROXY_DOMAIN
+
+                        # login_url = f"{site_domain}/auth/accounts/login/"
+                        login_url = f"{proxy_domain}"
 
                         password = _generate_and_set_site_password(django_user)
                         if profile and not profile.site_password_generated:
