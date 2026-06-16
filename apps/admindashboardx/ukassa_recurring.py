@@ -129,6 +129,7 @@ def _apply_referral_income(user, amount_to_charge):
     user_ids_to_pay = [r.referrer.user_id for r in referred_list]
     users_to_pay = {u.user_id: u for u in TelegramUser.objects.filter(user_id__in=user_ids_to_pay)}
 
+
     for r in referred_list:
         level = r.level
         user_to_pay = users_to_pay.get(r.referrer.user_id)
@@ -157,19 +158,59 @@ def _user_email(user):
         return "noemail@noemail.ru"
 
 
-def _handle_payment_exception(user, exc, channel, logger: TaskRunLogger):
+def _handle_payment_exception(user, exc, channel, logger: TaskRunLogger, *, dry_run=False):
     msg = (
         f"[CELERY] [{channel}] Ошибка при списании с пользователя {user.user_id}: {exc}\n"
         f"Payment Method ID:{user.payment_method_id}"
     )
-    if "This payment_method_id doesn't exist" in msg or "Payment method is not available" in msg:
-        user.payment_method_id = ""
-        user.save()
+    if not dry_run:
+        if "This payment_method_id doesn't exist" in msg or "Payment method is not available" in msg:
+            user.payment_method_id = ""
+            user.save()
     logger.log("FATAL", msg, user=user)
     return 1
 
 
-def run_ukassa_bot_recurring(logger: TaskRunLogger):
+def _bot_skip_reason(user):
+    if (getattr(user, "robokassa_recurring_parent_inv_id", "") or "").strip():
+        return "активна рекуррентная подписка RoboKassa"
+    if not (len(user.payment_method_id) > 10 and "000" in user.payment_method_id):
+        return "payment_method_id не подходит под YooKassa Bot"
+    try:
+        payment_system = Transaction.objects.filter(payment_id=user.payment_method_id).last().payment_system
+    except (Transaction.DoesNotExist, AttributeError):
+        payment_system = None
+    if payment_system in ("YooKassaSite", "RoboKassaBot", "RoboKassaSite"):
+        return f"платёжная система «{payment_system}» (не Bot)"
+    return None
+
+
+def _site_skip_reason(user):
+    if not user.payment_method_id:
+        return "нет payment_method_id"
+    try:
+        payment_system = Transaction.objects.filter(payment_id=user.payment_method_id).last().payment_system
+    except (Transaction.DoesNotExist, AttributeError):
+        payment_system = None
+    if payment_system != "YooKassaSite":
+        ps = payment_system or "неизвестна"
+        return f"платёжная система «{ps}» (нужна YooKassaSite)"
+    return None
+
+
+def _dry_run_charge_log(channel, user, amount_to_charge, currency, payment_system_label):
+    exp_date = timezone.now().date() + timedelta(days=31)
+    referral_count = TelegramReferral.objects.filter(referred=user).count()
+    pm_preview = user.payment_method_id[:12] + "…" if len(user.payment_method_id) > 12 else user.payment_method_id
+    return (
+        f"[DRY-RUN] [{channel}] Списание: user_id={user.user_id}, сумма={amount_to_charge} {currency}, "
+        f"email={_user_email(user)}, payment_method_id={pm_preview}, магазин={payment_system_label}. "
+        f"Будет: Payment.create → при успехе подписка до {exp_date}, Transaction ({payment_system_label}), "
+        f"рефералов для начисления: {referral_count}"
+    )
+
+
+def run_ukassa_bot_recurring(logger: TaskRunLogger, *, dry_run=False):
     channel = "BOT"
     users_to_charge = TelegramUser.objects.filter(
         subscription_status=False,
@@ -178,30 +219,44 @@ def run_ukassa_bot_recurring(logger: TaskRunLogger):
         permission_revoked=False,
     )
 
+    mode_label = "DRY-RUN" if dry_run else "Списание"
     logger.log(
         "INFO",
-        f"[CELERY] [{channel}] [Списание] [Начало] [количество пользователей: {users_to_charge.count()}]",
+        f"[{'DRY-RUN' if dry_run else 'CELERY'}] [{channel}] [{mode_label}] [Начало] "
+        f"[кандидатов в выборке: {users_to_charge.count()}]",
     )
-    success = canceled = failed = unknown = 0
+    if dry_run:
+        logger.log(
+            "WARNING",
+            "[DRY-RUN] Режим пробного запуска — запросы в YooKassa и изменения в БД не выполняются.",
+        )
+
+    success = canceled = failed = unknown = skipped = would_charge = 0
+    amount_to_charge = Decimal(Prices.objects.get(pk=1).price_1)
+    currency = "RUB"
 
     for user in users_to_charge:
-        if (getattr(user, "robokassa_recurring_parent_inv_id", "") or "").strip():
+        skip_reason = _bot_skip_reason(user)
+        if skip_reason:
+            skipped += 1
+            if dry_run:
+                logger.log(
+                    "DEBUG",
+                    f"[DRY-RUN] [{channel}] Пропуск user_id={user.user_id}: {skip_reason}",
+                    user=user,
+                )
             continue
-        if not (len(user.payment_method_id) > 10 and "000" in user.payment_method_id):
+
+        if dry_run:
+            would_charge += 1
+            logger.log(
+                "INFO",
+                _dry_run_charge_log(channel, user, amount_to_charge, currency, "YooKassa Bot"),
+                user=user,
+            )
             continue
 
         try:
-            payment_system = Transaction.objects.filter(payment_id=user.payment_method_id).last().payment_system
-        except (Transaction.DoesNotExist, AttributeError):
-            payment_system = None
-
-        if payment_system in ("YooKassaSite", "RoboKassaBot", "RoboKassaSite"):
-            continue
-
-        try:
-            amount_to_charge = Decimal(Prices.objects.get(pk=1).price_1)
-            currency = "RUB"
-
             Configuration.account_id = settings.YOOKASSA_SHOP_ID_BOT
             Configuration.secret_key = settings.YOOKASSA_SECRET_BOT
 
@@ -285,16 +340,20 @@ def run_ukassa_bot_recurring(logger: TaskRunLogger):
                 logger.log("WARNING", msg, user=user)
 
         except Exception as exc:
-            failed += _handle_payment_exception(user, exc, channel, logger)
+            failed += _handle_payment_exception(user, exc, channel, logger, dry_run=dry_run)
 
-    summary = (
-        f"успешно: {success} | отменено: {canceled} | ошибка: {failed} | неизвестно: {unknown}"
-    )
-    logger.log("INFO", f"[CELERY] [{channel}] [Списание] [Конец] [{summary}]")
+    if dry_run:
+        summary = f"dry-run: к списанию {would_charge} | пропущено {skipped}"
+        logger.log("INFO", f"[DRY-RUN] [{channel}] [Конец] [{summary}]")
+    else:
+        summary = (
+            f"успешно: {success} | отменено: {canceled} | ошибка: {failed} | неизвестно: {unknown}"
+        )
+        logger.log("INFO", f"[CELERY] [{channel}] [Списание] [Конец] [{summary}]")
     return summary
 
 
-def run_ukassa_site_recurring(logger: TaskRunLogger):
+def run_ukassa_site_recurring(logger: TaskRunLogger, *, dry_run=False):
     channel = "SITE"
     users_to_charge = TelegramUser.objects.filter(
         subscription_status=False,
@@ -303,23 +362,44 @@ def run_ukassa_site_recurring(logger: TaskRunLogger):
         permission_revoked=False,
     )
 
+    mode_label = "DRY-RUN" if dry_run else "Списание"
     logger.log(
         "INFO",
-        f"[CELERY] [{channel}] [Списание] [Начало] [количество пользователей: {users_to_charge.count()}]",
+        f"[{'DRY-RUN' if dry_run else 'CELERY'}] [{channel}] [{mode_label}] [Начало] "
+        f"[кандидатов в выборке: {users_to_charge.count()}]",
     )
-    success = canceled = failed = unknown = 0
+    if dry_run:
+        logger.log(
+            "WARNING",
+            "[DRY-RUN] Режим пробного запуска — запросы в YooKassa и изменения в БД не выполняются.",
+        )
+
+    success = canceled = failed = unknown = skipped = would_charge = 0
+    amount_to_charge = Decimal(Prices.objects.get(pk=1).price_1)
+    currency = "RUB"
 
     for user in users_to_charge:
-        if not user.payment_method_id:
+        skip_reason = _site_skip_reason(user)
+        if skip_reason:
+            skipped += 1
+            if dry_run:
+                logger.log(
+                    "DEBUG",
+                    f"[DRY-RUN] [{channel}] Пропуск user_id={user.user_id}: {skip_reason}",
+                    user=user,
+                )
             continue
+
+        if dry_run:
+            would_charge += 1
+            logger.log(
+                "INFO",
+                _dry_run_charge_log(channel, user, amount_to_charge, currency, "YooKassa Site"),
+                user=user,
+            )
+            continue
+
         try:
-            payment_system = Transaction.objects.filter(payment_id=user.payment_method_id).last().payment_system
-            if payment_system != "YooKassaSite":
-                continue
-
-            amount_to_charge = Decimal(Prices.objects.get(pk=1).price_1)
-            currency = "RUB"
-
             Configuration.account_id = settings.YOOKASSA_SHOP_ID_SITE
             Configuration.secret_key = settings.YOOKASSA_SECRET_SITE
 
@@ -397,10 +477,14 @@ def run_ukassa_site_recurring(logger: TaskRunLogger):
                 logger.log("WARNING", msg, user=user)
 
         except Exception as exc:
-            failed += _handle_payment_exception(user, exc, channel, logger)
+            failed += _handle_payment_exception(user, exc, channel, logger, dry_run=dry_run)
 
-    summary = (
-        f"успешно: {success} | отменено: {canceled} | ошибка: {failed} | неизвестно: {unknown}"
-    )
-    logger.log("INFO", f"[CELERY] [{channel}] [Списание] [Конец] [{summary}]")
+    if dry_run:
+        summary = f"dry-run: к списанию {would_charge} | пропущено {skipped}"
+        logger.log("INFO", f"[DRY-RUN] [{channel}] [Конец] [{summary}]")
+    else:
+        summary = (
+            f"успешно: {success} | отменено: {canceled} | ошибка: {failed} | неизвестно: {unknown}"
+        )
+        logger.log("INFO", f"[CELERY] [{channel}] [Списание] [Конец] [{summary}]")
     return summary

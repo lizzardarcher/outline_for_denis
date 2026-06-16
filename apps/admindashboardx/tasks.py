@@ -84,7 +84,6 @@ def initialize_server_task(server_id: int):
         ...
 
 
-
 @shared_task(bind=True, name="apps.admindashboardx.tasks.manual_ukassa_bot_attempt_recurring_payment")
 def manual_ukassa_bot_attempt_recurring_payment(self, run_id: int):
     from .models import ManualTaskLog, ManualTaskRun
@@ -99,7 +98,10 @@ def manual_ukassa_bot_attempt_recurring_payment(self, run_id: int):
         message="Задача принята воркером Celery.",
     )
     try:
-        summary = run_ukassa_bot_recurring(TaskRunLogger(run_id=run_id, channel="BOT"))
+        dry_run = run.is_dry_run
+        summary = run_ukassa_bot_recurring(
+            TaskRunLogger(run_id=run_id, channel="BOT"), dry_run=dry_run
+        )
         run.mark_completed(summary=summary)
         return summary
     except Exception as exc:
@@ -128,7 +130,10 @@ def manual_ukassa_site_attempt_recurring_payment(self, run_id: int):
         message="Задача принята воркером Celery.",
     )
     try:
-        summary = run_ukassa_site_recurring(TaskRunLogger(run_id=run_id, channel="SITE"))
+        dry_run = run.is_dry_run
+        summary = run_ukassa_site_recurring(
+            TaskRunLogger(run_id=run_id, channel="SITE"), dry_run=dry_run
+        )
         run.mark_completed(summary=summary)
         return summary
     except Exception as exc:

@@ -1,5 +1,6 @@
 from collections import defaultdict
 import csv
+import json
 from datetime import datetime, timedelta
 from urllib.parse import urlencode
 from decimal import Decimal
@@ -932,6 +933,7 @@ class RevenueAnalyticsView(DashboardBaseView):
             )
         total_failed = sum(int(x["failed_count"]) for x in by_ps)
         total_ok = sum(int(x["ok_count"]) for x in by_ps)
+
 
 
         if total_ok + total_failed >= 20:
@@ -2748,6 +2750,7 @@ class ProjectManagementView(DashboardBaseView):
                     "icon": meta.get("icon", "bi-gear"),
                     "last_run": last_run,
                     "is_running": is_running,
+                    "supports_dry_run": meta.get("supports_dry_run", False),
                 }
             )
 
@@ -2789,15 +2792,21 @@ class ManualTaskStartView(DashboardBaseView, View):
             )
 
         meta = MANUAL_TASKS[task_key]
+        dry_run = self._parse_dry_run(request)
+        if dry_run and not meta.get("supports_dry_run"):
+            return JsonResponse({"detail": "dry-run не поддерживается для этой задачи"}, status=400)
+
         run = ManualTaskRun.objects.create(
             task_key=task_key,
             status=ManualTaskRun.STATUS_PENDING,
             started_by=request.user if request.user.is_authenticated else None,
+            is_dry_run=dry_run,
         )
+        mode_note = " (пробный dry-run)" if dry_run else ""
         ManualTaskLog.objects.create(
             run=run,
             log_level="INFO",
-            message=f"Запуск задачи «{meta['title']}» инициирован из панели.",
+            message=f"Запуск задачи «{meta['title']}»{mode_note} инициирован из панели.",
         )
 
         from celery import current_app
@@ -2810,8 +2819,19 @@ class ManualTaskStartView(DashboardBaseView, View):
                 "task_key": task_key,
                 "status": run.status,
                 "status_label": run.get_status_display(),
+                "is_dry_run": run.is_dry_run,
             }
         )
+
+    @staticmethod
+    def _parse_dry_run(request):
+        if request.content_type and "application/json" in request.content_type:
+            try:
+                body = json.loads(request.body.decode("utf-8") or "{}")
+                return bool(body.get("dry_run"))
+            except (json.JSONDecodeError, UnicodeDecodeError):
+                return False
+        return request.POST.get("dry_run") in ("1", "true", "on", "yes")
 
 
 class ManualTaskRunStatusView(DashboardBaseView, View):
@@ -2855,6 +2875,7 @@ class ManualTaskRunStatusView(DashboardBaseView, View):
                 "finished_at": timezone.localtime(run.finished_at).strftime("%d.%m.%Y %H:%M:%S")
                 if run.finished_at
                 else None,
+                "is_dry_run": run.is_dry_run,
                 "logs": logs,
             }
         )

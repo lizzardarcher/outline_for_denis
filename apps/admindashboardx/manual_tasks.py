@@ -1,5 +1,6 @@
 """Реестр задач, доступных для ручного запуска из панели."""
 
+
 MANUAL_TASKS = {
     "ukassa_bot_attempt_recurring_payment": {
         "title": "YooKassa Bot — рекуррентное списание",
@@ -9,6 +10,7 @@ MANUAL_TASKS = {
         ),
         "icon": "bi-robot",
         "celery_task_name": "apps.admindashboardx.tasks.manual_ukassa_bot_attempt_recurring_payment",
+        "supports_dry_run": True,
     },
     "ukassa_site_attempt_recurring_payment": {
         "title": "YooKassa Site — рекуррентное списание",
@@ -18,6 +20,7 @@ MANUAL_TASKS = {
         ),
         "icon": "bi-globe2",
         "celery_task_name": "apps.admindashboardx.tasks.manual_ukassa_site_attempt_recurring_payment",
+        "supports_dry_run": True,
     },
 }
 

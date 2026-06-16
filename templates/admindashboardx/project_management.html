@@ -2,7 +2,6 @@
 
 {% block title %} · Управление проектом{% endblock %}
 
-
 {% block content %}
     <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-4">
         <div>
@@ -22,6 +21,12 @@
             </a>
         </li>
     </ul>
+
+    <div class="alert admx-card border-secondary border-opacity-25 py-2 px-3 mb-4 small text-secondary">
+        <i class="bi bi-info-circle me-1"></i>
+        <strong class="text-light">Пробный запуск (dry-run)</strong> — показывает, с кого будет списание и что изменится,
+        без запросов в YooKassa и без записи в БД. Для реального списания используйте «Запустить».
+    </div>
 
     <div id="admx-project-tasks-root"
          data-csrf="{{ csrf_token }}"
@@ -67,9 +72,20 @@
                             </div>
 
                             <div class="mt-auto d-flex flex-wrap gap-2 align-items-center">
+                                {% if task.supports_dry_run %}
+                                    <button type="button"
+                                            class="btn btn-outline-info btn-sm admx-task-action-btn"
+                                            data-task-key="{{ task.key }}"
+                                            data-dry-run="1"
+                                            data-start-url="{% url 'admindashboardx:manual_task_start' task_key=task.key %}"
+                                            {% if task.is_running %}disabled{% endif %}>
+                                        <i class="bi bi-eye me-1"></i>Пробный запуск
+                                    </button>
+                                {% endif %}
                                 <button type="button"
-                                        class="btn btn-primary btn-sm admx-task-start-btn"
+                                        class="btn btn-primary btn-sm admx-task-action-btn admx-task-start-btn"
                                         data-task-key="{{ task.key }}"
+                                        data-dry-run="0"
                                         data-start-url="{% url 'admindashboardx:manual_task_start' task_key=task.key %}"
                                         {% if task.is_running %}disabled{% endif %}>
                                     <i class="bi bi-play-fill me-1"></i>Запустить
@@ -92,6 +108,7 @@
                     <tr>
                         <th>#</th>
                         <th>Задача</th>
+                        <th>Режим</th>
                         <th>Статус</th>
                         <th>Запустил</th>
                         <th>Начало</th>
@@ -105,6 +122,13 @@
                         <tr>
                             <td>{{ run.id }}</td>
                             <td class="small">{{ run.task_title }}</td>
+                            <td>
+                                {% if run.is_dry_run %}
+                                    <span class="badge admx-dry-run-badge">dry-run</span>
+                                {% else %}
+                                    <span class="text-secondary small">боевой</span>
+                                {% endif %}
+                            </td>
                             <td>
                                 <span class="badge admx-run-status-{{ run.status }}">{{ run.get_status_display }}</span>
                             </td>
@@ -122,7 +146,7 @@
                             </td>
                         </tr>
                     {% empty %}
-                        <tr><td colspan="8" class="text-center text-secondary py-4">История пуста</td></tr>
+                        <tr><td colspan="9" class="text-center text-secondary py-4">История пуста</td></tr>
                     {% endfor %}
                     </tbody>
                 </table>
@@ -198,10 +222,14 @@
         const logBody = card.querySelector('[data-role="log-body"]');
         const runMeta = card.querySelector('[data-role="run-meta"]');
         const summaryEl = card.querySelector('[data-role="summary"]');
-        const startBtn = card.querySelector('.admx-task-start-btn');
+        const actionBtns = card.querySelectorAll('.admx-task-action-btn');
 
         logConsole.hidden = false;
         runMeta.textContent = 'Запуск #' + runId;
+
+        function setActionButtonsDisabled(disabled) {
+            actionBtns.forEach(function (btn) { btn.disabled = disabled; });
+        }
 
         function tick() {
             const url = statusUrl(runId) + (afterId ? '?after_id=' + afterId : '');
@@ -211,6 +239,9 @@
 
             fetcher.then(function (data) {
                 setBadge(card, data.status);
+                if (data.is_dry_run) {
+                    runMeta.textContent = 'Запуск #' + runId + ' · dry-run';
+                }
                 if (data.logs && data.logs.length) {
                     appendLogs(logBody, data.logs);
                     afterId = data.logs[data.logs.length - 1].id;
@@ -220,9 +251,9 @@
 
                 if (data.status === 'completed' || data.status === 'failed') {
                     stopPoller(runId);
-                    if (startBtn) startBtn.disabled = false;
-                } else if (startBtn) {
-                    startBtn.disabled = true;
+                    setActionButtonsDisabled(false);
+                } else {
+                    setActionButtonsDisabled(true);
                 }
             }).catch(function () {});
         }
@@ -240,26 +271,34 @@
     }
 
     root.addEventListener('click', function (event) {
-        const startBtn = event.target.closest('.admx-task-start-btn');
-        if (startBtn) {
-            const card = startBtn.closest('.admx-task-card');
-            const url = startBtn.getAttribute('data-start-url');
-            startBtn.disabled = true;
+        const actionBtn = event.target.closest('.admx-task-action-btn');
+        if (actionBtn) {
+            const card = actionBtn.closest('.admx-task-card');
+            const url = actionBtn.getAttribute('data-start-url');
+            const isDryRun = actionBtn.getAttribute('data-dry-run') === '1';
+            const actionBtns = card.querySelectorAll('.admx-task-action-btn');
+            actionBtns.forEach(function (btn) { btn.disabled = true; });
             setBadge(card, 'pending');
 
             const logConsole = card.querySelector('[data-role="log-console"]');
             const logBody = card.querySelector('[data-role="log-body"]');
             const summaryEl = card.querySelector('[data-role="summary"]');
+            const runMeta = card.querySelector('[data-role="run-meta"]');
             logBody.innerHTML = '';
             summaryEl.textContent = '';
             logConsole.hidden = false;
+            if (isDryRun) {
+                runMeta.textContent = 'Пробный запуск (dry-run)…';
+            }
 
             fetch(url, {
                 method: 'POST',
                 headers: {
                     'X-CSRFToken': csrfToken,
                     'X-Requested-With': 'XMLHttpRequest',
+                    'Content-Type': 'application/json',
                 },
+                body: JSON.stringify({ dry_run: isDryRun }),
             }).then(function (res) {
                 return res.json().then(function (data) {
                     if (!res.ok) throw new Error(data.detail || 'Ошибка запуска');
@@ -277,7 +316,7 @@
                     message: err.message || 'Не удалось запустить задачу',
                     created_at: new Date().toLocaleString('ru-RU'),
                 }]);
-                startBtn.disabled = false;
+                actionBtns.forEach(function (btn) { btn.disabled = false; });
             });
             return;
         }

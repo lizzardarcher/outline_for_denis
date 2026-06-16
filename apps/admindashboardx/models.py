@@ -38,11 +38,13 @@ class ManualTaskRun(models.Model):
     finished_at = models.DateTimeField(null=True, blank=True, verbose_name="Конец")
     summary = models.TextField(blank=True, default="", verbose_name="Итог")
     error_message = models.TextField(blank=True, default="", verbose_name="Ошибка")
+    is_dry_run = models.BooleanField(default=False, verbose_name="Пробный запуск (dry-run)")
 
     class Meta:
         verbose_name = "Ручной запуск задачи"
         verbose_name_plural = "Ручные запуски задач"
         ordering = ("-id",)
+
 
     def __str__(self):
         return f"{self.task_key} #{self.pk} ({self.status})"

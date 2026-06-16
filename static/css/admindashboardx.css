@@ -9,6 +9,7 @@
 }
 
 
+
 body.admx-body {
     background: var(--admx-bg);
     color: var(--admx-text);
@@ -485,6 +486,15 @@ body.admx-body {
 .admx-log-debug .admx-task-log-level,
 .admx-log-trace .admx-task-log-level { color: #abb5c7; }
 .admx-task-log-msg { color: #e8edf7; word-break: break-word; }
+
+.admx-dry-run-badge {
+    background: rgba(13, 202, 240, 0.18);
+    color: #6edff6;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    font-size: 0.68rem;
+}
 
 @media (max-width: 767.98px) {
     .admx-task-log-line {
