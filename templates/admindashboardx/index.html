@@ -2,7 +2,6 @@
 
 {% block title %} · Главная{% endblock %}
 
-
 {% block content %}
     <div id="admx-index-root" data-api-url="{% url 'admindashboardx:index_data' %}"></div>
     <div class="row g-3 mb-4">
@@ -158,6 +157,17 @@
                         <div class="small text-secondary mt-1">Цены, доходы, бот</div>
                     </div>
                 </div>
+            </div>
+            <div class="col">
+                <a class="text-decoration-none d-block h-100" href="{% url 'admindashboardx:project_management' %}">
+                    <div class="card admx-card admx-hub-card h-100">
+                        <div class="card-body text-center py-4">
+                            <i class="bi bi-gear-wide-connected fs-2 text-primary-emphasis d-block mb-2"></i>
+                            <div class="fw-semibold">Управление проектом</div>
+                            <div class="small text-secondary mt-1">Задачи и операции</div>
+                        </div>
+                    </div>
+                </a>
             </div>
         {% endif %}
         <div class="col">

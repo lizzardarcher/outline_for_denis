@@ -83,3 +83,60 @@ def initialize_server_task(server_id: int):
     else:
         ...
 
+
+
+@shared_task(bind=True, name="apps.admindashboardx.tasks.manual_ukassa_bot_attempt_recurring_payment")
+def manual_ukassa_bot_attempt_recurring_payment(self, run_id: int):
+    from .models import ManualTaskLog, ManualTaskRun
+    from .task_run_logging import TaskRunLogger
+    from .ukassa_recurring import run_ukassa_bot_recurring
+
+    run = ManualTaskRun.objects.get(pk=run_id)
+    run.mark_running(self.request.id or "")
+    ManualTaskLog.objects.create(
+        run_id=run_id,
+        log_level="INFO",
+        message="Задача принята воркером Celery.",
+    )
+    try:
+        summary = run_ukassa_bot_recurring(TaskRunLogger(run_id=run_id, channel="BOT"))
+        run.mark_completed(summary=summary)
+        return summary
+    except Exception as exc:
+        run.mark_failed(str(exc))
+        from .models import ManualTaskLog
+
+        ManualTaskLog.objects.create(
+            run_id=run_id,
+            log_level="FATAL",
+            message=f"Критическая ошибка задачи: {exc}",
+        )
+        raise
+
+
+@shared_task(bind=True, name="apps.admindashboardx.tasks.manual_ukassa_site_attempt_recurring_payment")
+def manual_ukassa_site_attempt_recurring_payment(self, run_id: int):
+    from .models import ManualTaskLog, ManualTaskRun
+    from .task_run_logging import TaskRunLogger
+    from .ukassa_recurring import run_ukassa_site_recurring
+
+    run = ManualTaskRun.objects.get(pk=run_id)
+    run.mark_running(self.request.id or "")
+    ManualTaskLog.objects.create(
+        run_id=run_id,
+        log_level="INFO",
+        message="Задача принята воркером Celery.",
+    )
+    try:
+        summary = run_ukassa_site_recurring(TaskRunLogger(run_id=run_id, channel="SITE"))
+        run.mark_completed(summary=summary)
+        return summary
+    except Exception as exc:
+        run.mark_failed(str(exc))
+        ManualTaskLog.objects.create(
+            run_id=run_id,
+            log_level="FATAL",
+            message=f"Критическая ошибка задачи: {exc}",
+        )
+        raise
+

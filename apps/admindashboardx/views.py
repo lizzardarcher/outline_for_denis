@@ -42,6 +42,8 @@ from bot.models import (
     WithdrawalRequest,
 )
 from .tasks import initialize_server_task
+from .manual_tasks import MANUAL_TASKS
+from .models import ManualTaskRun, ManualTaskLog
 
 class ServerForm(forms.ModelForm):
     class Meta:
@@ -930,6 +932,7 @@ class RevenueAnalyticsView(DashboardBaseView):
             )
         total_failed = sum(int(x["failed_count"]) for x in by_ps)
         total_ok = sum(int(x["ok_count"]) for x in by_ps)
+
 
         if total_ok + total_failed >= 20:
             fail_rate = (total_failed / (total_ok + total_failed)) * 100
@@ -2707,3 +2710,151 @@ class TransactionCRUDListView(GenericCRUDListView):
 class TransactionCreateView(GenericCRUDCreateView): model = Transaction; page_key = "transaction_crud"; list_url_name = "admindashboardx:transaction_crud"; form_title = "Создать Transaction"
 class TransactionUpdateView(GenericCRUDUpdateView): model = Transaction; page_key = "transaction_crud"; list_url_name = "admindashboardx:transaction_crud"; form_title = "Редактировать Transaction"
 class TransactionDeleteView(GenericCRUDDeleteView): model = Transaction; page_key = "transaction_crud"; list_url_name = "admindashboardx:transaction_crud"
+
+
+class ProjectManagementView(DashboardBaseView):
+    template_name = "admindashboardx/project_management.html"
+    page_title = "AdminDashboardX · Управление проектом"
+    page_key = "project_management"
+
+    def dispatch(self, request, *args, **kwargs):
+        if self._is_support():
+            return self._forbidden_response()
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        active_tab = (self.request.GET.get("tab") or "tasks").strip()
+        if active_tab not in ("tasks",):
+            active_tab = "tasks"
+
+        task_cards = []
+        for task_key, meta in MANUAL_TASKS.items():
+            last_run = (
+                ManualTaskRun.objects.filter(task_key=task_key)
+                .select_related("started_by")
+                .order_by("-id")
+                .first()
+            )
+            is_running = ManualTaskRun.objects.filter(
+                task_key=task_key,
+                status__in=(ManualTaskRun.STATUS_PENDING, ManualTaskRun.STATUS_RUNNING),
+            ).exists()
+            task_cards.append(
+                {
+                    "key": task_key,
+                    "title": meta["title"],
+                    "description": meta["description"],
+                    "icon": meta.get("icon", "bi-gear"),
+                    "last_run": last_run,
+                    "is_running": is_running,
+                }
+            )
+
+        recent_runs = (
+            ManualTaskRun.objects.select_related("started_by")
+            .order_by("-id")[:30]
+        )
+        context.update(
+            {
+                "active_tab": active_tab,
+                "task_cards": task_cards,
+                "recent_runs": recent_runs,
+            }
+        )
+        return context
+
+
+class ManualTaskStartView(DashboardBaseView, View):
+    page_key = "project_management"
+
+    def dispatch(self, request, *args, **kwargs):
+        if self._is_support():
+            return JsonResponse({"detail": "forbidden"}, status=403)
+        if request.method != "POST":
+            return JsonResponse({"detail": "method not allowed"}, status=405)
+        return super().dispatch(request, *args, **kwargs)
+
+    def post(self, request, task_key, *args, **kwargs):
+        if task_key not in MANUAL_TASKS:
+            return JsonResponse({"detail": "unknown task"}, status=404)
+
+        if ManualTaskRun.objects.filter(
+            task_key=task_key,
+            status__in=(ManualTaskRun.STATUS_PENDING, ManualTaskRun.STATUS_RUNNING),
+        ).exists():
+            return JsonResponse(
+                {"detail": "Задача уже выполняется. Дождитесь завершения."},
+                status=409,
+            )
+
+        meta = MANUAL_TASKS[task_key]
+        run = ManualTaskRun.objects.create(
+            task_key=task_key,
+            status=ManualTaskRun.STATUS_PENDING,
+            started_by=request.user if request.user.is_authenticated else None,
+        )
+        ManualTaskLog.objects.create(
+            run=run,
+            log_level="INFO",
+            message=f"Запуск задачи «{meta['title']}» инициирован из панели.",
+        )
+
+        from celery import current_app
+
+        current_app.send_task(meta["celery_task_name"], args=[run.id])
+
+        return JsonResponse(
+            {
+                "run_id": run.id,
+                "task_key": task_key,
+                "status": run.status,
+                "status_label": run.get_status_display(),
+            }
+        )
+
+
+class ManualTaskRunStatusView(DashboardBaseView, View):
+    page_key = "project_management"
+
+    def dispatch(self, request, *args, **kwargs):
+        if self._is_support():
+            return JsonResponse({"detail": "forbidden"}, status=403)
+        return super().dispatch(request, *args, **kwargs)
+
+    def get(self, request, run_id, *args, **kwargs):
+        run = get_object_or_404(ManualTaskRun, pk=run_id)
+        after_id = request.GET.get("after_id")
+        try:
+            after_id = int(after_id) if after_id else 0
+        except (TypeError, ValueError):
+            after_id = 0
+
+        logs_qs = run.logs.filter(id__gt=after_id).order_by("id")[:500]
+        logs = [
+            {
+                "id": row.id,
+                "level": row.log_level,
+                "message": row.message,
+                "created_at": timezone.localtime(row.created_at).strftime("%d.%m.%Y %H:%M:%S"),
+            }
+            for row in logs_qs
+        ]
+
+        return JsonResponse(
+            {
+                "run_id": run.id,
+                "task_key": run.task_key,
+                "status": run.status,
+                "status_label": run.get_status_display(),
+                "summary": run.summary,
+                "error_message": run.error_message,
+                "started_at": timezone.localtime(run.started_at).strftime("%d.%m.%Y %H:%M:%S")
+                if run.started_at
+                else None,
+                "finished_at": timezone.localtime(run.finished_at).strftime("%d.%m.%Y %H:%M:%S")
+                if run.finished_at
+                else None,
+                "logs": logs,
+            }
+        )

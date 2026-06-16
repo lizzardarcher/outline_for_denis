@@ -1,0 +1,301 @@
+{% extends "admindashboardx/admipanelbase.html" %}
+
+{% block title %} · Управление проектом{% endblock %}
+
+
+{% block content %}
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-4">
+        <div>
+            <h1 class="h4 mb-1">Управление проектом</h1>
+            <div class="text-secondary small">Ручные операции и фоновые задачи</div>
+        </div>
+        <a href="{% url 'admindashboardx:index' %}" class="btn btn-sm btn-outline-light">
+            <i class="bi bi-arrow-left me-1"></i>На главную
+        </a>
+    </div>
+
+    <ul class="nav nav-tabs admx-tabs mb-4" role="tablist">
+        <li class="nav-item" role="presentation">
+            <a class="nav-link {% if active_tab == 'tasks' %}active{% endif %}"
+               href="{% url 'admindashboardx:project_management' %}?tab=tasks">
+                <i class="bi bi-list-task me-1"></i>Управление задачами
+            </a>
+        </li>
+    </ul>
+
+    <div id="admx-project-tasks-root"
+         data-csrf="{{ csrf_token }}"
+         data-status-url-template="{% url 'admindashboardx:manual_task_run_status' run_id=0 %}">
+        <div class="row g-3 mb-4">
+            {% for task in task_cards %}
+                <div class="col-12 col-xl-6">
+                    <div class="card admx-card h-100 admx-task-card" data-task-key="{{ task.key }}">
+                        <div class="card-body d-flex flex-column">
+                            <div class="d-flex align-items-start justify-content-between gap-3 mb-3">
+                                <div class="d-flex align-items-start gap-3">
+                                    <div class="admx-task-icon">
+                                        <i class="bi {{ task.icon }}"></i>
+                                    </div>
+                                    <div>
+                                        <h2 class="h6 mb-1">{{ task.title }}</h2>
+                                        <p class="small text-secondary mb-0">{{ task.description }}</p>
+                                    </div>
+                                </div>
+                                <span class="badge admx-task-status-badge admx-task-status-idle"
+                                      data-role="status-badge"
+                                      data-status="idle">Готово</span>
+                            </div>
+
+                            <div class="small text-secondary mb-3" data-role="last-run-meta">
+                                {% if task.last_run %}
+                                    Последний запуск: #{{ task.last_run.id }}
+                                    · {{ task.last_run.get_status_display }}
+                                    {% if task.last_run.started_at %}
+                                        · {{ task.last_run.started_at|date:"d.m.Y H:i" }}
+                                    {% endif %}
+                                {% else %}
+                                    Запусков ещё не было
+                                {% endif %}
+                            </div>
+
+                            <div class="admx-task-console mb-3" data-role="log-console" hidden>
+                                <div class="admx-task-console-header">
+                                    <span><i class="bi bi-terminal me-1"></i>Лог выполнения</span>
+                                    <span class="text-secondary" data-role="run-meta"></span>
+                                </div>
+                                <div class="admx-task-console-body" data-role="log-body"></div>
+                            </div>
+
+                            <div class="mt-auto d-flex flex-wrap gap-2 align-items-center">
+                                <button type="button"
+                                        class="btn btn-primary btn-sm admx-task-start-btn"
+                                        data-task-key="{{ task.key }}"
+                                        data-start-url="{% url 'admindashboardx:manual_task_start' task_key=task.key %}"
+                                        {% if task.is_running %}disabled{% endif %}>
+                                    <i class="bi bi-play-fill me-1"></i>Запустить
+                                </button>
+                                <span class="small text-secondary" data-role="summary"></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+
+        <div class="card admx-card">
+            <div class="card-header border-secondary border-opacity-25 bg-transparent py-3">
+                <h2 class="h6 mb-0"><i class="bi bi-clock-history me-1"></i>История запусков</h2>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-dark table-hover align-middle mb-0 admx-table">
+                    <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Задача</th>
+                        <th>Статус</th>
+                        <th>Запустил</th>
+                        <th>Начало</th>
+                        <th>Конец</th>
+                        <th>Итог</th>
+                        <th></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for run in recent_runs %}
+                        <tr>
+                            <td>{{ run.id }}</td>
+                            <td class="small">{{ run.task_title }}</td>
+                            <td>
+                                <span class="badge admx-run-status-{{ run.status }}">{{ run.get_status_display }}</span>
+                            </td>
+                            <td>{{ run.started_by.username|default:"—" }}</td>
+                            <td>{{ run.started_at|date:"d.m.Y H:i:s"|default:"—" }}</td>
+                            <td>{{ run.finished_at|date:"d.m.Y H:i:s"|default:"—" }}</td>
+                            <td class="small text-secondary">{{ run.summary|default:run.error_message|default:"—"|truncatechars:80 }}</td>
+                            <td>
+                                <button type="button"
+                                        class="btn btn-sm btn-outline-light admx-view-run-btn"
+                                        data-run-id="{{ run.id }}"
+                                        data-task-key="{{ run.task_key }}">
+                                    Логи
+                                </button>
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr><td colspan="8" class="text-center text-secondary py-4">История пуста</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block extrascript %}
+<script>
+(function () {
+    const root = document.getElementById('admx-project-tasks-root');
+    if (!root) return;
+
+    const csrfToken = root.getAttribute('data-csrf');
+    const statusUrlTemplate = root.getAttribute('data-status-url-template');
+    const api = window.AdmxApi;
+    const pollers = {};
+
+    const STATUS_LABELS = {
+        idle: 'Готово',
+        pending: 'Ожидание',
+        running: 'В процессе',
+        completed: 'Завершено',
+        failed: 'Ошибка',
+    };
+
+    const LEVEL_CLASS = {
+        SUCCESS: 'admx-log-success',
+        INFO: 'admx-log-info',
+        WARNING: 'admx-log-warning',
+        FATAL: 'admx-log-fatal',
+        DEBUG: 'admx-log-debug',
+        TRACE: 'admx-log-trace',
+    };
+
+    function statusUrl(runId) {
+        return statusUrlTemplate.replace('/0/', '/' + runId + '/');
+    }
+
+    function setBadge(card, status) {
+        const badge = card.querySelector('[data-role="status-badge"]');
+        if (!badge) return;
+        badge.dataset.status = status;
+        badge.textContent = STATUS_LABELS[status] || status;
+        badge.className = 'badge admx-task-status-badge admx-task-status-' + status;
+    }
+
+    function appendLogs(logBody, logs) {
+        if (!logs || !logs.length) return;
+        const atBottom = logBody.scrollHeight - logBody.scrollTop - logBody.clientHeight < 40;
+        logs.forEach(function (row) {
+            const line = document.createElement('div');
+            line.className = 'admx-task-log-line ' + (LEVEL_CLASS[row.level] || 'admx-log-info');
+            line.innerHTML = '<span class="admx-task-log-time">' + row.created_at + '</span>'
+                + '<span class="admx-task-log-level">[' + row.level + ']</span>'
+                + '<span class="admx-task-log-msg"></span>';
+            line.querySelector('.admx-task-log-msg').textContent = row.message;
+            logBody.appendChild(line);
+        });
+        if (atBottom) logBody.scrollTop = logBody.scrollHeight;
+    }
+
+    function stopPoller(runId) {
+        if (pollers[runId]) {
+            clearInterval(pollers[runId]);
+            delete pollers[runId];
+        }
+    }
+
+    function pollRun(card, runId, afterId) {
+        const logConsole = card.querySelector('[data-role="log-console"]');
+        const logBody = card.querySelector('[data-role="log-body"]');
+        const runMeta = card.querySelector('[data-role="run-meta"]');
+        const summaryEl = card.querySelector('[data-role="summary"]');
+        const startBtn = card.querySelector('.admx-task-start-btn');
+
+        logConsole.hidden = false;
+        runMeta.textContent = 'Запуск #' + runId;
+
+        function tick() {
+            const url = statusUrl(runId) + (afterId ? '?after_id=' + afterId : '');
+            const fetcher = api && api.fetchJsonWithRetry
+                ? api.fetchJsonWithRetry(url, { fetchOptions: { headers: { 'X-Requested-With': 'XMLHttpRequest' } } })
+                : fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } }).then(function (r) { return r.json(); });
+
+            fetcher.then(function (data) {
+                setBadge(card, data.status);
+                if (data.logs && data.logs.length) {
+                    appendLogs(logBody, data.logs);
+                    afterId = data.logs[data.logs.length - 1].id;
+                }
+                if (data.summary) summaryEl.textContent = data.summary;
+                if (data.error_message) summaryEl.textContent = data.error_message;
+
+                if (data.status === 'completed' || data.status === 'failed') {
+                    stopPoller(runId);
+                    if (startBtn) startBtn.disabled = false;
+                } else if (startBtn) {
+                    startBtn.disabled = true;
+                }
+            }).catch(function () {});
+        }
+
+        stopPoller(runId);
+        tick();
+        pollers[runId] = setInterval(tick, 2000);
+    }
+
+    function findCardByRunId(runId) {
+        return Array.from(document.querySelectorAll('.admx-task-card')).find(function (card) {
+            const body = card.querySelector('[data-role="log-body"]');
+            return body && body.dataset.activeRunId === String(runId);
+        });
+    }
+
+    root.addEventListener('click', function (event) {
+        const startBtn = event.target.closest('.admx-task-start-btn');
+        if (startBtn) {
+            const card = startBtn.closest('.admx-task-card');
+            const url = startBtn.getAttribute('data-start-url');
+            startBtn.disabled = true;
+            setBadge(card, 'pending');
+
+            const logConsole = card.querySelector('[data-role="log-console"]');
+            const logBody = card.querySelector('[data-role="log-body"]');
+            const summaryEl = card.querySelector('[data-role="summary"]');
+            logBody.innerHTML = '';
+            summaryEl.textContent = '';
+            logConsole.hidden = false;
+
+            fetch(url, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': csrfToken,
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+            }).then(function (res) {
+                return res.json().then(function (data) {
+                    if (!res.ok) throw new Error(data.detail || 'Ошибка запуска');
+                    return data;
+                });
+            }).then(function (data) {
+                logBody.dataset.activeRunId = String(data.run_id);
+                setBadge(card, data.status);
+                pollRun(card, data.run_id, 0);
+            }).catch(function (err) {
+                setBadge(card, 'failed');
+                appendLogs(logBody, [{
+                    id: 0,
+                    level: 'FATAL',
+                    message: err.message || 'Не удалось запустить задачу',
+                    created_at: new Date().toLocaleString('ru-RU'),
+                }]);
+                startBtn.disabled = false;
+            });
+            return;
+        }
+
+        const viewBtn = event.target.closest('.admx-view-run-btn');
+        if (viewBtn) {
+            const runId = viewBtn.getAttribute('data-run-id');
+            const taskKey = viewBtn.getAttribute('data-task-key');
+            const card = document.querySelector('.admx-task-card[data-task-key="' + taskKey + '"]')
+                || document.querySelector('.admx-task-card');
+            if (!card) return;
+            const logBody = card.querySelector('[data-role="log-body"]');
+            logBody.innerHTML = '';
+            logBody.dataset.activeRunId = String(runId);
+            card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            pollRun(card, runId, 0);
+        }
+    });
+})();
+</script>
+{% endblock %}

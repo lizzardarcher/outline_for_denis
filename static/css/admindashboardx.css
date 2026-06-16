@@ -8,6 +8,7 @@
     --admx-accent: #7c9cff;
 }
 
+
 body.admx-body {
     background: var(--admx-bg);
     color: var(--admx-text);
@@ -394,5 +395,100 @@ body.admx-body {
 
     .admx-card .card-header {
         font-size: 0.92rem;
+    }
+}
+
+.admx-tabs .nav-link {
+    color: var(--admx-muted);
+    border-color: transparent;
+}
+
+.admx-tabs .nav-link.active {
+    color: #fff;
+    background: rgba(124, 156, 255, 0.12);
+    border-color: var(--admx-border) var(--admx-border) transparent;
+}
+
+.admx-task-icon {
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 0.65rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(124, 156, 255, 0.15);
+    color: var(--admx-accent);
+    font-size: 1.2rem;
+    flex-shrink: 0;
+}
+
+.admx-task-status-badge {
+    font-weight: 600;
+    letter-spacing: 0.02em;
+}
+
+.admx-task-status-idle { background: rgba(171, 181, 199, 0.2); color: var(--admx-muted); }
+.admx-task-status-pending { background: rgba(255, 193, 7, 0.2); color: #ffc107; }
+.admx-task-status-running { background: rgba(13, 202, 240, 0.2); color: #6edff6; }
+.admx-task-status-completed { background: rgba(25, 135, 84, 0.25); color: #75d6a5; }
+.admx-task-status-failed { background: rgba(220, 53, 69, 0.25); color: #f1aeb5; }
+
+.admx-run-status-pending { background: rgba(255, 193, 7, 0.2); color: #ffc107; }
+.admx-run-status-running { background: rgba(13, 202, 240, 0.2); color: #6edff6; }
+.admx-run-status-completed { background: rgba(25, 135, 84, 0.25); color: #75d6a5; }
+.admx-run-status-failed { background: rgba(220, 53, 69, 0.25); color: #f1aeb5; }
+
+.admx-task-console {
+    border: 1px solid var(--admx-border);
+    border-radius: 0.65rem;
+    overflow: hidden;
+    background: #171b24;
+}
+
+.admx-task-console-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.55rem 0.85rem;
+    font-size: 0.78rem;
+    border-bottom: 1px solid var(--admx-border);
+    color: var(--admx-muted);
+}
+
+.admx-task-console-body {
+    max-height: 280px;
+    overflow: auto;
+    padding: 0.65rem 0.85rem;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 0.78rem;
+    line-height: 1.45;
+}
+
+.admx-task-log-line {
+    display: grid;
+    grid-template-columns: 9.5rem 5.5rem 1fr;
+    gap: 0.5rem;
+    padding: 0.15rem 0;
+    border-bottom: 1px solid rgba(64, 74, 95, 0.35);
+}
+
+.admx-task-log-line:last-child {
+    border-bottom: none;
+}
+
+.admx-task-log-time { color: #7d8799; }
+.admx-task-log-level { font-weight: 600; }
+.admx-log-success .admx-task-log-level { color: #75d6a5; }
+.admx-log-info .admx-task-log-level { color: #6edff6; }
+.admx-log-warning .admx-task-log-level { color: #ffc107; }
+.admx-log-fatal .admx-task-log-level { color: #f1aeb5; }
+.admx-log-debug .admx-task-log-level,
+.admx-log-trace .admx-task-log-level { color: #abb5c7; }
+.admx-task-log-msg { color: #e8edf7; word-break: break-word; }
+
+@media (max-width: 767.98px) {
+    .admx-task-log-line {
+        grid-template-columns: 1fr;
+        gap: 0.15rem;
     }
 }
