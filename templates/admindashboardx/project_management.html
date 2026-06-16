@@ -12,7 +12,6 @@
             <i class="bi bi-arrow-left me-1"></i>На главную
         </a>
     </div>
-
     <ul class="nav nav-tabs admx-tabs mb-4" role="tablist">
         <li class="nav-item" role="presentation">
             <a class="nav-link {% if active_tab == 'tasks' %}active{% endif %}"
@@ -31,7 +30,10 @@
 
     <div id="admx-project-tasks-root"
          data-csrf="{{ csrf_token }}"
-         data-status-url-template="{% url 'admindashboardx:manual_task_run_status' run_id=0 %}">
+         data-status-url-template="{% url 'admindashboardx:manual_task_run_status' run_id=0 %}"
+         data-purge-url="{% url 'admindashboardx:manual_task_log_purge' %}"
+         data-run-edit-url-template="{% url 'admindashboardx:manual_task_run_edit' run_id=0 %}"
+         data-run-delete-url-template="{% url 'admindashboardx:manual_task_run_delete' run_id=0 %}">
         <div class="row g-3 mb-4">
             {% for task in task_cards %}
                 <div class="col-12 col-xl-6">
@@ -99,6 +101,42 @@
             {% endfor %}
         </div>
 
+        <div class="card admx-card mb-4" id="admx-log-maintenance">
+            <div class="card-header border-secondary border-opacity-25 bg-transparent py-3 d-flex flex-wrap align-items-center justify-content-between gap-2">
+                <h2 class="h6 mb-0"><i class="bi bi-trash3 me-1"></i>Очистка логов и запусков</h2>
+                <span class="small text-secondary" id="admx-log-stats-summary">
+                    Логов: <strong class="text-light">{{ log_stats.total_logs }}</strong>
+                    · Запусков: <strong class="text-light">{{ log_stats.total_runs }}</strong>
+                    {% if log_stats.logs_over_limit %}
+                        · <span class="text-warning">свыше лимита {{ log_stats.log_count_limit }}: {{ log_stats.logs_over_limit }}</span>
+                    {% endif %}
+                </span>
+            </div>
+            <div class="card-body">
+                <p class="small text-secondary mb-3">
+                    Кнопки активны только если условие выполняется. Удаление необратимо.
+                </p>
+                <div class="row g-2" id="admx-purge-options">
+                    {% for opt in purge_options %}
+                        <div class="col-12 col-md-6 col-xl-4">
+                            <button type="button"
+                                    class="btn btn-sm w-100 text-start admx-purge-btn {% if opt.available %}btn-outline-danger{% else %}btn-outline-secondary disabled{% endif %}"
+                                    data-purge-mode="{{ opt.mode }}"
+                                    data-purge-label="{{ opt.label }}"
+                                    data-purge-count="{{ opt.count }}"
+                                    {% if not opt.available %}disabled{% endif %}>
+                                <span class="d-block fw-semibold">{{ opt.label }}</span>
+                                <span class="small {% if opt.available %}text-danger-emphasis{% else %}text-secondary{% endif %}">
+                                    {% if opt.count %}Подходит записей: {{ opt.count }}{% else %}Нет записей для удаления{% endif %}
+                                </span>
+                            </button>
+                        </div>
+                    {% endfor %}
+                </div>
+                <div class="small mt-3 text-secondary" id="admx-purge-result" hidden></div>
+            </div>
+        </div>
+
         <div class="card admx-card">
             <div class="card-header border-secondary border-opacity-25 bg-transparent py-3">
                 <h2 class="h6 mb-0"><i class="bi bi-clock-history me-1"></i>История запусков</h2>
@@ -135,13 +173,29 @@
                             <td>{{ run.started_at|date:"d.m.Y H:i:s"|default:"—" }}</td>
                             <td>{{ run.finished_at|date:"d.m.Y H:i:s"|default:"—" }}</td>
                             <td class="small text-secondary">{{ run.summary|default:run.error_message|default:"—"|truncatechars:80 }}</td>
-                            <td>
-                                <button type="button"
-                                        class="btn btn-sm btn-outline-light admx-view-run-btn"
-                                        data-run-id="{{ run.id }}"
-                                        data-task-key="{{ run.task_key }}">
-                                    Логи
-                                </button>
+                            <td class="text-nowrap">
+                                <div class="btn-group btn-group-sm">
+                                    <button type="button"
+                                            class="btn btn-outline-light admx-view-run-btn"
+                                            data-run-id="{{ run.id }}"
+                                            data-task-key="{{ run.task_key }}"
+                                            title="Логи">
+                                        <i class="bi bi-terminal"></i>
+                                    </button>
+                                    <button type="button"
+                                            class="btn btn-outline-light admx-edit-run-btn"
+                                            data-run-id="{{ run.id }}"
+                                            {% if run.status == 'running' %}disabled title="Нельзя редактировать во время выполнения"{% endif %}>
+                                        <i class="bi bi-pencil"></i>
+                                    </button>
+                                    <button type="button"
+                                            class="btn btn-outline-danger admx-delete-run-btn"
+                                            data-run-id="{{ run.id }}"
+                                            data-run-label="#{{ run.id }} {{ run.task_title }}"
+                                            {% if run.status == 'running' %}disabled title="Нельзя удалить во время выполнения"{% endif %}>
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </div>
                             </td>
                         </tr>
                     {% empty %}
@@ -149,6 +203,43 @@
                     {% endfor %}
                     </tbody>
                 </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="admxEditRunModal" tabindex="-1" aria-labelledby="admxEditRunModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content admx-modal-content">
+                <div class="modal-header border-secondary border-opacity-25">
+                    <h5 class="modal-title" id="admxEditRunModalLabel">Редактировать запуск</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="small text-secondary mb-3" id="admx-edit-run-meta"></div>
+                    <form id="admx-edit-run-form">
+                        <div class="mb-3">
+                            <label class="form-label" for="admx-edit-status">Статус</label>
+                            <select class="form-select" id="admx-edit-status" name="status">
+                                {% for value, label in status_choices %}
+                                    <option value="{{ value }}">{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label" for="admx-edit-summary">Итог</label>
+                            <textarea class="form-control" id="admx-edit-summary" name="summary" rows="3"></textarea>
+                        </div>
+                        <div class="mb-0">
+                            <label class="form-label" for="admx-edit-error">Ошибка</label>
+                            <textarea class="form-control" id="admx-edit-error" name="error_message" rows="3"></textarea>
+                        </div>
+                    </form>
+                    <div class="small text-danger mt-2" id="admx-edit-run-error" hidden></div>
+                </div>
+                <div class="modal-footer border-secondary border-opacity-25">
+                    <button type="button" class="btn btn-outline-light" data-bs-dismiss="modal">Отмена</button>
+                    <button type="button" class="btn btn-primary" id="admx-edit-run-save">Сохранить</button>
+                </div>
             </div>
         </div>
     </div>
@@ -162,8 +253,16 @@
 
     const csrfToken = root.getAttribute('data-csrf');
     const statusUrlTemplate = root.getAttribute('data-status-url-template');
+    const purgeUrl = root.getAttribute('data-purge-url');
+    const runEditUrlTemplate = root.getAttribute('data-run-edit-url-template');
+    const runDeleteUrlTemplate = root.getAttribute('data-run-delete-url-template');
     const api = window.AdmxApi;
     const pollers = {};
+    let editingRunId = null;
+
+    function runUrl(template, runId) {
+        return template.replace('/0/', '/' + runId + '/');
+    }
 
     const STATUS_LABELS = {
         idle: 'Готово',
@@ -183,7 +282,77 @@
     };
 
     function statusUrl(runId) {
-        return statusUrlTemplate.replace('/0/', '/' + runId + '/');
+        return runUrl(statusUrlTemplate, runId);
+    }
+
+    function updatePurgeUi(stats, message) {
+        const summaryEl = document.getElementById('admx-log-stats-summary');
+        const resultEl = document.getElementById('admx-purge-result');
+        if (summaryEl && stats) {
+            let html = 'Логов: <strong class="text-light">' + stats.total_logs + '</strong>'
+                + ' · Запусков: <strong class="text-light">' + stats.total_runs + '</strong>';
+            if (stats.logs_over_limit > 0) {
+                html += ' · <span class="text-warning">свыше лимита ' + stats.log_count_limit
+                    + ': ' + stats.logs_over_limit + '</span>';
+            }
+            summaryEl.innerHTML = html;
+        }
+        if (resultEl && message) {
+            resultEl.hidden = false;
+            resultEl.className = 'small mt-3 text-success';
+            resultEl.textContent = message;
+        }
+        if (!stats) return;
+
+        document.querySelectorAll('.admx-purge-btn').forEach(function (btn) {
+            const mode = btn.getAttribute('data-purge-mode');
+            let count = 0;
+            let available = false;
+            if (mode && mode.indexOf('logs_older_than_') === 0) {
+                const days = parseInt(mode.replace('logs_older_than_', '').replace('d', ''), 10);
+                count = (stats.logs_older_than && stats.logs_older_than[days]) || 0;
+                available = count > 0;
+            } else if (mode === 'trim_logs_to_10000') {
+                count = stats.logs_over_limit || 0;
+                available = count > 0;
+            } else if (mode && mode.indexOf('runs_completed_older_than_') === 0) {
+                const days = parseInt(mode.replace('runs_completed_older_than_', '').replace('d', ''), 10);
+                count = (stats.runs_completed_older_than && stats.runs_completed_older_than[days]) || 0;
+                available = count > 0;
+            } else if (mode === 'orphan_runs') {
+                count = stats.orphan_runs || 0;
+                available = count > 0;
+            }
+            btn.disabled = !available;
+            btn.classList.toggle('btn-outline-danger', available);
+            btn.classList.toggle('btn-outline-secondary', !available);
+            btn.classList.toggle('disabled', !available);
+            btn.setAttribute('data-purge-count', String(count));
+            const countEl = btn.querySelector('.small');
+            if (countEl) {
+                countEl.textContent = available
+                    ? ('Подходит записей: ' + count)
+                    : 'Нет записей для удаления';
+                countEl.className = 'small ' + (available ? 'text-danger-emphasis' : 'text-secondary');
+            }
+        });
+    }
+
+    function postJson(url, payload) {
+        return fetch(url, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': csrfToken,
+                'X-Requested-With': 'XMLHttpRequest',
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(payload || {}),
+        }).then(function (res) {
+            return res.json().then(function (data) {
+                if (!res.ok) throw new Error(data.detail || 'Ошибка запроса');
+                return data;
+            });
+        });
     }
 
     function setBadge(card, status) {
@@ -343,8 +512,99 @@
             logBody.dataset.activeRunId = String(runId);
             card.scrollIntoView({ behavior: 'smooth', block: 'start' });
             pollRun(card, runId, 0);
+            return;
+        }
+
+        const editBtn = event.target.closest('.admx-edit-run-btn');
+        if (editBtn) {
+            const runId = editBtn.getAttribute('data-run-id');
+            editingRunId = runId;
+            const errEl = document.getElementById('admx-edit-run-error');
+            if (errEl) errEl.hidden = true;
+
+            fetch(runUrl(runEditUrlTemplate, runId), {
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            }).then(function (res) {
+                return res.json().then(function (data) {
+                    if (!res.ok) throw new Error(data.detail || 'Ошибка загрузки');
+                    return data;
+                });
+            }).then(function (data) {
+                document.getElementById('admx-edit-run-meta').textContent =
+                    '#' + data.run_id + ' · ' + data.task_title + (data.is_dry_run ? ' · dry-run' : '');
+                document.getElementById('admx-edit-status').value = data.status;
+                document.getElementById('admx-edit-summary').value = data.summary || '';
+                document.getElementById('admx-edit-error').value = data.error_message || '';
+                const modalEl = document.getElementById('admxEditRunModal');
+                if (modalEl && window.bootstrap) {
+                    bootstrap.Modal.getOrCreateInstance(modalEl).show();
+                }
+            }).catch(function (err) {
+                alert(err.message || 'Не удалось загрузить запуск');
+            });
+            return;
+        }
+
+        const deleteBtn = event.target.closest('.admx-delete-run-btn');
+        if (deleteBtn) {
+            const runId = deleteBtn.getAttribute('data-run-id');
+            const label = deleteBtn.getAttribute('data-run-label') || ('#' + runId);
+            if (!window.confirm('Удалить запуск ' + label + ' и все его логи?')) return;
+
+            postJson(runUrl(runDeleteUrlTemplate, runId), {}).then(function (data) {
+                const row = deleteBtn.closest('tr');
+                if (row) row.remove();
+                stopPoller(runId);
+                alert(data.message || 'Удалено');
+            }).catch(function (err) {
+                alert(err.message || 'Не удалось удалить');
+            });
+            return;
+        }
+
+        const purgeBtn = event.target.closest('.admx-purge-btn');
+        if (purgeBtn && !purgeBtn.disabled) {
+            const mode = purgeBtn.getAttribute('data-purge-mode');
+            const label = purgeBtn.getAttribute('data-purge-label');
+            const count = purgeBtn.getAttribute('data-purge-count');
+            if (!window.confirm('Удалить записи: «' + label + '» (' + count + ')?')) return;
+
+            purgeBtn.disabled = true;
+            postJson(purgeUrl, { mode: mode, confirm: true }).then(function (data) {
+                updatePurgeUi(data.stats, data.message);
+                alert(data.message || 'Очистка выполнена');
+            }).catch(function (err) {
+                alert(err.message || 'Ошибка очистки');
+            }).finally(function () {
+                purgeBtn.disabled = false;
+            });
         }
     });
+
+    const saveEditBtn = document.getElementById('admx-edit-run-save');
+    if (saveEditBtn) {
+        saveEditBtn.addEventListener('click', function () {
+            if (!editingRunId) return;
+            const errEl = document.getElementById('admx-edit-run-error');
+            const payload = {
+                status: document.getElementById('admx-edit-status').value,
+                summary: document.getElementById('admx-edit-summary').value,
+                error_message: document.getElementById('admx-edit-error').value,
+            };
+            postJson(runUrl(runEditUrlTemplate, editingRunId), payload).then(function () {
+                const modalEl = document.getElementById('admxEditRunModal');
+                if (modalEl && window.bootstrap) {
+                    bootstrap.Modal.getOrCreateInstance(modalEl).hide();
+                }
+                window.location.reload();
+            }).catch(function (err) {
+                if (errEl) {
+                    errEl.hidden = false;
+                    errEl.textContent = err.message || 'Ошибка сохранения';
+                }
+            });
+        });
+    }
 })();
 </script>
 {% endblock %}

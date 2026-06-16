@@ -44,6 +44,12 @@ from bot.models import (
 )
 from .tasks import initialize_server_task
 from .manual_tasks import MANUAL_TASKS
+from .manual_task_log_cleanup import (
+    PURGE_MODES,
+    execute_purge,
+    get_manual_task_log_stats,
+    purge_mode_available,
+)
 from .models import ManualTaskRun, ManualTaskLog
 
 class ServerForm(forms.ModelForm):
@@ -933,6 +939,7 @@ class RevenueAnalyticsView(DashboardBaseView):
             )
         total_failed = sum(int(x["failed_count"]) for x in by_ps)
         total_ok = sum(int(x["ok_count"]) for x in by_ps)
+
 
 
         if total_ok + total_failed >= 20:
@@ -2752,12 +2759,39 @@ class ProjectManagementView(DashboardBaseView):
                 }
             )
 
-        recent_runs = ManualTaskRun.objects.order_by("-id")[:30]
+        recent_runs = ManualTaskRun.objects.annotate(
+            log_count=Count("logs")
+        ).order_by("-id")[:30]
+
+        log_stats = get_manual_task_log_stats()
+        purge_options = []
+        for mode, (label, _action, param) in PURGE_MODES.items():
+            count = 0
+            if mode.startswith("logs_older_than_"):
+                count = log_stats["logs_older_than"].get(param, 0)
+            elif mode == "trim_logs_to_10000":
+                count = log_stats["logs_over_limit"]
+            elif mode.startswith("runs_completed_older_than_"):
+                count = log_stats["runs_completed_older_than"].get(param, 0)
+            elif mode == "orphan_runs":
+                count = log_stats["orphan_runs"]
+            purge_options.append(
+                {
+                    "mode": mode,
+                    "label": label,
+                    "count": count,
+                    "available": purge_mode_available(mode, log_stats),
+                }
+            )
+
         context.update(
             {
                 "active_tab": active_tab,
                 "task_cards": task_cards,
                 "recent_runs": recent_runs,
+                "log_stats": log_stats,
+                "purge_options": purge_options,
+                "status_choices": ManualTaskRun.STATUS_CHOICES,
             }
         )
         return context
@@ -2907,3 +2941,137 @@ class ManualTaskRunStatusView(DashboardBaseView, View):
                 "logs": logs,
             }
         )
+
+
+class ManualTaskRunForm(forms.ModelForm):
+    class Meta:
+        model = ManualTaskRun
+        fields = ("status", "summary", "error_message")
+        widgets = {
+            "summary": forms.Textarea(attrs={"rows": 3}),
+            "error_message": forms.Textarea(attrs={"rows": 3}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for field in self.fields.values():
+            css = field.widget.attrs.get("class", "")
+            field.widget.attrs["class"] = f"{css} form-control".strip()
+
+
+class ManualTaskRunUpdateView(DashboardBaseView, View):
+    page_key = "project_management"
+
+    def dispatch(self, request, *args, **kwargs):
+        if self._is_support():
+            return JsonResponse({"detail": "forbidden"}, status=403)
+        return super().dispatch(request, *args, **kwargs)
+
+    def get(self, request, run_id, *args, **kwargs):
+        run = get_object_or_404(ManualTaskRun, pk=run_id)
+        return JsonResponse(
+            {
+                "run_id": run.id,
+                "task_key": run.task_key,
+                "task_title": run.task_title,
+                "status": run.status,
+                "summary": run.summary,
+                "error_message": run.error_message,
+                "is_dry_run": run.is_dry_run,
+                "can_edit": run.status != ManualTaskRun.STATUS_RUNNING,
+            }
+        )
+
+    def post(self, request, run_id, *args, **kwargs):
+        run = get_object_or_404(ManualTaskRun, pk=run_id)
+        if run.status == ManualTaskRun.STATUS_RUNNING:
+            return JsonResponse(
+                {"detail": "Нельзя редактировать запуск в статусе «В процессе»."},
+                status=409,
+            )
+
+        try:
+            body = json.loads(request.body.decode("utf-8") or "{}")
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            body = request.POST
+
+        form = ManualTaskRunForm(body, instance=run)
+        if not form.is_valid():
+            return JsonResponse({"detail": "Некорректные данные", "errors": form.errors}, status=400)
+
+        form.save()
+        return JsonResponse(
+            {
+                "run_id": run.id,
+                "status": run.status,
+                "status_label": run.get_status_display(),
+                "summary": run.summary,
+                "error_message": run.error_message,
+            }
+        )
+
+
+class ManualTaskRunDeleteView(DashboardBaseView, View):
+    page_key = "project_management"
+
+    def dispatch(self, request, *args, **kwargs):
+        if self._is_support():
+            return JsonResponse({"detail": "forbidden"}, status=403)
+        if request.method != "POST":
+            return JsonResponse({"detail": "method not allowed"}, status=405)
+        return super().dispatch(request, *args, **kwargs)
+
+    def post(self, request, run_id, *args, **kwargs):
+        run = get_object_or_404(ManualTaskRun, pk=run_id)
+        if run.status == ManualTaskRun.STATUS_RUNNING:
+            return JsonResponse(
+                {"detail": "Нельзя удалить запуск в статусе «В процессе»."},
+                status=409,
+            )
+
+        run_id_value = run.id
+        log_count = run.logs.count()
+        run.delete()
+        return JsonResponse(
+            {
+                "deleted_run_id": run_id_value,
+                "deleted_logs": log_count,
+                "message": f"Запуск #{run_id_value} удалён (логов: {log_count}).",
+            }
+        )
+
+
+class ManualTaskLogPurgeView(DashboardBaseView, View):
+    page_key = "project_management"
+
+    def dispatch(self, request, *args, **kwargs):
+        if self._is_support():
+            return JsonResponse({"detail": "forbidden"}, status=403)
+        if request.method != "POST":
+            return JsonResponse({"detail": "method not allowed"}, status=405)
+        return super().dispatch(request, *args, **kwargs)
+
+    def post(self, request, *args, **kwargs):
+        try:
+            body = json.loads(request.body.decode("utf-8") or "{}")
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            return JsonResponse({"detail": "Ожидается JSON"}, status=400)
+
+        mode = (body.get("mode") or "").strip()
+        if not body.get("confirm"):
+            return JsonResponse({"detail": "Требуется подтверждение (confirm: true)"}, status=400)
+
+        stats = get_manual_task_log_stats()
+        if not purge_mode_available(mode, stats):
+            return JsonResponse(
+                {"detail": "Для выбранного условия нечего удалять"},
+                status=400,
+            )
+
+        try:
+            result = execute_purge(mode)
+        except ValueError as exc:
+            return JsonResponse({"detail": str(exc)}, status=400)
+
+        result["stats"] = get_manual_task_log_stats()
+        return JsonResponse(result)

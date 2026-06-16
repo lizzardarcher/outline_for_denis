@@ -1,5 +1,6 @@
 from django.urls import path
 
+
 from .views import (
     AdminDashboardIndexDataView,
     AdminDashboardIndexView,
@@ -18,7 +19,10 @@ from .views import (
     IncomeInfoUpdateView,
     KeysListView,
     LogsListView,
+    ManualTaskLogPurgeView,
+    ManualTaskRunDeleteView,
     ManualTaskRunStatusView,
+    ManualTaskRunUpdateView,
     ManualTaskStartView,
     ProjectManagementView,
     PricesCreateView,
@@ -172,5 +176,8 @@ urlpatterns = [
     path("project/", ProjectManagementView.as_view(), name="project_management"),
     path("project/tasks/<str:task_key>/start/", ManualTaskStartView.as_view(), name="manual_task_start"),
     path("project/tasks/runs/<int:run_id>/", ManualTaskRunStatusView.as_view(), name="manual_task_run_status"),
+    path("project/tasks/runs/<int:run_id>/edit/", ManualTaskRunUpdateView.as_view(), name="manual_task_run_edit"),
+    path("project/tasks/runs/<int:run_id>/delete/", ManualTaskRunDeleteView.as_view(), name="manual_task_run_delete"),
+    path("project/tasks/logs/purge/", ManualTaskLogPurgeView.as_view(), name="manual_task_log_purge"),
 ]
 
