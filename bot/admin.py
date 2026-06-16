@@ -11,6 +11,7 @@ from django.utils.html import format_html
 from django_celery_beat.models import *
 from django_admin_inline_paginator.admin import TabularInlinePaginated
 
+from apps.admindashboardx.models import ManualTaskRun
 from bot.models import *
 
 User = get_user_model()
@@ -863,3 +864,9 @@ class IntervalScheduleAdmin(BaseAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return True
+
+
+
+@admin.register(ManualTaskRun)
+class ManualTaskRunAdmin(BaseAdmin):
+    list_display = ('task_key', 'status', 'celery_task_id', 'started_at', 'finished_at', 'summary', 'error_message', 'is_dry_run')

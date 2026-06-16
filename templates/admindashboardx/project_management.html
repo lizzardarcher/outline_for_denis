@@ -24,8 +24,9 @@
 
     <div class="alert admx-card border-secondary border-opacity-25 py-2 px-3 mb-4 small text-secondary">
         <i class="bi bi-info-circle me-1"></i>
-        <strong class="text-light">Пробный запуск (dry-run)</strong> — показывает, с кого будет списание и что изменится,
-        без запросов в YooKassa и без записи в БД. Для реального списания используйте «Запустить».
+        <strong class="text-light">Пробный запуск (dry-run)</strong> — выполняется сразу в панели, без Celery.
+        Показывает, с кого будет списание и что изменится, без запросов в YooKassa.
+        Кнопка «Запустить» требует работающий <code>celery worker</code>.
     </div>
 
     <div id="admx-project-tasks-root"
@@ -110,7 +111,6 @@
                         <th>Задача</th>
                         <th>Режим</th>
                         <th>Статус</th>
-                        <th>Запустил</th>
                         <th>Начало</th>
                         <th>Конец</th>
                         <th>Итог</th>
@@ -132,7 +132,6 @@
                             <td>
                                 <span class="badge admx-run-status-{{ run.status }}">{{ run.get_status_display }}</span>
                             </td>
-                            <td>{{ run.started_by.username|default:"—" }}</td>
                             <td>{{ run.started_at|date:"d.m.Y H:i:s"|default:"—" }}</td>
                             <td>{{ run.finished_at|date:"d.m.Y H:i:s"|default:"—" }}</td>
                             <td class="small text-secondary">{{ run.summary|default:run.error_message|default:"—"|truncatechars:80 }}</td>
@@ -146,7 +145,7 @@
                             </td>
                         </tr>
                     {% empty %}
-                        <tr><td colspan="9" class="text-center text-secondary py-4">История пуста</td></tr>
+                        <tr><td colspan="8" class="text-center text-secondary py-4">История пуста</td></tr>
                     {% endfor %}
                     </tbody>
                 </table>
@@ -248,6 +247,12 @@
                 }
                 if (data.summary) summaryEl.textContent = data.summary;
                 if (data.error_message) summaryEl.textContent = data.error_message;
+                if (data.worker_hint && data.worker_hint_message) {
+                    summaryEl.textContent = data.worker_hint_message;
+                    summaryEl.classList.add('text-warning');
+                } else {
+                    summaryEl.classList.remove('text-warning');
+                }
 
                 if (data.status === 'completed' || data.status === 'failed') {
                     stopPoller(runId);
@@ -307,6 +312,11 @@
             }).then(function (data) {
                 logBody.dataset.activeRunId = String(data.run_id);
                 setBadge(card, data.status);
+                if (data.summary) summaryEl.textContent = data.summary;
+                if (data.error_message) {
+                    summaryEl.textContent = data.error_message;
+                    summaryEl.classList.add('text-warning');
+                }
                 pollRun(card, data.run_id, 0);
             }).catch(function (err) {
                 setBadge(card, 'failed');

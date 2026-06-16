@@ -1,8 +1,5 @@
-from django.conf import settings
 from django.db import models
 from django.utils import timezone
-
-
 
 class ManualTaskRun(models.Model):
     STATUS_PENDING = "pending"
@@ -26,14 +23,6 @@ class ManualTaskRun(models.Model):
         verbose_name="Статус",
     )
     celery_task_id = models.CharField(max_length=255, blank=True, default="", verbose_name="Celery task id")
-    started_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        null=True,
-        blank=True,
-        on_delete=models.SET_NULL,
-        related_name="manual_task_runs",
-        verbose_name="Запустил",
-    )
     started_at = models.DateTimeField(null=True, blank=True, verbose_name="Начало")
     finished_at = models.DateTimeField(null=True, blank=True, verbose_name="Конец")
     summary = models.TextField(blank=True, default="", verbose_name="Итог")

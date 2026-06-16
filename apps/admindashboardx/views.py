@@ -935,7 +935,6 @@ class RevenueAnalyticsView(DashboardBaseView):
         total_ok = sum(int(x["ok_count"]) for x in by_ps)
 
 
-
         if total_ok + total_failed >= 20:
             fail_rate = (total_failed / (total_ok + total_failed)) * 100
             if fail_rate >= 15:
@@ -2734,7 +2733,6 @@ class ProjectManagementView(DashboardBaseView):
         for task_key, meta in MANUAL_TASKS.items():
             last_run = (
                 ManualTaskRun.objects.filter(task_key=task_key)
-                .select_related("started_by")
                 .order_by("-id")
                 .first()
             )
@@ -2754,10 +2752,7 @@ class ProjectManagementView(DashboardBaseView):
                 }
             )
 
-        recent_runs = (
-            ManualTaskRun.objects.select_related("started_by")
-            .order_by("-id")[:30]
-        )
+        recent_runs = ManualTaskRun.objects.order_by("-id")[:30]
         context.update(
             {
                 "active_tab": active_tab,
@@ -2799,7 +2794,6 @@ class ManualTaskStartView(DashboardBaseView, View):
         run = ManualTaskRun.objects.create(
             task_key=task_key,
             status=ManualTaskRun.STATUS_PENDING,
-            started_by=request.user if request.user.is_authenticated else None,
             is_dry_run=dry_run,
         )
         mode_note = " (пробный dry-run)" if dry_run else ""
@@ -2809,9 +2803,28 @@ class ManualTaskStartView(DashboardBaseView, View):
             message=f"Запуск задачи «{meta['title']}»{mode_note} инициирован из панели.",
         )
 
-        from celery import current_app
+        from .manual_task_runner import execute_manual_task_run, queue_manual_task_run
 
-        current_app.send_task(meta["celery_task_name"], args=[run.id])
+        if dry_run:
+            try:
+                execute_manual_task_run(run.id, celery_task_id="sync")
+            except Exception:
+                pass
+            run.refresh_from_db()
+        else:
+            try:
+                queue_manual_task_run(run)
+            except Exception as exc:
+                run.mark_failed(f"Не удалось поставить задачу в Celery: {exc}")
+                ManualTaskLog.objects.create(
+                    run=run,
+                    log_level="FATAL",
+                    message=run.error_message,
+                )
+                return JsonResponse(
+                    {"detail": run.error_message},
+                    status=503,
+                )
 
         return JsonResponse(
             {
@@ -2820,6 +2833,8 @@ class ManualTaskStartView(DashboardBaseView, View):
                 "status": run.status,
                 "status_label": run.get_status_display(),
                 "is_dry_run": run.is_dry_run,
+                "summary": run.summary,
+                "error_message": run.error_message,
             }
         )
 
@@ -2861,6 +2876,12 @@ class ManualTaskRunStatusView(DashboardBaseView, View):
             for row in logs_qs
         ]
 
+        worker_hint = (
+            run.status == ManualTaskRun.STATUS_PENDING
+            and not run.is_dry_run
+            and run.logs.count() <= 1
+        )
+
         return JsonResponse(
             {
                 "run_id": run.id,
@@ -2869,6 +2890,13 @@ class ManualTaskRunStatusView(DashboardBaseView, View):
                 "status_label": run.get_status_display(),
                 "summary": run.summary,
                 "error_message": run.error_message,
+                "worker_hint": worker_hint,
+                "worker_hint_message": (
+                    "Задача в очереди Celery. Проверьте, что запущен celery worker "
+                    "(и он перезапущен после обновления кода)."
+                    if worker_hint
+                    else ""
+                ),
                 "started_at": timezone.localtime(run.started_at).strftime("%d.%m.%Y %H:%M:%S")
                 if run.started_at
                 else None,
