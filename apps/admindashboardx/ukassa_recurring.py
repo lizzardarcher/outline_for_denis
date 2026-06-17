@@ -129,7 +129,6 @@ def _apply_referral_income(user, amount_to_charge):
     user_ids_to_pay = [r.referrer.user_id for r in referred_list]
     users_to_pay = {u.user_id: u for u in TelegramUser.objects.filter(user_id__in=user_ids_to_pay)}
 
-
     for r in referred_list:
         level = r.level
         user_to_pay = users_to_pay.get(r.referrer.user_id)
@@ -158,9 +157,9 @@ def _user_email(user):
         return "noemail@noemail.ru"
 
 
-def _handle_payment_exception(user, exc, channel, logger: TaskRunLogger, *, dry_run=False):
+def _handle_payment_exception(user, exc, channel, logger: TaskRunLogger, *, dry_run=False, prefix=""):
     msg = (
-        f"[CELERY] [{channel}] Ошибка при списании с пользователя {user.user_id}: {exc}\n"
+        f"{prefix}[CELERY] [{channel}] Ошибка при списании с пользователя {user.user_id}: {exc}\n"
         f"Payment Method ID:{user.payment_method_id}"
     )
     if not dry_run:
@@ -169,6 +168,10 @@ def _handle_payment_exception(user, exc, channel, logger: TaskRunLogger, *, dry_
             user.save()
     logger.log("FATAL", msg, user=user)
     return 1
+
+
+def _charge_step_prefix(index, total):
+    return f"[#{index:03d}/{total:03d}]"
 
 
 def _bot_skip_reason(user):
@@ -198,12 +201,12 @@ def _site_skip_reason(user):
     return None
 
 
-def _dry_run_charge_log(channel, user, amount_to_charge, currency, payment_system_label):
+def _dry_run_charge_log(channel, user, amount_to_charge, currency, payment_system_label, prefix=""):
     exp_date = timezone.now().date() + timedelta(days=31)
     referral_count = TelegramReferral.objects.filter(referred=user).count()
     pm_preview = user.payment_method_id[:12] + "…" if len(user.payment_method_id) > 12 else user.payment_method_id
     return (
-        f"[DRY-RUN] [{channel}] Списание: user_id={user.user_id}, сумма={amount_to_charge} {currency}, "
+        f"{prefix}[DRY-RUN] [{channel}] Списание: user_id={user.user_id}, сумма={amount_to_charge} {currency}, "
         f"email={_user_email(user)}, payment_method_id={pm_preview}, магазин={payment_system_label}. "
         f"Будет: Payment.create → при успехе подписка до {exp_date}, Transaction ({payment_system_label}), "
         f"рефералов для начисления: {referral_count}"
@@ -231,10 +234,11 @@ def run_ukassa_bot_recurring(logger: TaskRunLogger, *, dry_run=False):
             "[DRY-RUN] Режим пробного запуска — запросы в YooKassa и изменения в БД не выполняются.",
         )
 
-    success = canceled = failed = unknown = skipped = would_charge = 0
+    success = canceled = failed = unknown = skipped = 0
     amount_to_charge = Decimal(Prices.objects.get(pk=1).price_1)
     currency = "RUB"
 
+    eligible_users = []
     for user in users_to_charge:
         skip_reason = _bot_skip_reason(user)
         if skip_reason:
@@ -246,12 +250,29 @@ def run_ukassa_bot_recurring(logger: TaskRunLogger, *, dry_run=False):
                     user=user,
                 )
             continue
+        eligible_users.append(user)
+
+    total_charges = len(eligible_users)
+    logger.log(
+        "INFO",
+        f"[{'DRY-RUN' if dry_run else 'CELERY'}] [{channel}] К списанию: {total_charges} "
+        f"(пропущено: {skipped})",
+    )
+
+    for idx, user in enumerate(eligible_users, 1):
+        prefix = f"{_charge_step_prefix(idx, total_charges)} "
+        logger.log(
+            "INFO",
+            f"{prefix}[{channel}] Попытка списания user_id={user.user_id}, сумма={amount_to_charge} {currency}",
+            user=user,
+        )
 
         if dry_run:
-            would_charge += 1
             logger.log(
                 "INFO",
-                _dry_run_charge_log(channel, user, amount_to_charge, currency, "YooKassa Bot"),
+                _dry_run_charge_log(
+                    channel, user, amount_to_charge, currency, "YooKassa Bot", prefix=prefix
+                ),
                 user=user,
             )
             continue
@@ -301,7 +322,7 @@ def run_ukassa_bot_recurring(logger: TaskRunLogger, *, dry_run=False):
                     payment_system="YooKassaBot",
                 )
                 msg = (
-                    f"[CELERY] [{channel}] Автосписание успешно! Пользователь {user.user_id} оплатил "
+                    f"{prefix}[CELERY] [{channel}] Автосписание успешно! Пользователь {user.user_id} оплатил "
                     f"с {amount_to_charge} {currency}. Подписка активирована до {user.subscription_expiration} "
                     f"ID платежа {user.payment_method_id}"
                 )
@@ -316,7 +337,7 @@ def run_ukassa_bot_recurring(logger: TaskRunLogger, *, dry_run=False):
 
             elif payment.status in ("waiting_for_capture", "pending"):
                 msg = (
-                    f"[CELERY] [{channel}] Платеж для пользователя {user.user_id} в статусе {payment.status}. "
+                    f"{prefix}[CELERY] [{channel}] Платеж для пользователя {user.user_id} в статусе {payment.status}. "
                     "Требуется дополнительная проверка."
                 )
                 logger.log("WARNING", msg, user=user)
@@ -325,14 +346,14 @@ def run_ukassa_bot_recurring(logger: TaskRunLogger, *, dry_run=False):
                 canceled += 1
                 cancellation_details = payment.cancellation_details
                 reason = cancellation_details.reason if cancellation_details else "Unknown reason"
-                message = f"[CELERY] [{channel}] Платеж отменен для пользователя {user.user_id}. Причина: {reason}. "
+                message = f"{prefix}[CELERY] [{channel}] Платеж отменен для пользователя {user.user_id}. Причина: {reason}. "
                 message += _apply_cancellation_side_effects(user, reason)
                 logger.log("WARNING", message, user=user)
 
             else:
                 unknown += 1
                 msg = (
-                    f"[CELERY] [{channel}] Неизвестный статус платежа {payment.status} "
+                    f"{prefix}[CELERY] [{channel}] Неизвестный статус платежа {payment.status} "
                     f"для пользователя {user.user_id}."
                 )
                 user.payment_method_id = ""
@@ -340,10 +361,12 @@ def run_ukassa_bot_recurring(logger: TaskRunLogger, *, dry_run=False):
                 logger.log("WARNING", msg, user=user)
 
         except Exception as exc:
-            failed += _handle_payment_exception(user, exc, channel, logger, dry_run=dry_run)
+            failed += _handle_payment_exception(
+                user, exc, channel, logger, dry_run=dry_run, prefix=prefix
+            )
 
     if dry_run:
-        summary = f"dry-run: к списанию {would_charge} | пропущено {skipped}"
+        summary = f"dry-run: к списанию {total_charges} | пропущено {skipped}"
         logger.log("INFO", f"[DRY-RUN] [{channel}] [Конец] [{summary}]")
     else:
         summary = (
@@ -374,10 +397,11 @@ def run_ukassa_site_recurring(logger: TaskRunLogger, *, dry_run=False):
             "[DRY-RUN] Режим пробного запуска — запросы в YooKassa и изменения в БД не выполняются.",
         )
 
-    success = canceled = failed = unknown = skipped = would_charge = 0
+    success = canceled = failed = unknown = skipped = 0
     amount_to_charge = Decimal(Prices.objects.get(pk=1).price_1)
     currency = "RUB"
 
+    eligible_users = []
     for user in users_to_charge:
         skip_reason = _site_skip_reason(user)
         if skip_reason:
@@ -389,12 +413,29 @@ def run_ukassa_site_recurring(logger: TaskRunLogger, *, dry_run=False):
                     user=user,
                 )
             continue
+        eligible_users.append(user)
+
+    total_charges = len(eligible_users)
+    logger.log(
+        "INFO",
+        f"[{'DRY-RUN' if dry_run else 'CELERY'}] [{channel}] К списанию: {total_charges} "
+        f"(пропущено: {skipped})",
+    )
+
+    for idx, user in enumerate(eligible_users, 1):
+        prefix = f"{_charge_step_prefix(idx, total_charges)} "
+        logger.log(
+            "INFO",
+            f"{prefix}[{channel}] Попытка списания user_id={user.user_id}, сумма={amount_to_charge} {currency}",
+            user=user,
+        )
 
         if dry_run:
-            would_charge += 1
             logger.log(
                 "INFO",
-                _dry_run_charge_log(channel, user, amount_to_charge, currency, "YooKassa Site"),
+                _dry_run_charge_log(
+                    channel, user, amount_to_charge, currency, "YooKassa Site", prefix=prefix
+                ),
                 user=user,
             )
             continue
@@ -444,7 +485,7 @@ def run_ukassa_site_recurring(logger: TaskRunLogger, *, dry_run=False):
                     payment_system="YooKassaSite",
                 )
                 msg = (
-                    f"[CELERY] [{channel}] Автосписание успешно! Пользователь {user.user_id} оплатил "
+                    f"{prefix}[CELERY] [{channel}] Автосписание успешно! Пользователь {user.user_id} оплатил "
                     f"с {amount_to_charge} {currency}. Подписка активирована до {user.subscription_expiration} "
                     f"ID платежа {user.payment_method_id}"
                 )
@@ -453,7 +494,7 @@ def run_ukassa_site_recurring(logger: TaskRunLogger, *, dry_run=False):
 
             elif payment.status in ("waiting_for_capture", "pending"):
                 msg = (
-                    f"[CELERY] [{channel}] Платеж для пользователя {user.user_id} в статусе {payment.status}. "
+                    f"{prefix}[CELERY] [{channel}] Платеж для пользователя {user.user_id} в статусе {payment.status}. "
                     "Требуется дополнительная проверка."
                 )
                 logger.log("WARNING", msg, user=user)
@@ -462,14 +503,14 @@ def run_ukassa_site_recurring(logger: TaskRunLogger, *, dry_run=False):
                 canceled += 1
                 cancellation_details = payment.cancellation_details
                 reason = cancellation_details.reason if cancellation_details else "Unknown reason"
-                message = f"[CELERY] [{channel}] Платеж отменен для пользователя {user.user_id}. Причина: {reason}. "
+                message = f"{prefix}[CELERY] [{channel}] Платеж отменен для пользователя {user.user_id}. Причина: {reason}. "
                 message += _apply_cancellation_side_effects(user, reason)
                 logger.log("WARNING", message, user=user)
 
             else:
                 unknown += 1
                 msg = (
-                    f"[CELERY] [{channel}] Неизвестный статус платежа {payment.status} "
+                    f"{prefix}[CELERY] [{channel}] Неизвестный статус платежа {payment.status} "
                     f"для пользователя {user.user_id}."
                 )
                 user.payment_method_id = ""
@@ -477,10 +518,12 @@ def run_ukassa_site_recurring(logger: TaskRunLogger, *, dry_run=False):
                 logger.log("WARNING", msg, user=user)
 
         except Exception as exc:
-            failed += _handle_payment_exception(user, exc, channel, logger, dry_run=dry_run)
+            failed += _handle_payment_exception(
+                user, exc, channel, logger, dry_run=dry_run, prefix=prefix
+            )
 
     if dry_run:
-        summary = f"dry-run: к списанию {would_charge} | пропущено {skipped}"
+        summary = f"dry-run: к списанию {total_charges} | пропущено {skipped}"
         logger.log("INFO", f"[DRY-RUN] [{channel}] [Конец] [{summary}]")
     else:
         summary = (
