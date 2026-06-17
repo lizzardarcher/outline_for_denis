@@ -4,8 +4,6 @@ from bot.models import Logging
 
 from .models import ManualTaskLog
 
-
-
 class TaskRunLogger:
     """Пишет в ManualTaskLog при ручном запуске, иначе — в bot.models.Logging."""
 
@@ -28,3 +26,26 @@ class TaskRunLogger:
                 datetime=datetime.now(),
                 user=user,
             )
+
+
+class ConsoleTaskRunLogger(TaskRunLogger):
+    """Логирует в bot.Logging и дублирует вывод в консоль."""
+
+    def __init__(self, *, channel="BOT", stdout=None, style=None):
+        super().__init__(run_id=None, channel=channel)
+        self.stdout = stdout
+        self.style = style
+
+    def log(self, level, message, user=None):
+        super().log(level, message, user=user)
+        if not self.stdout:
+            return
+        line = f"[{level}] {message}"
+        if self.style:
+            if level == "SUCCESS":
+                line = self.style.SUCCESS(line)
+            elif level in ("WARNING", "FATAL"):
+                line = self.style.ERROR(line)
+            elif level == "DEBUG":
+                line = self.style.NOTICE(line)
+        self.stdout.write(line)
