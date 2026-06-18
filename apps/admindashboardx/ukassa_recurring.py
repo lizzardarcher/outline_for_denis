@@ -1,9 +1,12 @@
+import time
+import uuid
 from datetime import timedelta
 from decimal import Decimal
+from types import SimpleNamespace
 
+import requests
 from django.conf import settings
 from django.utils import timezone
-from yookassa import Configuration, Payment
 
 from bot.models import (
     IncomeInfo,
@@ -15,6 +18,127 @@ from bot.models import (
 )
 
 from .task_run_logging import TaskRunLogger
+
+
+YOOKASSA_API_BASE = "https://api.yookassa.ru/v3/payments"
+DEFAULT_YOOKASSA_API_TIMEOUT = 30
+
+
+class _YooKassaPaymentResponse:
+    def __init__(self, data):
+        self.id = data.get("id")
+        self.status = data.get("status")
+        cancellation = data.get("cancellation_details") or {}
+        self.cancellation_details = (
+            SimpleNamespace(reason=cancellation.get("reason")) if cancellation else None
+        )
+
+
+def _build_payment_system_map(users):
+    """Последняя payment_system по payment_method_id (один запрос вместо N)."""
+    pm_ids = [u.payment_method_id for u in users if u.payment_method_id]
+    if not pm_ids:
+        return {}
+    rows = (
+        Transaction.objects.filter(payment_id__in=pm_ids)
+        .order_by("payment_id", "-id")
+        .values_list("payment_id", "payment_system")
+    )
+    result = {}
+    for payment_id, payment_system in rows:
+        if payment_id not in result:
+            result[payment_id] = payment_system
+    return result
+
+
+def _payment_system_for_user(user, payment_system_by_pm_id):
+    if payment_system_by_pm_id is not None:
+        return payment_system_by_pm_id.get(user.payment_method_id)
+    try:
+        return Transaction.objects.filter(payment_id=user.payment_method_id).last().payment_system
+    except (Transaction.DoesNotExist, AttributeError):
+        return None
+
+
+def _create_yookassa_payment(
+    payload,
+    shop_id,
+    secret_key,
+    *,
+    timeout,
+    logger,
+    prefix,
+    channel,
+    user,
+):
+    logger.log(
+        "INFO",
+        f"{prefix}[{channel}] Запрос YooKassa Payment.create (timeout={timeout}s)...",
+        user=user,
+    )
+    started = time.monotonic()
+    try:
+        response = requests.post(
+            YOOKASSA_API_BASE,
+            json=payload,
+            auth=(shop_id, secret_key),
+            headers={
+                "Idempotence-Key": str(uuid.uuid4()),
+                "Content-Type": "application/json",
+            },
+            timeout=timeout,
+        )
+    except requests.Timeout as exc:
+        elapsed = time.monotonic() - started
+        raise TimeoutError(
+            f"YooKassa API: таймаут {timeout}s (ожидание {elapsed:.1f}s)"
+        ) from exc
+    except requests.RequestException as exc:
+        elapsed = time.monotonic() - started
+        raise RuntimeError(f"YooKassa API: ошибка сети за {elapsed:.1f}s: {exc}") from exc
+
+    elapsed = time.monotonic() - started
+    logger.log(
+        "INFO",
+        f"{prefix}[{channel}] Ответ YooKassa за {elapsed:.1f}s, HTTP {response.status_code}",
+        user=user,
+    )
+    if not response.ok:
+        body_preview = (response.text or "")[:300]
+        raise RuntimeError(
+            f"YooKassa API: HTTP {response.status_code}, тело: {body_preview}"
+        )
+
+    data = response.json()
+    logger.log(
+        "INFO",
+        f"{prefix}[{channel}] payment_id={data.get('id')}, status={data.get('status')}",
+        user=user,
+    )
+    return _YooKassaPaymentResponse(data)
+
+
+def _recurring_payment_payload(user, amount_to_charge, currency):
+    return {
+        "amount": {"value": str(amount_to_charge), "currency": currency},
+        "capture": True,
+        "payment_method_id": user.payment_method_id,
+        "payment_method": {"saved": True},
+        "description": f"Рекуррентный платеж для пользователя {user.user_id} Подписка DomVPN",
+        "receipt": {
+            "customer": {"email": _user_email(user)},
+            "items": [
+                {
+                    "description": "Рекуррентный платеж",
+                    "quantity": "1.00",
+                    "amount": {"value": str(amount_to_charge), "currency": currency},
+                    "vat_code": 4,
+                    "payment_subject": "service",
+                    "payment_mode": "full_payment",
+                }
+            ],
+        },
+    }
 
 
 def _apply_cancellation_side_effects(user, reason):
@@ -174,27 +298,21 @@ def _charge_step_prefix(index, total):
     return f"[#{index:03d}/{total:03d}]"
 
 
-def _bot_skip_reason(user):
+def _bot_skip_reason(user, payment_system_by_pm_id=None):
     if (getattr(user, "robokassa_recurring_parent_inv_id", "") or "").strip():
         return "активна рекуррентная подписка RoboKassa"
     if not (len(user.payment_method_id) > 10 and "000" in user.payment_method_id):
         return "payment_method_id не подходит под YooKassa Bot"
-    try:
-        payment_system = Transaction.objects.filter(payment_id=user.payment_method_id).last().payment_system
-    except (Transaction.DoesNotExist, AttributeError):
-        payment_system = None
+    payment_system = _payment_system_for_user(user, payment_system_by_pm_id)
     if payment_system in ("YooKassaSite", "RoboKassaBot", "RoboKassaSite"):
         return f"платёжная система «{payment_system}» (не Bot)"
     return None
 
 
-def _site_skip_reason(user):
+def _site_skip_reason(user, payment_system_by_pm_id=None):
     if not user.payment_method_id:
         return "нет payment_method_id"
-    try:
-        payment_system = Transaction.objects.filter(payment_id=user.payment_method_id).last().payment_system
-    except (Transaction.DoesNotExist, AttributeError):
-        payment_system = None
+    payment_system = _payment_system_for_user(user, payment_system_by_pm_id)
     if payment_system != "YooKassaSite":
         ps = payment_system or "неизвестна"
         return f"платёжная система «{ps}» (нужна YooKassaSite)"
@@ -213,20 +331,28 @@ def _dry_run_charge_log(channel, user, amount_to_charge, currency, payment_syste
     )
 
 
-def run_ukassa_bot_recurring(logger: TaskRunLogger, *, dry_run=False):
+def run_ukassa_bot_recurring(
+    logger: TaskRunLogger,
+    *,
+    dry_run=False,
+    api_timeout=DEFAULT_YOOKASSA_API_TIMEOUT,
+):
     channel = "BOT"
-    users_to_charge = TelegramUser.objects.filter(
-        subscription_status=False,
-        payment_method_id__isnull=False,
-        payment_method_id__gt="",
-        permission_revoked=False,
+    users_to_charge = list(
+        TelegramUser.objects.filter(
+            subscription_status=False,
+            payment_method_id__isnull=False,
+            payment_method_id__gt="",
+            permission_revoked=False,
+        )
     )
+    payment_system_by_pm_id = _build_payment_system_map(users_to_charge)
 
     mode_label = "DRY-RUN" if dry_run else "Списание"
     logger.log(
         "INFO",
         f"[{'DRY-RUN' if dry_run else 'CELERY'}] [{channel}] [{mode_label}] [Начало] "
-        f"[кандидатов в выборке: {users_to_charge.count()}]",
+        f"[кандидатов в выборке: {len(users_to_charge)}]",
     )
     if dry_run:
         logger.log(
@@ -240,7 +366,7 @@ def run_ukassa_bot_recurring(logger: TaskRunLogger, *, dry_run=False):
 
     eligible_users = []
     for user in users_to_charge:
-        skip_reason = _bot_skip_reason(user)
+        skip_reason = _bot_skip_reason(user, payment_system_by_pm_id)
         if skip_reason:
             skipped += 1
             if dry_run:
@@ -278,30 +404,15 @@ def run_ukassa_bot_recurring(logger: TaskRunLogger, *, dry_run=False):
             continue
 
         try:
-            Configuration.account_id = settings.YOOKASSA_SHOP_ID_BOT
-            Configuration.secret_key = settings.YOOKASSA_SECRET_BOT
-
-            payment = Payment.create(
-                {
-                    "amount": {"value": str(amount_to_charge), "currency": currency},
-                    "capture": True,
-                    "payment_method_id": user.payment_method_id,
-                    "payment_method": {"saved": True},
-                    "description": f"Рекуррентный платеж для пользователя {user.user_id} Подписка DomVPN",
-                    "receipt": {
-                        "customer": {"email": _user_email(user)},
-                        "items": [
-                            {
-                                "description": "Рекуррентный платеж",
-                                "quantity": "1.00",
-                                "amount": {"value": str(amount_to_charge), "currency": currency},
-                                "vat_code": 4,
-                                "payment_subject": "service",
-                                "payment_mode": "full_payment",
-                            }
-                        ],
-                    },
-                }
+            payment = _create_yookassa_payment(
+                _recurring_payment_payload(user, amount_to_charge, currency),
+                settings.YOOKASSA_SHOP_ID_BOT,
+                settings.YOOKASSA_SECRET_BOT,
+                timeout=api_timeout,
+                logger=logger,
+                prefix=prefix,
+                channel=channel,
+                user=user,
             )
 
             if payment.status == "succeeded":
@@ -376,20 +487,29 @@ def run_ukassa_bot_recurring(logger: TaskRunLogger, *, dry_run=False):
     return summary
 
 
-def run_ukassa_site_recurring(logger: TaskRunLogger, *, dry_run=False):
+def run_ukassa_site_recurring(
+    logger: TaskRunLogger,
+    *,
+    dry_run=False,
+    api_timeout=DEFAULT_YOOKASSA_API_TIMEOUT,
+):
     channel = "SITE"
-    users_to_charge = TelegramUser.objects.filter(
-        subscription_status=False,
-        payment_method_id__isnull=False,
-        payment_method_id__gt="",
-        permission_revoked=False,
+    users_to_charge = list(
+        TelegramUser.objects.filter(
+            subscription_status=False,
+            payment_method_id__isnull=False,
+            payment_method_id__gt="",
+            permission_revoked=False,
+        )
     )
+    payment_system_by_pm_id = _build_payment_system_map(users_to_charge)
+
 
     mode_label = "DRY-RUN" if dry_run else "Списание"
     logger.log(
         "INFO",
         f"[{'DRY-RUN' if dry_run else 'CELERY'}] [{channel}] [{mode_label}] [Начало] "
-        f"[кандидатов в выборке: {users_to_charge.count()}]",
+        f"[кандидатов в выборке: {len(users_to_charge)}]",
     )
     if dry_run:
         logger.log(
@@ -403,7 +523,7 @@ def run_ukassa_site_recurring(logger: TaskRunLogger, *, dry_run=False):
 
     eligible_users = []
     for user in users_to_charge:
-        skip_reason = _site_skip_reason(user)
+        skip_reason = _site_skip_reason(user, payment_system_by_pm_id)
         if skip_reason:
             skipped += 1
             if dry_run:
@@ -441,30 +561,15 @@ def run_ukassa_site_recurring(logger: TaskRunLogger, *, dry_run=False):
             continue
 
         try:
-            Configuration.account_id = settings.YOOKASSA_SHOP_ID_SITE
-            Configuration.secret_key = settings.YOOKASSA_SECRET_SITE
-
-            payment = Payment.create(
-                {
-                    "amount": {"value": str(amount_to_charge), "currency": currency},
-                    "capture": True,
-                    "payment_method_id": user.payment_method_id,
-                    "payment_method": {"saved": True},
-                    "description": f"Рекуррентный платеж для пользователя {user.user_id} Подписка DomVPN",
-                    "receipt": {
-                        "customer": {"email": _user_email(user)},
-                        "items": [
-                            {
-                                "description": "Рекуррентный платеж",
-                                "quantity": "1.00",
-                                "amount": {"value": str(amount_to_charge), "currency": currency},
-                                "vat_code": 4,
-                                "payment_subject": "service",
-                                "payment_mode": "full_payment",
-                            }
-                        ],
-                    },
-                }
+            payment = _create_yookassa_payment(
+                _recurring_payment_payload(user, amount_to_charge, currency),
+                settings.YOOKASSA_SHOP_ID_SITE,
+                settings.YOOKASSA_SECRET_SITE,
+                timeout=api_timeout,
+                logger=logger,
+                prefix=prefix,
+                channel=channel,
+                user=user,
             )
 
             if payment.status == "succeeded":
