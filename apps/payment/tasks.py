@@ -214,7 +214,7 @@ def _process_payment_data(payment_data: dict, transaction: Transaction, telegram
         Logging.objects.create(category="payment", log_level="DANGER", message=f'{traceback.format_exc()}', datetime=timezone.now())
 
 
-@shared_task(bind=True, name="yookassa_check_pending_bot")
+@shared_task(bind=True)
 def ukassa_check_pending_bot(self):
     """
     Таск для опроса платежей ЮKassa (бот). Проходит по всем pending Transaction и пытается получить
@@ -250,7 +250,7 @@ def ukassa_check_pending_bot(self):
                                    datetime=timezone.now())
 
 
-@shared_task(bind=True, name="yookassa_check_pending_site")
+@shared_task(bind=True)
 def ukassa_check_pending_site(self):
     """
     Таск для опроса платежей ЮKassa (сайт). Аналогично таску для бота, но использует креды сайта.
@@ -477,7 +477,7 @@ def _apply_robokassa_success(transaction: Transaction, amount_value: Decimal, so
 
 
 
-@shared_task(bind=True, name="robokassa_check_pending_bot")
+@shared_task(bind=True)
 def robokassa_check_pending_bot(self):
     merchant_login = getattr(settings, "ROBOKASSA_MERCHANT_LOGIN_BOT", None)
     password_2 = getattr(settings, "ROBOKASSA_PASSWORD_2_BOT", None)
@@ -530,7 +530,7 @@ def robokassa_check_pending_bot(self):
             )
 
 
-@shared_task(bind=True, name="robokassa_check_pending_site")
+@shared_task(bind=True)
 def robokassa_check_pending_site(self):
     merchant_login = getattr(settings, "ROBOKASSA_MERCHANT_LOGIN_SITE", None)
     password_2 = getattr(settings, "ROBOKASSA_PASSWORD_2_SITE", None)
