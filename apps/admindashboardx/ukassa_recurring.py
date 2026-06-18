@@ -60,22 +60,7 @@ def _payment_system_for_user(user, payment_system_by_pm_id):
         return None
 
 
-def _create_yookassa_payment(
-    payload,
-    shop_id,
-    secret_key,
-    *,
-    timeout,
-    logger,
-    prefix,
-    channel,
-    user,
-):
-    logger.log(
-        "INFO",
-        f"{prefix}[{channel}] Запрос YooKassa Payment.create (timeout={timeout}s)...",
-        user=user,
-    )
+def _create_yookassa_payment(payload, shop_id, secret_key, *, timeout):
     started = time.monotonic()
     try:
         response = requests.post(
@@ -98,24 +83,13 @@ def _create_yookassa_payment(
         raise RuntimeError(f"YooKassa API: ошибка сети за {elapsed:.1f}s: {exc}") from exc
 
     elapsed = time.monotonic() - started
-    logger.log(
-        "INFO",
-        f"{prefix}[{channel}] Ответ YooKassa за {elapsed:.1f}s, HTTP {response.status_code}",
-        user=user,
-    )
     if not response.ok:
         body_preview = (response.text or "")[:300]
         raise RuntimeError(
-            f"YooKassa API: HTTP {response.status_code}, тело: {body_preview}"
+            f"YooKassa API: HTTP {response.status_code} за {elapsed:.1f}s, тело: {body_preview}"
         )
 
-    data = response.json()
-    logger.log(
-        "INFO",
-        f"{prefix}[{channel}] payment_id={data.get('id')}, status={data.get('status')}",
-        user=user,
-    )
-    return _YooKassaPaymentResponse(data)
+    return _YooKassaPaymentResponse(response.json()), elapsed
 
 
 def _recurring_payment_payload(user, amount_to_charge, currency):
@@ -283,8 +257,8 @@ def _user_email(user):
 
 def _handle_payment_exception(user, exc, channel, logger: TaskRunLogger, *, dry_run=False, prefix=""):
     msg = (
-        f"{prefix}[CELERY] [{channel}] Ошибка при списании с пользователя {user.user_id}: {exc}\n"
-        f"Payment Method ID:{user.payment_method_id}"
+        f"{prefix}[CELERY] [{channel}] Неуспех: user_id={user.user_id}, {exc} "
+        f"(payment_method_id={user.payment_method_id})"
     )
     if not dry_run:
         if "This payment_method_id doesn't exist" in msg or "Payment method is not available" in msg:
@@ -387,11 +361,6 @@ def run_ukassa_bot_recurring(
 
     for idx, user in enumerate(eligible_users, 1):
         prefix = f"{_charge_step_prefix(idx, total_charges)} "
-        logger.log(
-            "INFO",
-            f"{prefix}[{channel}] Попытка списания user_id={user.user_id}, сумма={amount_to_charge} {currency}",
-            user=user,
-        )
 
         if dry_run:
             logger.log(
@@ -404,15 +373,11 @@ def run_ukassa_bot_recurring(
             continue
 
         try:
-            payment = _create_yookassa_payment(
+            payment, elapsed = _create_yookassa_payment(
                 _recurring_payment_payload(user, amount_to_charge, currency),
                 settings.YOOKASSA_SHOP_ID_BOT,
                 settings.YOOKASSA_SECRET_BOT,
                 timeout=api_timeout,
-                logger=logger,
-                prefix=prefix,
-                channel=channel,
-                user=user,
             )
 
             if payment.status == "succeeded":
@@ -433,9 +398,9 @@ def run_ukassa_bot_recurring(
                     payment_system="YooKassaBot",
                 )
                 msg = (
-                    f"{prefix}[CELERY] [{channel}] Автосписание успешно! Пользователь {user.user_id} оплатил "
-                    f"с {amount_to_charge} {currency}. Подписка активирована до {user.subscription_expiration} "
-                    f"ID платежа {user.payment_method_id}"
+                    f"{prefix}[CELERY] [{channel}] Успех за {elapsed:.1f}s: user_id={user.user_id}, "
+                    f"{amount_to_charge} {currency}, подписка до {user.subscription_expiration}, "
+                    f"payment_id={payment.id}"
                 )
                 try:
                     tr = Transaction.objects.filter(payment_id=user.payment_method_id).last()
@@ -448,8 +413,8 @@ def run_ukassa_bot_recurring(
 
             elif payment.status in ("waiting_for_capture", "pending"):
                 msg = (
-                    f"{prefix}[CELERY] [{channel}] Платеж для пользователя {user.user_id} в статусе {payment.status}. "
-                    "Требуется дополнительная проверка."
+                    f"{prefix}[CELERY] [{channel}] Неуспех за {elapsed:.1f}s: user_id={user.user_id}, "
+                    f"статус {payment.status}, payment_id={payment.id}. Требуется дополнительная проверка."
                 )
                 logger.log("WARNING", msg, user=user)
 
@@ -457,15 +422,18 @@ def run_ukassa_bot_recurring(
                 canceled += 1
                 cancellation_details = payment.cancellation_details
                 reason = cancellation_details.reason if cancellation_details else "Unknown reason"
-                message = f"{prefix}[CELERY] [{channel}] Платеж отменен для пользователя {user.user_id}. Причина: {reason}. "
+                message = (
+                    f"{prefix}[CELERY] [{channel}] Неуспех за {elapsed:.1f}s: user_id={user.user_id}, "
+                    f"отменён, payment_id={payment.id}. Причина: {reason}. "
+                )
                 message += _apply_cancellation_side_effects(user, reason)
                 logger.log("WARNING", message, user=user)
 
             else:
                 unknown += 1
                 msg = (
-                    f"{prefix}[CELERY] [{channel}] Неизвестный статус платежа {payment.status} "
-                    f"для пользователя {user.user_id}."
+                    f"{prefix}[CELERY] [{channel}] Неуспех за {elapsed:.1f}s: user_id={user.user_id}, "
+                    f"неизвестный статус {payment.status}, payment_id={payment.id}."
                 )
                 user.payment_method_id = ""
                 user.save()
@@ -517,6 +485,7 @@ def run_ukassa_site_recurring(
             "[DRY-RUN] Режим пробного запуска — запросы в YooKassa и изменения в БД не выполняются.",
         )
 
+
     success = canceled = failed = unknown = skipped = 0
     amount_to_charge = Decimal(Prices.objects.get(pk=1).price_1)
     currency = "RUB"
@@ -544,11 +513,6 @@ def run_ukassa_site_recurring(
 
     for idx, user in enumerate(eligible_users, 1):
         prefix = f"{_charge_step_prefix(idx, total_charges)} "
-        logger.log(
-            "INFO",
-            f"{prefix}[{channel}] Попытка списания user_id={user.user_id}, сумма={amount_to_charge} {currency}",
-            user=user,
-        )
 
         if dry_run:
             logger.log(
@@ -561,15 +525,11 @@ def run_ukassa_site_recurring(
             continue
 
         try:
-            payment = _create_yookassa_payment(
+            payment, elapsed = _create_yookassa_payment(
                 _recurring_payment_payload(user, amount_to_charge, currency),
                 settings.YOOKASSA_SHOP_ID_SITE,
                 settings.YOOKASSA_SECRET_SITE,
                 timeout=api_timeout,
-                logger=logger,
-                prefix=prefix,
-                channel=channel,
-                user=user,
             )
 
             if payment.status == "succeeded":
@@ -590,17 +550,17 @@ def run_ukassa_site_recurring(
                     payment_system="YooKassaSite",
                 )
                 msg = (
-                    f"{prefix}[CELERY] [{channel}] Автосписание успешно! Пользователь {user.user_id} оплатил "
-                    f"с {amount_to_charge} {currency}. Подписка активирована до {user.subscription_expiration} "
-                    f"ID платежа {user.payment_method_id}"
+                    f"{prefix}[CELERY] [{channel}] Успех за {elapsed:.1f}s: user_id={user.user_id}, "
+                    f"{amount_to_charge} {currency}, подписка до {user.subscription_expiration}, "
+                    f"payment_id={payment.id}"
                 )
                 _apply_referral_income(user, amount_to_charge)
                 logger.log("SUCCESS", msg, user=user)
 
             elif payment.status in ("waiting_for_capture", "pending"):
                 msg = (
-                    f"{prefix}[CELERY] [{channel}] Платеж для пользователя {user.user_id} в статусе {payment.status}. "
-                    "Требуется дополнительная проверка."
+                    f"{prefix}[CELERY] [{channel}] Неуспех за {elapsed:.1f}s: user_id={user.user_id}, "
+                    f"статус {payment.status}, payment_id={payment.id}. Требуется дополнительная проверка."
                 )
                 logger.log("WARNING", msg, user=user)
 
@@ -608,15 +568,18 @@ def run_ukassa_site_recurring(
                 canceled += 1
                 cancellation_details = payment.cancellation_details
                 reason = cancellation_details.reason if cancellation_details else "Unknown reason"
-                message = f"{prefix}[CELERY] [{channel}] Платеж отменен для пользователя {user.user_id}. Причина: {reason}. "
+                message = (
+                    f"{prefix}[CELERY] [{channel}] Неуспех за {elapsed:.1f}s: user_id={user.user_id}, "
+                    f"отменён, payment_id={payment.id}. Причина: {reason}. "
+                )
                 message += _apply_cancellation_side_effects(user, reason)
                 logger.log("WARNING", message, user=user)
 
             else:
                 unknown += 1
                 msg = (
-                    f"{prefix}[CELERY] [{channel}] Неизвестный статус платежа {payment.status} "
-                    f"для пользователя {user.user_id}."
+                    f"{prefix}[CELERY] [{channel}] Неуспех за {elapsed:.1f}s: user_id={user.user_id}, "
+                    f"неизвестный статус {payment.status}, payment_id={payment.id}."
                 )
                 user.payment_method_id = ""
                 user.save()
