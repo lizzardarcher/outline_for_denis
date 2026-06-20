@@ -278,7 +278,7 @@ CELERY_TASK_SERIALIZER = 'json'  # Сериализация задач
 CELERY_RESULT_SERIALIZER = 'json'  # Сериализация результатов
 CELERY_TIMEZONE = 'UTC'  # Часовой пояс
 CELERY_TASK_TRACK_STARTED = True  # Отслеживание состояния задач
-CELERY_TASK_TIME_LIMIT = 30 * 60  # Ограничение времени выполнения задачи (в секундах, 30 минут)
+CELERY_TASK_TIME_LIMIT = 60 * 60 * 3 # Ограничение времени выполнения задачи (в секундах, 30 минут)
 
 CELERY_ACKS_LATE = True  # Подтверждение получения задачи после ее выполнения
 CELERY_PREFETCH_MULTIPLIER = 1  # Количество задач, получаемых воркером за раз

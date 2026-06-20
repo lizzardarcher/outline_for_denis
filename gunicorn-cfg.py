@@ -5,9 +5,9 @@ from glob import glob
 command = '/opt/outline/venv/bin/gunicorn'
 pythonpath = '/opt/outline'
 bind = '0.0.0.0'
-workers = 5
+workers = 9
 timeout = 600
-loglevel = 'debug'
+loglevel = 'warning'
 capture_output = True
 enable_stdio_inheritance = True
 reload = True
