@@ -10,6 +10,7 @@ SECRET_KEY = os.getenv('DJANGO_SECRET_KEY')
 ALIAS_DOMAIN = 'https://dom-vpn.su'
 PROXY_DOMAIN = 'https://tm3949.craftum.io'
 
+
 # DEBUG = True
 DEBUG = False
 

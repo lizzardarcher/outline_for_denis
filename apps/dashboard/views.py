@@ -1,3 +1,4 @@
+import traceback
 from datetime import timedelta, datetime, date
 
 from django.conf import settings
@@ -21,6 +22,63 @@ from bot.models import VpnKey, Server, TelegramUser, Country, Prices, UserProfil
     Transaction, Logging, SiteNotification, SiteNotificationState
 
 KEY_LIMIT = settings.KEY_LIMIT
+
+
+def _short_repr(value, limit=1000):
+    try:
+        text = repr(value)
+    except Exception:
+        text = f"<unreprable {type(value).__name__}>"
+    if len(text) > limit:
+        return text[:limit] + "..."
+    return text
+
+
+def _log_web_marzban(telegram_user, protocol, message, level=" INFO"):
+    Logging.objects.create(
+        category="web",
+        log_level=level,
+        message=message,
+        datetime=datetime.now(),
+        user=telegram_user,
+    )
+
+
+def _marzban_create_and_get_user(telegram_user, protocol, server):
+    """Создание пользователя Marzban + get_user с подробными логами на каждом шаге."""
+    uid = str(telegram_user.user_id)
+    api = MarzbanAPI()
+    _log_web_marzban(
+        telegram_user,
+        protocol,
+        f'[WEB] [marzban] start [{protocol}] user_id={uid} server_ip={server.ip_address} '
+        f'api_url={api.api_url} token_ok={bool(api.api_token)}',
+    )
+    create_ok, create_result = api.create_user(username=uid)
+    _log_web_marzban(
+        telegram_user,
+        protocol,
+        f'[WEB] [marzban] create_user [{protocol}] user_id={uid} ok={create_ok} '
+        f'result_type={type(create_result).__name__} result={_short_repr(create_result)}',
+        level=" INFO" if create_ok else "DANGER",
+    )
+    get_ok, get_result = api.get_user(username=uid)
+    _log_web_marzban(
+        telegram_user,
+        protocol,
+        f'[WEB] [marzban] get_user [{protocol}] user_id={uid} ok={get_ok} '
+        f'result_type={type(get_result).__name__} result={_short_repr(get_result)}',
+        level=" INFO" if get_ok else "DANGER",
+    )
+    if get_ok and isinstance(get_result, dict):
+        links = get_result.get("links")
+        _log_web_marzban(
+            telegram_user,
+            protocol,
+            f'[WEB] [marzban] get_user [{protocol}] user_id={uid} links_count={len(links) if links else 0} '
+            f'links_preview={_short_repr(links, limit=500)}',
+        )
+    return get_ok, get_result
 
 
 class ProfileView(LoginRequiredMixin, SuccessMessageMixin, TemplateView):
@@ -145,6 +203,7 @@ class ManageMtProxyView(LoginRequiredMixin, View):
 
 class CancelSubscriptionView(LoginRequiredMixin, TemplateView):
 
+
     def get(self, request, *args, **kwargs):
         user = TelegramUser.objects.filter(user_id=self.request.user.profile.telegram_user.user_id).first()
         user.payment_method_id = None
@@ -190,8 +249,11 @@ class CreateNewKeyView(LoginRequiredMixin, TemplateView):
                 VpnKey.objects.filter(user=user).delete()  # Удаляем все предыдущие ключи
                 try_delete_celerity_user(user.user_id)
 
-                MarzbanAPI().create_user(username=str(user.user_id))  # Генерируем новый ключ vless
-                success, result = MarzbanAPI().get_user(username=str(user.user_id))
+                success, result = _marzban_create_and_get_user(user, protocol, server)
+                if not success or not isinstance(result, dict):
+                    raise ValueError(
+                        f"Marzban get_user failed: ok={success} result={_short_repr(result)}"
+                    )
                 links = result['links']
                 key = "---"
 
@@ -221,8 +283,11 @@ class CreateNewKeyView(LoginRequiredMixin, TemplateView):
                 VpnKey.objects.filter(user=user).delete()  # Удаляем все предыдущие ключи
                 try_delete_celerity_user(user.user_id)
 
-                MarzbanAPI().create_user(username=str(user.user_id))  # Генерируем новый ключ vless
-                success, result = MarzbanAPI().get_user(username=str(user.user_id))
+                success, result = _marzban_create_and_get_user(user, protocol, server)
+                if not success or not isinstance(result, dict):
+                    raise ValueError(
+                        f"Marzban get_user failed: ok={success} result={_short_repr(result)}"
+                    )
                 links = result['links']
                 key = "---"
                 for link in links:
@@ -290,7 +355,7 @@ class CreateNewKeyView(LoginRequiredMixin, TemplateView):
             Logging.objects.create(
                 category="web",
                 log_level=" FATAL",
-                message=f'[WEB] [ошибка создания ключа] [{protocol}] [{e}]',
+                message=f'[WEB] [ошибка создания ключа] [{protocol}] [{traceback.format_exc()}]',
                 datetime=datetime.now(),
                 user=self.request.user.profile.telegram_user,
             )
