@@ -696,7 +696,7 @@ async def callback_query_handlers(call):
                                     await asyncio.sleep(2)
                                     await bot.delete_message(wait_msg.chat.id, wait_msg.message_id)
 
-                                    MarzbanAPI().create_user(username=str(user.user_id))
+                                    MarzbanAPI().create_user(username=str(user.user_id), protocol=protocol)
                                     success, result = MarzbanAPI().get_user(username=str(user.user_id))
 
                                     links = result["links"]

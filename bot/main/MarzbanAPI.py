@@ -6,6 +6,17 @@ from django.conf import settings
 from bot.models import TelegramBot
 
 
+# Теги inbounds должны совпадать с Marzban/Xray 1:1 (поле "tag" в xray config).
+MARZBAN_INBOUNDS_BY_PROTOCOL = {
+    "outline": {
+        "shadowsocks": ["Shadowsocks TCP"],
+    },
+    "vless": {
+        "vless": ["VLESS TCP REALITY"],
+    },
+}
+
+
 class MarzbanAPI:
     """
     Класс для взаимодействия с API Marzban для управления пользователями.
@@ -57,6 +68,32 @@ class MarzbanAPI:
             print(f"Error: {response.status_code}, {response.text}")
             return None
 
+    @staticmethod
+    def inbounds_for_protocol(protocol):
+        if protocol in MARZBAN_INBOUNDS_BY_PROTOCOL:
+            return MARZBAN_INBOUNDS_BY_PROTOCOL[protocol]
+        return {
+            "vless": MARZBAN_INBOUNDS_BY_PROTOCOL["vless"]["vless"],
+            "shadowsocks": MARZBAN_INBOUNDS_BY_PROTOCOL["outline"]["shadowsocks"],
+        }
+
+    @staticmethod
+    def _error_detail(response, request_data=None):
+        body = response.text
+        try:
+            body = response.json()
+        except json.JSONDecodeError:
+            pass
+        detail = {
+            "status_code": response.status_code,
+            "reason": response.reason,
+            "url": response.url,
+            "body": body,
+        }
+        if request_data is not None:
+            detail["request_data"] = request_data
+        return detail
+
     def _make_request(self, method, endpoint, data=None):
         """
         Вспомогательная функция для выполнения HTTP-запросов.
@@ -72,9 +109,10 @@ class MarzbanAPI:
         """
         url = f"{self.api_url}{endpoint}"
         try:
-            response = requests.request(method, url, headers=self.headers, json=data, timeout=10)  # Добавил timeout
+            response = requests.request(method, url, headers=self.headers, json=data, timeout=10)
 
-            response.raise_for_status()
+            if response.status_code >= 400:
+                return False, self._error_detail(response, request_data=data)
 
             if response.status_code == 204:
                 return True, None
@@ -83,11 +121,14 @@ class MarzbanAPI:
             except json.JSONDecodeError:
                 return True, response.text
         except requests.exceptions.RequestException as e:
-            return False, str(e)
+            resp = getattr(e, "response", None)
+            if resp is not None:
+                return False, self._error_detail(resp, request_data=data)
+            return False, {"error": "request_error", "message": str(e)}
         except Exception as e:
-            return False, str(e)
+            return False, {"error": "unexpected_error", "message": str(e)}
 
-    def create_user(self, username, data_limit=0, data_limit_reset_strategy="no_reset", expire=0,
+    def create_user(self, username, protocol=None, data_limit=0, data_limit_reset_strategy="no_reset", expire=0,
                     inbounds=None, next_plan=None, note="", on_hold_expire_duration=0,
                     on_hold_timeout=None, proxies=None, status="active"):
         """
@@ -115,15 +156,7 @@ class MarzbanAPI:
         data = {
             "data_limit": data_limit,
             "expire": expire,
-            "inbounds": {
-                "vless": [
-                    # "VLESS_TCP_REALITY_443",
-                    # "VLESS XHTTP REALITY",
-                    # "VLESS TCP REALITY 8443",
-                    "VLESS TCP REALITY",
-                ],
-                "shadowsocks": ["Shadowsocks TCP"]
-            },
+            "inbounds": inbounds or self.inbounds_for_protocol(protocol),
             "proxies": proxies or {
                 "vless": {},
                 "shadowsocks": {}

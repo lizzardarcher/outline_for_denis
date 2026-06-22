@@ -1,4 +1,5 @@
 import traceback
+import json
 from datetime import timedelta, datetime, date
 
 from django.conf import settings
@@ -34,6 +35,24 @@ def _short_repr(value, limit=1000):
     return text
 
 
+def _format_marzban_error(result):
+    if isinstance(result, dict) and "status_code" in result:
+        body = result.get("body")
+        if isinstance(body, (dict, list)):
+            body = json.dumps(body, ensure_ascii=False)
+        req = result.get("request_data")
+        req_text = ""
+        if req is not None:
+            req_text = f" request={_short_repr(req, limit=500)}"
+        return (
+            f"HTTP {result['status_code']} {result.get('reason', '')} "
+            f"url={result.get('url')} body={_short_repr(body)}{req_text}"
+        )
+    if isinstance(result, dict) and result.get("error"):
+        return _short_repr(result)
+    return _short_repr(result)
+
+
 def _log_web_marzban(telegram_user, protocol, message, level=" INFO"):
     Logging.objects.create(
         category="web",
@@ -43,42 +62,67 @@ def _log_web_marzban(telegram_user, protocol, message, level=" INFO"):
         user=telegram_user,
     )
 
-
 def _marzban_create_and_get_user(telegram_user, protocol, server):
     """Создание пользователя Marzban + get_user с подробными логами на каждом шаге."""
     uid = str(telegram_user.user_id)
     api = MarzbanAPI()
+    inbounds = api.inbounds_for_protocol(protocol)
     _log_web_marzban(
         telegram_user,
         protocol,
         f'[WEB] [marzban] start [{protocol}] user_id={uid} server_ip={server.ip_address} '
-        f'api_url={api.api_url} token_ok={bool(api.api_token)}',
+        f'api_url={api.api_url} token_ok={bool(api.api_token)} inbounds={_short_repr(inbounds, limit=500)}',
     )
-    create_ok, create_result = api.create_user(username=uid)
+    delete_ok, delete_result = api.delete_user(username=uid)
+    delete_is_missing = (
+        isinstance(delete_result, dict)
+        and delete_result.get("status_code") == 404
+    )
+    _log_web_marzban(
+        telegram_user,
+        protocol,
+        f'[WEB] [marzban] delete_user [{protocol}] user_id={uid} ok={delete_ok} '
+        f'result={_format_marzban_error(delete_result)}',
+        level=" INFO" if (delete_ok or delete_is_missing) else "DANGER",
+    )
+    create_ok, create_result = api.create_user(username=uid, protocol=protocol)
     _log_web_marzban(
         telegram_user,
         protocol,
         f'[WEB] [marzban] create_user [{protocol}] user_id={uid} ok={create_ok} '
-        f'result_type={type(create_result).__name__} result={_short_repr(create_result)}',
+        f'result={_format_marzban_error(create_result)}',
         level=" INFO" if create_ok else "DANGER",
     )
+
+    if not create_ok:
+        raise ValueError(
+            f"Marzban create_user failed [{protocol}] user_id={uid}: {_format_marzban_error(create_result)}"
+        )
     get_ok, get_result = api.get_user(username=uid)
     _log_web_marzban(
         telegram_user,
         protocol,
         f'[WEB] [marzban] get_user [{protocol}] user_id={uid} ok={get_ok} '
-        f'result_type={type(get_result).__name__} result={_short_repr(get_result)}',
+        f'result={_format_marzban_error(get_result)}',
         level=" INFO" if get_ok else "DANGER",
     )
-    if get_ok and isinstance(get_result, dict):
-        links = get_result.get("links")
-        _log_web_marzban(
-            telegram_user,
-            protocol,
-            f'[WEB] [marzban] get_user [{protocol}] user_id={uid} links_count={len(links) if links else 0} '
-            f'links_preview={_short_repr(links, limit=500)}',
+    if not get_ok:
+        raise ValueError(
+            f"Marzban get_user failed [{protocol}] user_id={uid}: {_format_marzban_error(get_result)}"
         )
-    return get_ok, get_result
+    if not isinstance(get_result, dict):
+        raise ValueError(
+            f"Marzban get_user unexpected response [{protocol}] user_id={uid}: "
+            f"type={type(get_result).__name__} result={_short_repr(get_result)}"
+        )
+    links = get_result.get("links")
+    _log_web_marzban(
+        telegram_user,
+        protocol,
+        f'[WEB] [marzban] get_user [{protocol}] user_id={uid} links_count={len(links) if links else 0} '
+        f'links_preview={_short_repr(links, limit=500)}',
+    )
+    return True, get_result
 
 
 class ProfileView(LoginRequiredMixin, SuccessMessageMixin, TemplateView):
@@ -250,10 +294,6 @@ class CreateNewKeyView(LoginRequiredMixin, TemplateView):
                 try_delete_celerity_user(user.user_id)
 
                 success, result = _marzban_create_and_get_user(user, protocol, server)
-                if not success or not isinstance(result, dict):
-                    raise ValueError(
-                        f"Marzban get_user failed: ok={success} result={_short_repr(result)}"
-                    )
                 links = result['links']
                 key = "---"
 
@@ -284,10 +324,6 @@ class CreateNewKeyView(LoginRequiredMixin, TemplateView):
                 try_delete_celerity_user(user.user_id)
 
                 success, result = _marzban_create_and_get_user(user, protocol, server)
-                if not success or not isinstance(result, dict):
-                    raise ValueError(
-                        f"Marzban get_user failed: ok={success} result={_short_repr(result)}"
-                    )
                 links = result['links']
                 key = "---"
                 for link in links:
