@@ -158,7 +158,7 @@ class MarzbanAPI:
             "expire": expire,
             "inbounds": inbounds or self.inbounds_for_protocol(protocol),
             "proxies": proxies or {
-                "vless": {},
+                "vless": {"flow": "xtls-rprx-vision", "fp": "randomized"},
                 "shadowsocks": {}
             },
             "status": status,
@@ -274,7 +274,6 @@ class MarzbanAPI:
             "port": port,
             "usage_coefficient": 1
         }
-        print(self.api_token)
         success, result = self._make_request("POST", f"/node", data=node)
         return success, result
 
