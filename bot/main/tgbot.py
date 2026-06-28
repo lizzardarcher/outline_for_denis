@@ -98,6 +98,72 @@ def _generate_and_set_site_password(django_user: User) -> str:
     return password
 
 
+def _is_navigation_callback(call_data: str, data: list) -> bool:
+    """Экраны меню: edit_message вместо delete + send_message."""
+    if call_data in {
+        'back', 'download_app', 'app_installed', 'manage',
+        'help', 'common_info', 'profile',
+    }:
+        return True
+    if call_data.startswith('protocol_'):
+        return True
+    if data and data[0] == 'country':
+        return True
+    return False
+
+
+def _callback_uses_edit(call_data: str, data: list) -> bool:
+    """Callback-экраны, которые обновляют текущее сообщение (навигация + оплата)."""
+    if _is_navigation_callback(call_data, data):
+        return True
+    if not data or data[0] != 'account':
+        return False
+    if 'choose_payment' in call_data:
+        return True
+    if len(data) > 1 and data[1] == 'sub':
+        return True
+    if len(data) > 1 and data[1] == 'payment':
+        return True
+    if 'cancel_subscription' in call_data or 'cancelled_sbs' in call_data:
+        return True
+    if 'get_new_key' in call_data or 'swap_key' in call_data:
+        return True
+    return False
+
+
+async def _delete_callback_message(call) -> None:
+    try:
+        await bot.delete_message(call.message.chat.id, call.message.message_id)
+    except Exception:
+        pass
+
+
+async def edit_callback_message(call, text, reply_markup=None, parse_mode='HTML') -> None:
+    """Обновляет сообщение с inline-кнопками; при ошибке — delete + send."""
+    try:
+        await bot.edit_message_text(
+            text,
+            call.message.chat.id,
+            call.message.message_id,
+            reply_markup=reply_markup,
+            parse_mode=parse_mode,
+        )
+    except Exception as exc:
+        if 'message is not modified' in str(exc).lower():
+            try:
+                await bot.answer_callback_query(call.id)
+            except Exception:
+                pass
+            return
+        await _delete_callback_message(call)
+        await bot.send_message(
+            call.message.chat.id,
+            text=text,
+            reply_markup=reply_markup,
+            parse_mode=parse_mode,
+        )
+
+
 async def send_pending_messages():
     while True:
 
@@ -513,26 +579,37 @@ async def callback_query_handlers(call):
                                   datetime=datetime.now(), user=user)
 
             if call.message.chat.type == 'private':
-                try:
-                    await bot.delete_message(call.message.chat.id, call.message.message_id)
-                except:
-                    ...
+                if call.data == 'popup_help':
+                    await bot.answer_callback_query(call.id, text=msg.popup_help, show_alert=True)
+                    return
+
+                if not _callback_uses_edit(call.data, data):
+                    await _delete_callback_message(call)
 
                 if 'download_app' in data:
-                    await bot.send_message(call.message.chat.id, text=msg.download_app,
-                                           reply_markup=markup.download_app())
+                    await edit_callback_message(
+                        call,
+                        msg.download_app,
+                        reply_markup=markup.download_app(),
+                    )
 
                 elif 'app_installed' in data:
-                    await bot.send_message(chat_id=call.message.chat.id, text=msg.app_installed,
-                                           reply_markup=markup.start(user=user))
+                    await edit_callback_message(
+                        call,
+                        msg.app_installed,
+                        reply_markup=markup.start(user=user),
+                    )
                     # if user.subscription_status and not VpnKey.objects.filter(user=user):
                     #     server = random.choice(Server.objects.filter(is_active=True, keys_generated__lte=KEY_LIMIT))
                     #     key = await create_new_key(server, user)
                     #     await bot.send_message(chat_id=user.user_id, text=msg.trial_key.format(key))
 
                 elif 'manage' in data:
-                    await bot.send_message(call.message.chat.id, msg.choose_protocol,
-                                           reply_markup=markup.choose_protocol(user=user))
+                    await edit_callback_message(
+                        call,
+                        msg.choose_protocol,
+                        reply_markup=markup.choose_protocol(user=user),
+                    )
 
                 elif 'country' in data:
 
@@ -544,19 +621,30 @@ async def callback_query_handlers(call):
                                 try:
                                     key = VpnKey.objects.filter(user=user, server__country__name=country).last()
                                     if key.protocol == 'outline':
-                                        await bot.send_message(call.message.chat.id,
-                                                               text=f'{msg.key_avail}\n<code>{key.access_url}</code>',
-                                                               reply_markup=markup.key_menu(country, 'outline'))
+                                        await edit_callback_message(
+                                            call,
+                                            f'{msg.key_avail}\n<code>{key.access_url}</code>',
+                                            reply_markup=markup.key_menu(country, 'outline'),
+                                        )
                                     else:
-                                        await bot.send_message(call.message.chat.id, text=msg.get_new_key,
-                                                               reply_markup=markup.get_new_key(country, 'outline'))
+                                        await edit_callback_message(
+                                            call,
+                                            msg.get_new_key,
+                                            reply_markup=markup.get_new_key(country, 'outline'),
+                                        )
 
                                 except:
-                                    await bot.send_message(call.message.chat.id, text=msg.get_new_key,
-                                                           reply_markup=markup.get_new_key(country, 'outline'))
+                                    await edit_callback_message(
+                                        call,
+                                        msg.get_new_key,
+                                        reply_markup=markup.get_new_key(country, 'outline'),
+                                    )
                         else:
-                            await bot.send_message(call.message.chat.id, msg.no_subscription,
-                                                   reply_markup=markup.get_subscription())
+                            await edit_callback_message(
+                                call,
+                                msg.no_subscription,
+                                reply_markup=markup.get_subscription(),
+                            )
 
                     elif 'vless' in data:
 
@@ -566,18 +654,29 @@ async def callback_query_handlers(call):
                                 try:
                                     key = VpnKey.objects.filter(user=user, server__country__name=country).last()
                                     if key.protocol == 'vless':
-                                        await bot.send_message(call.message.chat.id,
-                                                               text=f'{msg.key_avail}\n<code>{key.access_url}</code>',
-                                                               reply_markup=markup.key_menu(country, 'vless'))
+                                        await edit_callback_message(
+                                            call,
+                                            f'{msg.key_avail}\n<code>{key.access_url}</code>',
+                                            reply_markup=markup.key_menu(country, 'vless'),
+                                        )
                                     else:
-                                        await bot.send_message(call.message.chat.id, text=msg.get_new_key,
-                                                               reply_markup=markup.get_new_key(country, 'vless'))
+                                        await edit_callback_message(
+                                            call,
+                                            msg.get_new_key,
+                                            reply_markup=markup.get_new_key(country, 'vless'),
+                                        )
                                 except:
-                                    await bot.send_message(call.message.chat.id, text=msg.get_new_key,
-                                                           reply_markup=markup.get_new_key(country, 'vless'))
+                                    await edit_callback_message(
+                                        call,
+                                        msg.get_new_key,
+                                        reply_markup=markup.get_new_key(country, 'vless'),
+                                    )
                         else:
-                            await bot.send_message(call.message.chat.id, msg.no_subscription,
-                                                   reply_markup=markup.get_subscription())
+                            await edit_callback_message(
+                                call,
+                                msg.no_subscription,
+                                reply_markup=markup.get_subscription(),
+                            )
 
                     elif 'hysteria2' in data:
                         if user.subscription_status:
@@ -586,40 +685,51 @@ async def callback_query_handlers(call):
                                 try:
                                     key = VpnKey.objects.filter(user=user, server__country__name=country).last()
                                     if key and key.protocol == "hysteria2":
-                                        await bot.send_message(
-                                            call.message.chat.id,
-                                            text=f'{msg.key_avail}\n<code>{key.access_url}</code>',
+                                        await edit_callback_message(
+                                            call,
+                                            f'{msg.key_avail}\n<code>{key.access_url}</code>',
                                             reply_markup=markup.key_menu(country, "hysteria2"),
                                         )
                                     else:
-                                        await bot.send_message(
-                                            call.message.chat.id,
-                                            text=msg.get_new_key,
+                                        await edit_callback_message(
+                                            call,
+                                            msg.get_new_key,
                                             reply_markup=markup.get_new_key(country, "hysteria2"),
                                         )
                                 except Exception:
-                                    await bot.send_message(
-                                        call.message.chat.id,
-                                        text=msg.get_new_key,
+                                    await edit_callback_message(
+                                        call,
+                                        msg.get_new_key,
                                         reply_markup=markup.get_new_key(country, "hysteria2"),
                                     )
                         else:
-                            await bot.send_message(call.message.chat.id, msg.no_subscription,
-                                                   reply_markup=markup.get_subscription())
+                            await edit_callback_message(
+                                call,
+                                msg.no_subscription,
+                                reply_markup=markup.get_subscription(),
+                            )
 
                 elif 'protocol_outline' in data:
-
-                    await bot.send_message(call.message.chat.id, msg.avail_location_choice,
-                                           reply_markup=markup.get_avail_location('outline'))
+                    await edit_callback_message(
+                        call,
+                        msg.avail_location_choice,
+                        reply_markup=markup.get_avail_location('outline'),
+                    )
 
                 elif 'protocol_vless' in data:
-
-                    await bot.send_message(call.message.chat.id, msg.avail_location_choice,
-                                           reply_markup=markup.get_avail_location('vless'))
+                    await edit_callback_message(
+                        call,
+                        msg.avail_location_choice,
+                        reply_markup=markup.get_avail_location('vless'),
+                    )
 
                 elif 'protocol_hysteria2' in data:
-                    await bot.send_message(call.message.chat.id, msg.avail_location_choice,
-                                           reply_markup=markup.get_avail_location('hysteria2'))
+                    await edit_callback_message(
+                        call,
+                        msg.avail_location_choice,
+                        reply_markup=markup.get_avail_location('hysteria2'),
+                    )
+
 
                 elif 'account' in data:
 
@@ -630,38 +740,37 @@ async def callback_query_handlers(call):
                                 country_name = call.data.split('_')[-1]
                                 country_obj = Country.objects.filter(name=country_name).first()
                                 if not country_obj:
-                                    await bot.send_message(
-                                        call.message.chat.id,
+                                    await edit_callback_message(
+                                        call,
                                         "Страна не найдена.",
                                         reply_markup=markup.start(user=user),
                                     )
                                     return
 
                                 if not acquire_vpn_key_create_lock(user.user_id):
-                                    await bot.send_message(
-                                        call.message.chat.id,
+                                    await edit_callback_message(
+                                        call,
                                         "Ключ уже создаётся. Подождите немного и попробуйте снова.",
-                                        reply_markup=markup.start(user=user),
+                                        reply_markup=markup.key_menu(country_name, protocol),
                                     )
                                     return
 
                                 try:
-                                    wait_msg = await bot.send_message(
-                                        call.message.chat.id,
-                                        text="Ожидайте, ключи генерируются...",
+                                    await edit_callback_message(
+                                        call,
+                                        "Ожидайте, ключи генерируются...",
+                                        reply_markup=InlineKeyboardMarkup(),
                                     )
                                     ok, result_msg, access_url = issue_vpn_key_for_user(
                                         user, country_obj, protocol
                                     )
-                                    await bot.delete_message(wait_msg.chat.id, wait_msg.message_id)
                                     if not ok:
-                                        await bot.send_message(
-                                            call.message.chat.id,
+                                        await edit_callback_message(
+                                            call,
                                             result_msg,
-                                            reply_markup=markup.start(user=user),
+                                            reply_markup=markup.get_new_key(country_name, protocol),
                                         )
                                         return
-
 
                                     vpn_key = VpnKey.objects.filter(user=user).select_related("server").first()
                                     server = vpn_key.server if vpn_key else None
@@ -676,9 +785,9 @@ async def callback_query_handlers(call):
                                         user=user,
                                     )
 
-                                    await bot.send_message(
-                                        call.message.chat.id,
-                                        text=f"{msg.key_avail}\n<code>{access_url or (vpn_key.access_url if vpn_key else '')}</code>",
+                                    await edit_callback_message(
+                                        call,
+                                        f"{msg.key_avail}\n<code>{access_url or (vpn_key.access_url if vpn_key else '')}</code>",
                                         reply_markup=markup.key_menu(country_name, protocol),
                                     )
                                 finally:
@@ -686,12 +795,18 @@ async def callback_query_handlers(call):
                             except:
                                 ...
                         else:
-                            await bot.send_message(call.message.chat.id, msg.no_subscription,
-                                                   reply_markup=markup.get_subscription())
+                            await edit_callback_message(
+                                call,
+                                msg.no_subscription,
+                                reply_markup=markup.get_subscription(),
+                            )
 
                     elif 'choose_payment' in data:
-                        await bot.send_message(call.message.chat.id, text=msg.choose_subscription,
-                                               reply_markup=markup.choose_subscription())
+                        await edit_callback_message(
+                            call,
+                            msg.choose_subscription,
+                            reply_markup=markup.choose_subscription(),
+                        )
                     elif 'sub' in data:
                         sub = None
                         price = None
@@ -712,8 +827,11 @@ async def callback_query_handlers(call):
                         elif data[-1] == '3_days_trial':
                             sub = '3 Дня'
                             price = prices.price_5
-                        await bot.send_message(call.message.chat.id, text=msg.payment_menu.format(sub, price, recurrent_price),
-                            reply_markup=markup.payment_menu(data[-1], user))
+                        await edit_callback_message(
+                            call,
+                            msg.payment_menu.format(sub, price, recurrent_price),
+                            reply_markup=markup.payment_menu(data[-1], user),
+                        )
 
                     elif 'payment' in data:
 
@@ -813,15 +931,23 @@ async def callback_query_handlers(call):
                                     InlineKeyboardButton(text='Пользовательское соглашение',
                                                          url=f'{SITE_DOMAIN}/user-agreement/'))
                                 payment_markup.add(InlineKeyboardButton(text=f'🔙 Назад', callback_data=f'back'))
-                                await bot.send_message(call.message.chat.id,
-                                                       f"Для оплаты подписки на {days} дн. нажмите на кнопку Оплатить и следуйте инструкциям:",
-                                                       reply_markup=payment_markup)
+                                await edit_callback_message(
+                                    call,
+                                    f"Для оплаты подписки на {days} дн. нажмите на кнопку Оплатить и следуйте инструкциям:",
+                                    reply_markup=payment_markup,
+                                )
                                 await asyncio.sleep(10)
-                                await bot.send_message(call.message.chat.id, text=msg.after_payment,
-                                                       reply_markup=markup.proceed_to_profile())
+                                await edit_callback_message(
+                                    call,
+                                    msg.after_payment,
+                                    reply_markup=markup.proceed_to_profile(),
+                                )
                             except Exception as e:
-                                await bot.send_message(call.message.chat.id,
-                                                       f"Произошла ошибка при оформлении подписки.  Попробуйте позже. {e}")
+                                await edit_callback_message(
+                                    call,
+                                    f"Произошла ошибка при оформлении подписки.  Попробуйте позже. {e}",
+                                    reply_markup=markup.start(user=user),
+                                )
 
                         elif 'robokassa' in data:
                             # Создание платежа через RoboKassa (бот-магазин)
@@ -972,22 +1098,23 @@ async def callback_query_handlers(call):
                                     InlineKeyboardButton(text='🔙 Назад', callback_data='back')
                                 )
 
-                                await bot.send_message(
-                                    call.message.chat.id,
+                                await edit_callback_message(
+                                    call,
                                     f"Для оплаты подписки на {days} дн. нажмите на кнопку Оплатить и следуйте инструкциям:",
-                                    reply_markup=payment_markup
+                                    reply_markup=payment_markup,
                                 )
                                 await asyncio.sleep(10)
-                                await bot.send_message(
-                                    call.message.chat.id,
-                                    text=msg.after_payment,
-                                    reply_markup=markup.proceed_to_profile()
+                                await edit_callback_message(
+                                    call,
+                                    msg.after_payment,
+                                    reply_markup=markup.proceed_to_profile(),
                                 )
 
                             except Exception as e:
-                                await bot.send_message(
-                                    call.message.chat.id,
-                                    f"Произошла ошибка при оформлении подписки через RoboKassa. Попробуйте позже. {e}"
+                                await edit_callback_message(
+                                    call,
+                                    f"Произошла ошибка при оформлении подписки через RoboKassa. Попробуйте позже. {e}",
+                                    reply_markup=markup.start(user=user),
                                 )
 
                         elif 'cryptobot' in data:
@@ -1078,32 +1205,39 @@ async def callback_query_handlers(call):
                                     InlineKeyboardButton(text='🔙 Назад', callback_data='back')
                                 )
 
-                                await bot.send_message(
-                                    call.message.chat.id,
+                                await edit_callback_message(
+                                    call,
                                     f"Для оплаты подписки на {days} дн. нажмите на кнопку Оплатить и следуйте инструкциям:",
                                     reply_markup=payment_markup,
                                 )
                                 await asyncio.sleep(10)
-                                await bot.send_message(
-                                    call.message.chat.id,
-                                    text=msg.after_payment,
+                                await edit_callback_message(
+                                    call,
+                                    msg.after_payment,
                                     reply_markup=markup.proceed_to_profile(),
                                 )
 
                             except Exception as e:
-                                await bot.send_message(
-                                    call.message.chat.id,
+                                await edit_callback_message(
+                                    call,
                                     f"Произошла ошибка при оформлении подписки через CryptoBot. Попробуйте позже. {e}",
+                                    reply_markup=markup.start(user=user),
                                 )
 
                     elif 'cancel_subscription' in data:
                         # Отмена подписки
                         if user.subscription_status:
-                            await bot.send_message(call.message.chat.id, text=msg.cancel_subscription,
-                                                   reply_markup=markup.cancel_subscription())
+                            await edit_callback_message(
+                                call,
+                                msg.cancel_subscription,
+                                reply_markup=markup.cancel_subscription(),
+                            )
                         else:
-                            await bot.send_message(call.message.chat.id, text=msg.cancel_subscription_error,
-                                                   reply_markup=markup.start(user=user))
+                            await edit_callback_message(
+                                call,
+                                msg.cancel_subscription_error,
+                                reply_markup=markup.start(user=user),
+                            )
 
 
                     elif 'cancelled_sbs' in data:
@@ -1117,8 +1251,11 @@ async def callback_query_handlers(call):
                         user.permission_revoked = True
                         user.save()
                         revoke_all_user_keys(user, reason="manual_cancel_bot")
-                        await bot.send_message(call.message.chat.id, text=msg.cancel_subscription_success,
-                                               reply_markup=markup.start(user=user))
+                        await edit_callback_message(
+                            call,
+                            msg.cancel_subscription_success,
+                            reply_markup=markup.start(user=user),
+                        )
 
                     elif 'site_access' in data:
                         lg.objects.create(log_level='INFO', message=f'[BOT] [site_access 2nd]', datetime=datetime.now(),
@@ -1210,9 +1347,11 @@ async def callback_query_handlers(call):
                         "%d.%m.%Y")) if user.subscription_status else 'Нет подписки'
                     active = '📌  <b>Подписка:</b> ✅' if user.payment_method_id else ''
 
-                    await bot.send_message(call.message.chat.id,
-                                           text=msg.profile.format(user_id, sub, active, income),
-                                           reply_markup=markup.my_profile(user=user))
+                    await edit_callback_message(
+                        call,
+                        msg.profile.format(user_id, sub, active, income),
+                        reply_markup=markup.my_profile(user=user),
+                    )
 
                 elif 'tgproxy' in data:
                     if not can_use_mtproxy(user):
@@ -1346,19 +1485,25 @@ async def callback_query_handlers(call):
                         await bot.send_message(call.message.chat.id, text="Произошла ошибка. Попробуйте позже.")
 
                 elif 'help' in data:
-                    await bot.send_message(call.message.chat.id, text=msg.help_message, reply_markup=markup.start(user=user),
-                                           parse_mode='HTML')
-
-                elif 'popup_help' in data:
-                    await bot.answer_callback_query(call.id, text=msg.popup_help, show_alert=True)
+                    await edit_callback_message(
+                        call,
+                        msg.help_message,
+                        reply_markup=markup.start(user=user),
+                    )
 
                 elif 'common_info' in data:
-                    await bot.send_message(call.message.chat.id, text=msg.commom_info,
-                                           reply_markup=markup.help_markup())
+                    await edit_callback_message(
+                        call,
+                        msg.commom_info,
+                        reply_markup=markup.help_markup(),
+                    )
 
                 elif 'back' in data:
-                    await bot.send_message(chat_id=call.message.chat.id, text=msg.main_menu_choice,
-                                           reply_markup=markup.start(user=user))
+                    await edit_callback_message(
+                        call,
+                        msg.main_menu_choice,
+                        reply_markup=markup.start(user=user),
+                    )
         except:
             ...
 
