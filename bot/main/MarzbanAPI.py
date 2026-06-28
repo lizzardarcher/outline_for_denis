@@ -158,7 +158,7 @@ class MarzbanAPI:
             "expire": expire,
             "inbounds": inbounds or self.inbounds_for_protocol(protocol),
             "proxies": proxies or {
-                "vless": {"flow": "xtls-rprx-vision", "fp": "randomized"},
+                "vless": {"flow": "xtls-rprx-vision", "fp": "randomized", "fingerprint": "randomized"},
                 "shadowsocks": {}
             },
             "status": status,
