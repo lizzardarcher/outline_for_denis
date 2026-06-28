@@ -88,6 +88,7 @@ def pick_hysteria2_tls_uri(subscription_text: str, server_ip: str) -> Optional[s
     return None
 
 
+
 def pick_hysteria2_hopping_uri(subscription_text: str, server_ip: str) -> Optional[str]:
     """
     Ищет строку с hysteria2:// для server_ip, у которой есть параметр mport
@@ -161,11 +162,13 @@ def issue_hysteria2_tls_for_user(
     }
     ok_c, res_c = api.create_user(body)
     if not ok_c:
-        return False, f"Celerity create_user: {res_c!r}"
-
-    ok_g, data_g = api.get_user(uid)
-    if not ok_g or not isinstance(data_g, dict):
-        return False, f"Celerity get_user: {data_g!r}"
+        ok_existing, data_g = api.get_user(uid)
+        if not ok_existing or not isinstance(data_g, dict):
+            return False, f"Celerity create_user: {res_c!r}"
+    else:
+        ok_g, data_g = api.get_user(uid)
+        if not ok_g or not isinstance(data_g, dict):
+            return False, f"Celerity get_user: {data_g!r}"
 
     tok = data_g.get("subscriptionToken")
     if not tok:

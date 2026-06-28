@@ -16,25 +16,13 @@ from django.views.generic import TemplateView
 
 from apps.authentication.forms import DashboardPasswordChangeForm
 from apps.mtproxy.services import can_use_mtproxy, get_active_key, issue_or_get_key, reissue_key, revoke_all_user_keys
-from bot.main.MarzbanAPI import MarzbanAPI
-from bot.main.celerity_key_issue import issue_hysteria2_tls_for_user, try_delete_celerity_user
+from bot.main.vpn_key_issue import issue_vpn_key_for_user, logging_context_for_protocol
+from bot.main.vpn_key_lock import acquire_vpn_key_create_lock, release_vpn_key_create_lock
 from bot.models import VpnKey, Server, TelegramUser, Country, Prices, UserProfile, ReferralSettings, TelegramReferral, \
     Transaction, Logging, SiteNotification, SiteNotificationState
 
 KEY_LIMIT = settings.KEY_LIMIT
 
-
-def _marzban_create_and_get_user(telegram_user, protocol):
-    uid = str(telegram_user.user_id)
-    api = MarzbanAPI()
-    api.delete_user(username=uid)
-    create_ok, create_result = api.create_user(username=uid, protocol=protocol)
-    if not create_ok:
-        raise ValueError(f"Marzban create_user failed: {create_result}")
-    get_ok, get_result = api.get_user(username=uid)
-    if not get_ok or not isinstance(get_result, dict):
-        raise ValueError(f"Marzban get_user failed: {get_result}")
-    return get_result
 
 
 class ProfileView(LoginRequiredMixin, SuccessMessageMixin, TemplateView):
@@ -108,6 +96,7 @@ class ProfileView(LoginRequiredMixin, SuccessMessageMixin, TemplateView):
             context['mtproxy_key'] = get_active_key(tg_user)
         return context
 
+
 class MarkNotificationReadView(LoginRequiredMixin, View):
     def post(self, request, *args, **kwargs):
         tg_user = request.user.profile.telegram_user
@@ -130,6 +119,7 @@ class MarkNotificationReadView(LoginRequiredMixin, View):
             state.save(update_fields=['last_seen_notification_id', 'updated_at'])
 
         return redirect('/dashboard/profile/?section=notifications')
+
 
 class ManageMtProxyView(LoginRequiredMixin, View):
     def post(self, request, *args, **kwargs):
@@ -158,7 +148,6 @@ class ManageMtProxyView(LoginRequiredMixin, View):
 
 class CancelSubscriptionView(LoginRequiredMixin, TemplateView):
 
-
     def get(self, request, *args, **kwargs):
         user = TelegramUser.objects.filter(user_id=self.request.user.profile.telegram_user.user_id).first()
         user.payment_method_id = None
@@ -177,139 +166,93 @@ class CancelSubscriptionView(LoginRequiredMixin, TemplateView):
         return redirect('profile')
 
 
-class CreateNewKeyView(LoginRequiredMixin, TemplateView):
+class CreateNewKeyView(LoginRequiredMixin, View):
+    _BUSY_MESSAGE = "Ключ уже создаётся. Подождите немного и обновите страницу."
+
+    def _wants_json(self, request):
+        if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+            return True
+        accept = request.headers.get("Accept") or ""
+        return "application/json" in accept
+
+    def _json(self, *, ok, message, busy=False, access_url=None, status=200):
+        payload = {"ok": ok, "message": message, "busy": busy}
+        if access_url:
+            payload["access_url"] = access_url
+        return JsonResponse(payload, status=status)
 
     def get(self, request, *args, **kwargs):
-        country_name = request.GET.get('country')
-        protocol = request.GET.get('protocol')
+        messages.info(
+            request,
+            "Создание ключа выполняется через форму в личном кабинете. "
+            "Если ключ уже создаётся — подождите и обновите страницу.",
+        )
+        return redirect("profile")
+
+    def post(self, request, *args, **kwargs):
+        country_name = (request.POST.get("country") or "").strip()
+        protocol = (request.POST.get("protocol") or "").strip().lower()
+        wants_json = self._wants_json(request)
+
         if not country_name or not protocol:
-            messages.error(request, 'Ошибка создания ключа! Не указана страна или протокол в параметрах запроса.')
-            return redirect('profile')
+            message = "Ошибка создания ключа! Не указана страна или протокол."
+            if wants_json:
+                return self._json(ok=False, message=message, status=400)
+            messages.error(request, message)
+            return redirect("profile")
 
         country = get_object_or_404(Country, name=country_name)
-
         user_profile = get_object_or_404(UserProfile, user=request.user)
         user = user_profile.telegram_user
 
+        if not acquire_vpn_key_create_lock(user.user_id):
+            if wants_json:
+                return self._json(ok=False, message=self._BUSY_MESSAGE, busy=True, status=409)
+            messages.info(request, self._BUSY_MESSAGE)
+            return redirect("profile")
+
         try:
-
-            if protocol == 'outline':
-
-                server = Server.objects.filter(is_active=True, is_activated_vless=True, country=country,
-                                               keys_generated__lte=KEY_LIMIT).order_by('keys_generated').first()
-                if not server:
-                    messages.error(request, f"Ошибка создания ключа! Нет доступных серверов для страны '{country.name}'.")
-                    return redirect('profile')
-
-                VpnKey.objects.filter(user=user).delete()  # Удаляем все предыдущие ключи
-                try_delete_celerity_user(user.user_id)
-
-                result = _marzban_create_and_get_user(user, protocol)
-                links = result['links']
-                key = "---"
-
-                for link in links:
-                    if server.ip_address in link and "ss://" in link:
-                        key = link
-                        break
-
-                VpnKey.objects.create(server=server, user=user, key_id=user.user_id,
-                                      name=str(user.user_id), password=str(user.user_id),
-                                      port=1040, method='ss', access_url=key, protocol='outline')
-
-                messages.success(request, f'Новый ключ создан!')
-                Logging.objects.create(category="web", log_level=" INFO",
-                                       message=f'[WEB] [Новый ключ создан] [outline] [{server.hosting}] [{server.country.name_for_app}]',
-                                       datetime=datetime.now(), user=self.request.user.profile.telegram_user)
-
-
-            elif protocol == 'vless':
-
-                server = Server.objects.filter(is_active=True, is_activated_vless=True, country=country,
-                                               keys_generated__lte=KEY_LIMIT).order_by('keys_generated').first()
-                if not server:
-                    messages.error(request, f"Ошибка создания ключа! Нет доступных серверов для страны '{country.name}'.")
-                    return redirect('profile')
-
-                VpnKey.objects.filter(user=user).delete()  # Удаляем все предыдущие ключи
-                try_delete_celerity_user(user.user_id)
-
-                result = _marzban_create_and_get_user(user, protocol)
-                links = result['links']
-                key = "---"
-                for link in links:
-
-                    if server.ip_address in link and "vless://" in link:
-                        key = link
-                        break
-
-                VpnKey.objects.create(server=server, user=user, key_id=user.user_id,
-                                      name=str(user.user_id), password=str(user.user_id),
-                                      port=1040, method='vless', access_url=key, protocol='vless')
-
-                messages.success(request, f'Новый ключ создан!')
-                Logging.objects.create(category="web", log_level=" INFO",
-                                       message=f'[WEB] [Новый ключ создан] [vless] [{server.hosting}] [{server.country.name_for_app}]',
-                                       datetime=datetime.now(), user=self.request.user.profile.telegram_user)
-
-
-            elif protocol == 'hysteria2':
-                server = Server.objects.filter(
-                    is_active=True,
-                    is_c3celeryty_activated=True,
-                    country=country,
-                    keys_generated__lte=KEY_LIMIT,
-                ).order_by('keys_generated').first()
-                if not server:
-                    messages.error(
-                        request,
-                        f"Ошибка создания ключа! Нет доступных серверов Hysteria2 для страны '{country.name}'.",
-                    )
-                    return redirect('profile')
-
-                VpnKey.objects.filter(user=user).delete()
-
-                ok, result = issue_hysteria2_tls_for_user(
-                    telegram_user_id=user.user_id,
-                    display_username=(user.username or str(user.user_id)),
-                    server_ip=(server.ip_address or "").strip(),
-                )
-                if not ok:
-                    messages.error(request, f'Ошибка создания ключа Hysteria2: {result}')
-                    return redirect('profile')
-
-                key = result
-                VpnKey.objects.create(
-                    server=server,
-                    user=user,
-                    key_id=user.user_id,
-                    name=str(user.user_id),
-                    password=str(user.user_id),
-                    port=443,
-                    method='hysteria2',
-                    access_url=key,
-                    protocol='hysteria2',
-                )
-                messages.success(request, f'Новый ключ создан!')
+            ok, message, access_url = issue_vpn_key_for_user(user, country, protocol)
+            if ok:
+                vpn_key = VpnKey.objects.filter(user=user).select_related("server", "server__country").first()
+                server = vpn_key.server if vpn_key else None
                 Logging.objects.create(
                     category="web",
                     log_level=" INFO",
-                    message=f'[WEB] [Новый ключ создан] [hysteria2] [{server.hosting}] [{server.country.name_for_app}]',
+                    message=(
+                        f"[WEB] [Новый ключ создан] "
+                        f"{logging_context_for_protocol(protocol, country, server)}"
+                    ),
                     datetime=datetime.now(),
-                    user=self.request.user.profile.telegram_user,
+                    user=user,
                 )
-        except Exception as e:
+                if wants_json:
+                    return self._json(ok=True, message=message, access_url=access_url)
+                messages.success(request, message)
+                return redirect("/dashboard/profile/?section=main-info")
+
+            if wants_json:
+                return self._json(ok=False, message=message, status=400)
+            messages.error(request, message)
+            return redirect("profile")
+        except Exception:
             Logging.objects.create(
                 category="web",
                 log_level=" FATAL",
-                message=f'[WEB] [ошибка создания ключа] [{protocol}] [{traceback.format_exc()}]',
+                message=f"[WEB] [ошибка создания ключа] [{protocol}] [{traceback.format_exc()}]",
                 datetime=datetime.now(),
-                user=self.request.user.profile.telegram_user,
+                user=user,
             )
-            messages.error(request, 'Ошибка создания ключа! На сервере возникли проблемы технического характера. Попробуйте позже или выберите другой протокол')
-            return redirect('profile')
-        return redirect('profile')
-
+            fatal_message = (
+                "Ошибка создания ключа! На сервере возникли проблемы технического характера. "
+                "Попробуйте позже или выберите другой протокол"
+            )
+            if wants_json:
+                return self._json(ok=False, message=fatal_message, status=500)
+            messages.error(request, fatal_message)
+            return redirect("profile")
+        finally:
+            release_vpn_key_create_lock(user.user_id)
 
 
 class UpdateSubscriptionView(LoginRequiredMixin, TemplateView):
@@ -392,7 +335,6 @@ def daily_transaction_analytics(request):
         }]
     }
 
-    # If it's an AJAX request (e.g., for API endpoints, though not strictly used here for initial render)
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
         return JsonResponse(chart_data)
 

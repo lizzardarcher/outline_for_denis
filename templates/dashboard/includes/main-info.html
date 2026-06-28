@@ -88,7 +88,6 @@
     }
 </style>
 
-
 <div class="dv-main-info mb-4">
     {# ——— Текущий ключ ——— #}
     <div class="card dv-card">
@@ -296,7 +295,9 @@
                 </h5>
             </div>
             <div class="modal-body pt-2">
-                <form action="{% url 'get_new_key' %}" method="get">
+                <form id="create-vpn-key-form" action="{% url 'get_new_key' %}" method="post">
+                    {% csrf_token %}
+                    <div id="create-vpn-key-alert" class="alert d-none mb-3" role="alert"></div>
                     <div class="form-group">
                         <label for="country" class="font-weight-bold">Страна</label>
                         <select class="form-control" id="country" name="country" style="border-radius: 8px;">
@@ -323,13 +324,109 @@
                     </div>
                     <div class="modal-footer border-0 px-0 pb-1 pt-3">
                         <button type="button" class="btn btn-light border" data-dismiss="modal">Отмена</button>
-                        <button type="submit" class="btn btn-primary px-4">Подтвердить</button>
+                        <button type="submit" id="create-vpn-key-submit" class="btn btn-primary px-4">
+                            <span class="create-vpn-key-submit-text">Подтвердить</span>
+                            <span class="create-vpn-key-submit-spinner d-none">
+                                <span class="spinner-border spinner-border-sm mr-1" role="status" aria-hidden="true"></span>
+                                Создаём ключ…
+                            </span>
+                        </button>
                     </div>
                 </form>
             </div>
         </div>
     </div>
 </div>
+
+<script>
+(function () {
+    var form = document.getElementById('create-vpn-key-form');
+    if (!form) {
+        return;
+    }
+
+    var submitBtn = document.getElementById('create-vpn-key-submit');
+    var submitText = submitBtn ? submitBtn.querySelector('.create-vpn-key-submit-text') : null;
+    var submitSpinner = submitBtn ? submitBtn.querySelector('.create-vpn-key-submit-spinner') : null;
+    var alertBox = document.getElementById('create-vpn-key-alert');
+
+    function getCookie(name) {
+        var value = '; ' + document.cookie;
+        var parts = value.split('; ' + name + '=');
+        if (parts.length === 2) {
+            return parts.pop().split(';').shift();
+        }
+        return '';
+    }
+
+    function setBusy(isBusy) {
+        if (!submitBtn) {
+            return;
+        }
+        submitBtn.disabled = isBusy;
+        if (submitText) {
+            submitText.classList.toggle('d-none', isBusy);
+        }
+        if (submitSpinner) {
+            submitSpinner.classList.toggle('d-none', !isBusy);
+        }
+    }
+
+    function showAlert(message, type) {
+        if (!alertBox) {
+            return;
+        }
+        alertBox.textContent = message;
+        alertBox.className = 'alert alert-' + type + ' mb-3';
+        alertBox.classList.remove('d-none');
+    }
+
+    function hideAlert() {
+        if (!alertBox) {
+            return;
+        }
+        alertBox.classList.add('d-none');
+        alertBox.textContent = '';
+    }
+
+    form.addEventListener('submit', function (event) {
+        event.preventDefault();
+        hideAlert();
+        setBusy(true);
+
+        var formData = new FormData(form);
+        fetch(form.action, {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            credentials: 'same-origin'
+        })
+            .then(function (response) {
+                return response.json().then(function (data) {
+                    return { ok: response.ok, data: data };
+                });
+            })
+            .then(function (result) {
+                var data = result.data || {};
+                if (result.ok && data.ok) {
+                    window.location.href = '/dashboard/profile/?section=main-info';
+                    return;
+                }
+                var message = data.message || 'Не удалось создать ключ. Попробуйте позже.';
+                showAlert(message, data.busy ? 'info' : 'danger');
+            })
+            .catch(function () {
+                showAlert('Ошибка сети. Проверьте подключение и попробуйте снова.', 'danger');
+            })
+            .finally(function () {
+                setBusy(false);
+            });
+    });
+})();
+</script>
 
 {% if vpn_key and vpn_key.access_url %}
 <script>

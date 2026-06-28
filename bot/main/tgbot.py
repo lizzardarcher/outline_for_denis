@@ -27,8 +27,8 @@ from bot.models import Logging as lg
 from bot.main.utils import msg
 from bot.main.utils import markup
 
-from bot.main.MarzbanAPI import MarzbanAPI
-from bot.main.celerity_key_issue import issue_hysteria2_tls_for_user, try_delete_celerity_user
+from bot.main.vpn_key_issue import issue_vpn_key_for_user, logging_context_for_protocol
+from bot.main.vpn_key_lock import acquire_vpn_key_create_lock, release_vpn_key_create_lock
 from apps.mtproxy.services import can_use_mtproxy, issue_or_get_key, reissue_key, revoke_all_user_keys
 
 from bot.main.utils.utils import return_matches, robokassa_md5
@@ -627,124 +627,62 @@ async def callback_query_handlers(call):
                         protocol = call.data.split(':')[1]
                         if user.subscription_status:
                             try:
-                                country = call.data.split('_')[-1]
-                                if protocol == "hysteria2":
-                                    server = Server.objects.filter(
-                                        is_active=True,
-                                        is_c3celeryty_activated=True,
-                                        country__name=country,
-                                        keys_generated__lte=200,
-                                    ).order_by("keys_generated").first()
-                                else:
-                                    server = Server.objects.filter(
-                                        is_active=True,
-                                        is_activated_vless=True,
-                                        country__name=country,
-                                        keys_generated__lte=200,
-                                    ).order_by("keys_generated").first()
-
-                                if not server:
+                                country_name = call.data.split('_')[-1]
+                                country_obj = Country.objects.filter(name=country_name).first()
+                                if not country_obj:
                                     await bot.send_message(
                                         call.message.chat.id,
-                                        "Нет доступного сервера для выбранной страны.",
+                                        "Страна не найдена.",
                                         reply_markup=markup.start(user=user),
                                     )
                                     return
 
-                                VpnKey.objects.filter(user=user).delete()
-                                wait_msg = await bot.send_message(
-                                    call.message.chat.id,
-                                    text="Ожидайте, ключи генерируются...",
-                                )
+                                if not acquire_vpn_key_create_lock(user.user_id):
+                                    await bot.send_message(
+                                        call.message.chat.id,
+                                        "Ключ уже создаётся. Подождите немного и попробуйте снова.",
+                                        reply_markup=markup.start(user=user),
+                                    )
+                                    return
 
-                                if protocol == "hysteria2":
-                                    ok, result = issue_hysteria2_tls_for_user(
-                                        telegram_user_id=user.user_id,
-                                        display_username=(user.username or str(user.user_id)),
-                                        server_ip=(server.ip_address or "").strip(),
+                                try:
+                                    wait_msg = await bot.send_message(
+                                        call.message.chat.id,
+                                        text="Ожидайте, ключи генерируются...",
+                                    )
+                                    ok, result_msg, access_url = issue_vpn_key_for_user(
+                                        user, country_obj, protocol
                                     )
                                     await bot.delete_message(wait_msg.chat.id, wait_msg.message_id)
                                     if not ok:
                                         await bot.send_message(
                                             call.message.chat.id,
-                                            f"Ошибка Hysteria2: {result}",
+                                            result_msg,
                                             reply_markup=markup.start(user=user),
                                         )
                                         return
-                                    key_obj = VpnKey.objects.create(
-                                        server=server,
+
+
+                                    vpn_key = VpnKey.objects.filter(user=user).select_related("server").first()
+                                    server = vpn_key.server if vpn_key else None
+                                    Logging.objects.create(
+                                        category="vpn",
+                                        log_level=" INFO",
+                                        message=(
+                                            f"[BOT] [Новый ключ создан] "
+                                            f"{logging_context_for_protocol(protocol, country_obj, server)}"
+                                        ),
+                                        datetime=datetime.now(),
                                         user=user,
-                                        key_id=user.user_id,
-                                        name=str(user.user_id),
-                                        password=str(user.user_id),
-                                        port=443,
-                                        method="hysteria2",
-                                        access_url=result,
-                                        protocol="hysteria2",
-                                    )
-                                else:
-                                    try_delete_celerity_user(user.user_id)
-                                    try:
-                                        MarzbanAPI().delete_user(username=str(user.user_id))
-                                    except:
-                                        await bot.send_message(
-                                            call.message.chat.id,
-                                            "Данный протокол временно недоступен. Пожалуйста выберите другой. Приносим извинения за временные неудобства.",
-                                            reply_markup=markup.start(user=user),
-                                        )
-                                        return
-                                    await asyncio.sleep(2)
-                                    await bot.delete_message(wait_msg.chat.id, wait_msg.message_id)
-
-                                    MarzbanAPI().create_user(username=str(user.user_id), protocol=protocol)
-                                    success, result = MarzbanAPI().get_user(username=str(user.user_id))
-
-                                    links = result["links"]
-                                    key = "---"
-                                    for link in links:
-
-                                        if protocol == "outline":
-                                            if (
-                                                server.ip_address in link
-                                                and "ss://" in link
-                                                and "vless://" not in link
-                                            ):
-                                                key = link
-                                                break
-
-                                        if protocol == "vless":
-                                            if server.ip_address in link and "vless://" in link:
-                                                key = link
-                                                break
-
-                                    key_obj = VpnKey.objects.create(
-                                        server=server,
-                                        user=user,
-                                        key_id=user.user_id,
-                                        name=str(user.user_id),
-                                        password=str(user.user_id),
-                                        port=1040,
-                                        method=protocol,
-                                        access_url=key,
-                                        protocol=protocol,
                                     )
 
-                                Logging.objects.create(
-                                    category="vpn",
-                                    log_level=" INFO",
-                                    message=(
-                                        f"[BOT] [Новый ключ создан] [{protocol}] "
-                                        f"[{server.hosting}] [{server.country.name_for_app}]"
-                                    ),
-                                    datetime=datetime.now(),
-                                    user=user,
-                                )
-
-                                await bot.send_message(
-                                    call.message.chat.id,
-                                    text=f"{msg.key_avail}\n<code>{key_obj.access_url}</code>",
-                                    reply_markup=markup.key_menu(country, protocol),
-                                )
+                                    await bot.send_message(
+                                        call.message.chat.id,
+                                        text=f"{msg.key_avail}\n<code>{access_url or (vpn_key.access_url if vpn_key else '')}</code>",
+                                        reply_markup=markup.key_menu(country_name, protocol),
+                                    )
+                                finally:
+                                    release_vpn_key_create_lock(user.user_id)
                             except:
                                 ...
                         else:
