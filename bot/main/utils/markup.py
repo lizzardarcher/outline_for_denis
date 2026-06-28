@@ -4,6 +4,7 @@ from telebot.types import InlineKeyboardButton
 from telebot.types import LabeledPrice
 from telebot.types import ShippingOption
 
+
 import django_orm
 from bot.models import Prices, Country, TelegramUser, Server
 
@@ -213,10 +214,34 @@ def choose_subscription():
 
 def key_menu(country: str, protocol: str):
     markup = InlineKeyboardMarkup()
-    btn1 = InlineKeyboardButton(text=f'🔃 Заменить ключ', callback_data=f'account:{protocol}:swap_key_{country}')
+    btn1 = InlineKeyboardButton(text=f'🔃 Заменить ключ', callback_data=f'account:{protocol}:swap_confirm_{country}')
     btn2 = InlineKeyboardButton(text=f'❔ Помощь', callback_data=f'help')
     markup.row(btn1, btn2)
     markup.row(btn_back)
+    return markup
+
+
+def swap_key_confirm(country: str, protocol: str):
+    markup = InlineKeyboardMarkup()
+    markup.add(
+        InlineKeyboardButton(
+            text='✅ Да, заменить',
+            callback_data=f'account:{protocol}:swap_key_{country}',
+        )
+    )
+    markup.add(
+        InlineKeyboardButton(
+            text='❌ Отмена',
+            callback_data=f'country:{protocol}:{country}',
+        )
+    )
+    markup.row(btn_back)
+    return markup
+
+
+def credentials_back():
+    markup = InlineKeyboardMarkup()
+    markup.add(InlineKeyboardButton(text='👨 Профиль', callback_data='profile'))
     return markup
 
 

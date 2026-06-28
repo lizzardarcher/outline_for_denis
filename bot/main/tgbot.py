@@ -29,6 +29,15 @@ from bot.main.utils import markup
 
 from bot.main.vpn_key_issue import issue_vpn_key_for_user, logging_context_for_protocol
 from bot.main.vpn_key_lock import acquire_vpn_key_create_lock, release_vpn_key_create_lock
+from bot.main.bot_ui import (
+    active_key_summary,
+    clear_ui_screen,
+    format_screen,
+    resolve_country_key_screen,
+    schedule_payment_reminder,
+    set_ui_screen,
+    trail_for_callback,
+)
 from apps.mtproxy.services import can_use_mtproxy, issue_or_get_key, reissue_key, revoke_all_user_keys
 
 from bot.main.utils.utils import return_matches, robokassa_md5
@@ -113,8 +122,12 @@ def _is_navigation_callback(call_data: str, data: list) -> bool:
 
 
 def _callback_uses_edit(call_data: str, data: list) -> bool:
-    """Callback-экраны, которые обновляют текущее сообщение (навигация + оплата)."""
+    """Callback-экраны, которые обновляют текущее сообщение."""
     if _is_navigation_callback(call_data, data):
+        return True
+    if call_data == 'referral' or call_data.startswith('withdraw:'):
+        return True
+    if call_data.startswith('tgproxy:'):
         return True
     if not data or data[0] != 'account':
         return False
@@ -126,7 +139,13 @@ def _callback_uses_edit(call_data: str, data: list) -> bool:
         return True
     if 'cancel_subscription' in call_data or 'cancelled_sbs' in call_data:
         return True
-    if 'get_new_key' in call_data or 'swap_key' in call_data:
+    if 'get_new_key' in call_data or 'swap_key' in call_data or 'swap_confirm' in call_data:
+        return True
+    return False
+
+
+def _callback_skip_delete(call_data: str, data: list) -> bool:
+    if 'site_access' in call_data or 'site_change_password' in call_data:
         return True
     return False
 
@@ -140,6 +159,7 @@ async def _delete_callback_message(call) -> None:
 
 async def edit_callback_message(call, text, reply_markup=None, parse_mode='HTML') -> None:
     """Обновляет сообщение с inline-кнопками; при ошибке — delete + send."""
+    clear_ui_screen(call.message.chat.id)
     try:
         await bot.edit_message_text(
             text,
@@ -162,6 +182,24 @@ async def edit_callback_message(call, text, reply_markup=None, parse_mode='HTML'
             reply_markup=reply_markup,
             parse_mode=parse_mode,
         )
+
+
+async def edit_screen(call, body: str, reply_markup=None, trail=None) -> None:
+    data = call.data.split(':')
+    parts = trail if trail is not None else trail_for_callback(call.data, data)
+    await edit_callback_message(call, format_screen(body, parts), reply_markup=reply_markup)
+
+
+def _schedule_payment_followup(call, user) -> None:
+    set_ui_screen(user.user_id, "payment", call.message.chat.id, call.message.message_id)
+    asyncio.create_task(
+        schedule_payment_reminder(
+            bot,
+            user.user_id,
+            call.message.chat.id,
+            call.message.message_id,
+        )
+    )
 
 
 async def send_pending_messages():
@@ -583,148 +621,58 @@ async def callback_query_handlers(call):
                     await bot.answer_callback_query(call.id, text=msg.popup_help, show_alert=True)
                     return
 
-                if not _callback_uses_edit(call.data, data):
+                try:
+                    await bot.answer_callback_query(call.id)
+                except Exception:
+                    pass
+
+                if not _callback_uses_edit(call.data, data) and not _callback_skip_delete(call.data, data):
                     await _delete_callback_message(call)
 
                 if 'download_app' in data:
-                    await edit_callback_message(
-                        call,
-                        msg.download_app,
-                        reply_markup=markup.download_app(),
-                    )
+                    await edit_screen(call, msg.download_app, reply_markup=markup.download_app())
 
                 elif 'app_installed' in data:
-                    await edit_callback_message(
-                        call,
-                        msg.app_installed,
-                        reply_markup=markup.start(user=user),
-                    )
-                    # if user.subscription_status and not VpnKey.objects.filter(user=user):
-                    #     server = random.choice(Server.objects.filter(is_active=True, keys_generated__lte=KEY_LIMIT))
-                    #     key = await create_new_key(server, user)
-                    #     await bot.send_message(chat_id=user.user_id, text=msg.trial_key.format(key))
+                    await edit_screen(call, msg.app_installed, reply_markup=markup.start(user=user))
 
                 elif 'manage' in data:
-                    await edit_callback_message(
-                        call,
-                        msg.choose_protocol,
-                        reply_markup=markup.choose_protocol(user=user),
-                    )
+                    manage_body = active_key_summary(user) + msg.choose_protocol
+                    await edit_screen(call, manage_body, reply_markup=markup.choose_protocol(user=user))
 
                 elif 'country' in data:
-
-                    if 'outline' in data:
-
-                        if user.subscription_status:
-                            country = return_matches(country_list, data[-1])[0]
-                            if country:
-                                try:
-                                    key = VpnKey.objects.filter(user=user, server__country__name=country).last()
-                                    if key.protocol == 'outline':
-                                        await edit_callback_message(
-                                            call,
-                                            f'{msg.key_avail}\n<code>{key.access_url}</code>',
-                                            reply_markup=markup.key_menu(country, 'outline'),
-                                        )
-                                    else:
-                                        await edit_callback_message(
-                                            call,
-                                            msg.get_new_key,
-                                            reply_markup=markup.get_new_key(country, 'outline'),
-                                        )
-
-                                except:
-                                    await edit_callback_message(
-                                        call,
-                                        msg.get_new_key,
-                                        reply_markup=markup.get_new_key(country, 'outline'),
-                                    )
-                        else:
-                            await edit_callback_message(
+                    protocol = data[1] if len(data) > 1 else ''
+                    if user.subscription_status:
+                        country = return_matches(country_list, data[-1])[0] if data else None
+                        if country:
+                            screen = resolve_country_key_screen(user, country, protocol)
+                            await edit_screen(
                                 call,
-                                msg.no_subscription,
-                                reply_markup=markup.get_subscription(),
+                                screen.text,
+                                reply_markup=screen.reply_markup,
                             )
-
-                    elif 'vless' in data:
-
-                        if user.subscription_status:
-                            country = return_matches(country_list, data[-1])[0]
-                            if country:
-                                try:
-                                    key = VpnKey.objects.filter(user=user, server__country__name=country).last()
-                                    if key.protocol == 'vless':
-                                        await edit_callback_message(
-                                            call,
-                                            f'{msg.key_avail}\n<code>{key.access_url}</code>',
-                                            reply_markup=markup.key_menu(country, 'vless'),
-                                        )
-                                    else:
-                                        await edit_callback_message(
-                                            call,
-                                            msg.get_new_key,
-                                            reply_markup=markup.get_new_key(country, 'vless'),
-                                        )
-                                except:
-                                    await edit_callback_message(
-                                        call,
-                                        msg.get_new_key,
-                                        reply_markup=markup.get_new_key(country, 'vless'),
-                                    )
-                        else:
-                            await edit_callback_message(
-                                call,
-                                msg.no_subscription,
-                                reply_markup=markup.get_subscription(),
-                            )
-
-                    elif 'hysteria2' in data:
-                        if user.subscription_status:
-                            country = return_matches(country_list, data[-1])[0]
-                            if country:
-                                try:
-                                    key = VpnKey.objects.filter(user=user, server__country__name=country).last()
-                                    if key and key.protocol == "hysteria2":
-                                        await edit_callback_message(
-                                            call,
-                                            f'{msg.key_avail}\n<code>{key.access_url}</code>',
-                                            reply_markup=markup.key_menu(country, "hysteria2"),
-                                        )
-                                    else:
-                                        await edit_callback_message(
-                                            call,
-                                            msg.get_new_key,
-                                            reply_markup=markup.get_new_key(country, "hysteria2"),
-                                        )
-                                except Exception:
-                                    await edit_callback_message(
-                                        call,
-                                        msg.get_new_key,
-                                        reply_markup=markup.get_new_key(country, "hysteria2"),
-                                    )
-                        else:
-                            await edit_callback_message(
-                                call,
-                                msg.no_subscription,
-                                reply_markup=markup.get_subscription(),
-                            )
+                    else:
+                        await edit_screen(
+                            call,
+                            msg.no_subscription,
+                            reply_markup=markup.get_subscription(),
+                        )
 
                 elif 'protocol_outline' in data:
-                    await edit_callback_message(
+                    await edit_screen(
                         call,
                         msg.avail_location_choice,
                         reply_markup=markup.get_avail_location('outline'),
                     )
 
                 elif 'protocol_vless' in data:
-                    await edit_callback_message(
+                    await edit_screen(
                         call,
                         msg.avail_location_choice,
                         reply_markup=markup.get_avail_location('vless'),
                     )
 
                 elif 'protocol_hysteria2' in data:
-                    await edit_callback_message(
+                    await edit_screen(
                         call,
                         msg.avail_location_choice,
                         reply_markup=markup.get_avail_location('hysteria2'),
@@ -733,14 +681,23 @@ async def callback_query_handlers(call):
 
                 elif 'account' in data:
 
-                    if 'get_new_key' in call.data or 'swap_key' in call.data:
+                    if 'swap_confirm' in call.data:
+                        protocol = call.data.split(':')[1]
+                        country_name = call.data.split('_')[-1]
+                        await edit_screen(
+                            call,
+                            msg.swap_key_confirm,
+                            reply_markup=markup.swap_key_confirm(country_name, protocol),
+                        )
+
+                    elif 'get_new_key' in call.data or 'swap_key' in call.data:
                         protocol = call.data.split(':')[1]
                         if user.subscription_status:
                             try:
                                 country_name = call.data.split('_')[-1]
                                 country_obj = Country.objects.filter(name=country_name).first()
                                 if not country_obj:
-                                    await edit_callback_message(
+                                    await edit_screen(
                                         call,
                                         "Страна не найдена.",
                                         reply_markup=markup.start(user=user),
@@ -748,7 +705,7 @@ async def callback_query_handlers(call):
                                     return
 
                                 if not acquire_vpn_key_create_lock(user.user_id):
-                                    await edit_callback_message(
+                                    await edit_screen(
                                         call,
                                         "Ключ уже создаётся. Подождите немного и попробуйте снова.",
                                         reply_markup=markup.key_menu(country_name, protocol),
@@ -756,7 +713,7 @@ async def callback_query_handlers(call):
                                     return
 
                                 try:
-                                    await edit_callback_message(
+                                    await edit_screen(
                                         call,
                                         "Ожидайте, ключи генерируются...",
                                         reply_markup=InlineKeyboardMarkup(),
@@ -765,7 +722,7 @@ async def callback_query_handlers(call):
                                         user, country_obj, protocol
                                     )
                                     if not ok:
-                                        await edit_callback_message(
+                                        await edit_screen(
                                             call,
                                             result_msg,
                                             reply_markup=markup.get_new_key(country_name, protocol),
@@ -785,7 +742,7 @@ async def callback_query_handlers(call):
                                         user=user,
                                     )
 
-                                    await edit_callback_message(
+                                    await edit_screen(
                                         call,
                                         f"{msg.key_avail}\n<code>{access_url or (vpn_key.access_url if vpn_key else '')}</code>",
                                         reply_markup=markup.key_menu(country_name, protocol),
@@ -795,18 +752,15 @@ async def callback_query_handlers(call):
                             except:
                                 ...
                         else:
-                            await edit_callback_message(
+                            await edit_screen(
                                 call,
                                 msg.no_subscription,
                                 reply_markup=markup.get_subscription(),
                             )
 
                     elif 'choose_payment' in data:
-                        await edit_callback_message(
-                            call,
-                            msg.choose_subscription,
-                            reply_markup=markup.choose_subscription(),
-                        )
+                        await edit_screen(call, msg.choose_subscription, reply_markup=markup.choose_subscription())
+
                     elif 'sub' in data:
                         sub = None
                         price = None
@@ -827,7 +781,7 @@ async def callback_query_handlers(call):
                         elif data[-1] == '3_days_trial':
                             sub = '3 Дня'
                             price = prices.price_5
-                        await edit_callback_message(
+                        await edit_screen(
                             call,
                             msg.payment_menu.format(sub, price, recurrent_price),
                             reply_markup=markup.payment_menu(data[-1], user),
@@ -931,19 +885,14 @@ async def callback_query_handlers(call):
                                     InlineKeyboardButton(text='Пользовательское соглашение',
                                                          url=f'{SITE_DOMAIN}/user-agreement/'))
                                 payment_markup.add(InlineKeyboardButton(text=f'🔙 Назад', callback_data=f'back'))
-                                await edit_callback_message(
+                                await edit_screen(
                                     call,
                                     f"Для оплаты подписки на {days} дн. нажмите на кнопку Оплатить и следуйте инструкциям:",
                                     reply_markup=payment_markup,
                                 )
-                                await asyncio.sleep(10)
-                                await edit_callback_message(
-                                    call,
-                                    msg.after_payment,
-                                    reply_markup=markup.proceed_to_profile(),
-                                )
+                                _schedule_payment_followup(call, user)
                             except Exception as e:
-                                await edit_callback_message(
+                                await edit_screen(
                                     call,
                                     f"Произошла ошибка при оформлении подписки.  Попробуйте позже. {e}",
                                     reply_markup=markup.start(user=user),
@@ -1098,20 +1047,15 @@ async def callback_query_handlers(call):
                                     InlineKeyboardButton(text='🔙 Назад', callback_data='back')
                                 )
 
-                                await edit_callback_message(
+                                await edit_screen(
                                     call,
                                     f"Для оплаты подписки на {days} дн. нажмите на кнопку Оплатить и следуйте инструкциям:",
                                     reply_markup=payment_markup,
                                 )
-                                await asyncio.sleep(10)
-                                await edit_callback_message(
-                                    call,
-                                    msg.after_payment,
-                                    reply_markup=markup.proceed_to_profile(),
-                                )
+                                _schedule_payment_followup(call, user)
 
                             except Exception as e:
-                                await edit_callback_message(
+                                await edit_screen(
                                     call,
                                     f"Произошла ошибка при оформлении подписки через RoboKassa. Попробуйте позже. {e}",
                                     reply_markup=markup.start(user=user),
@@ -1205,35 +1149,29 @@ async def callback_query_handlers(call):
                                     InlineKeyboardButton(text='🔙 Назад', callback_data='back')
                                 )
 
-                                await edit_callback_message(
+                                await edit_screen(
                                     call,
                                     f"Для оплаты подписки на {days} дн. нажмите на кнопку Оплатить и следуйте инструкциям:",
                                     reply_markup=payment_markup,
                                 )
-                                await asyncio.sleep(10)
-                                await edit_callback_message(
-                                    call,
-                                    msg.after_payment,
-                                    reply_markup=markup.proceed_to_profile(),
-                                )
+                                _schedule_payment_followup(call, user)
 
                             except Exception as e:
-                                await edit_callback_message(
+                                await edit_screen(
                                     call,
                                     f"Произошла ошибка при оформлении подписки через CryptoBot. Попробуйте позже. {e}",
                                     reply_markup=markup.start(user=user),
                                 )
 
                     elif 'cancel_subscription' in data:
-                        # Отмена подписки
                         if user.subscription_status:
-                            await edit_callback_message(
+                            await edit_screen(
                                 call,
                                 msg.cancel_subscription,
                                 reply_markup=markup.cancel_subscription(),
                             )
                         else:
-                            await edit_callback_message(
+                            await edit_screen(
                                 call,
                                 msg.cancel_subscription_error,
                                 reply_markup=markup.start(user=user),
@@ -1241,7 +1179,6 @@ async def callback_query_handlers(call):
 
 
                     elif 'cancelled_sbs' in data:
-                        # Подтверждение отмены подписки
                         Logging.objects.create(category="payment",
                                                log_level="INFO",
                                                message=f'[BOT] [ДЕЙСТВИЕ: ОТМЕНА ПОДПИСКИ ID Платежа: {user.payment_method_id}]',
@@ -1251,7 +1188,7 @@ async def callback_query_handlers(call):
                         user.permission_revoked = True
                         user.save()
                         revoke_all_user_keys(user, reason="manual_cancel_bot")
-                        await edit_callback_message(
+                        await edit_screen(
                             call,
                             msg.cancel_subscription_success,
                             reply_markup=markup.start(user=user),
@@ -1303,8 +1240,9 @@ async def callback_query_handlers(call):
 
                             await bot.send_message(
                                 chat_id=call.message.chat.id,
-                                text=text,
-                                parse_mode='HTML'
+                                text=format_screen(text, trail_for_callback(call.data, data)),
+                                parse_mode='HTML',
+                                reply_markup=markup.credentials_back(),
                             )
                         except Exception as e:
                             lg.objects.create(log_level='FATAL', message=f'[BOT] [{e}]', datetime=datetime.now(),
@@ -1336,8 +1274,9 @@ async def callback_query_handlers(call):
 
                         await bot.send_message(
                             chat_id=call.message.chat.id,
-                            text=text,
-                            parse_mode='HTML'
+                            text=format_screen(text, trail_for_callback(call.data, data)),
+                            parse_mode='HTML',
+                            reply_markup=markup.credentials_back(),
                         )
 
                 elif 'profile' in data:
@@ -1347,7 +1286,7 @@ async def callback_query_handlers(call):
                         "%d.%m.%Y")) if user.subscription_status else 'Нет подписки'
                     active = '📌  <b>Подписка:</b> ✅' if user.payment_method_id else ''
 
-                    await edit_callback_message(
+                    await edit_screen(
                         call,
                         msg.profile.format(user_id, sub, active, income),
                         reply_markup=markup.my_profile(user=user),
@@ -1355,9 +1294,9 @@ async def callback_query_handlers(call):
 
                 elif 'tgproxy' in data:
                     if not can_use_mtproxy(user):
-                        await bot.send_message(
-                            call.message.chat.id,
-                            text='Раздел недоступен.',
+                        await edit_screen(
+                            call,
+                            'Раздел недоступен.',
                             reply_markup=markup.start(user=user),
                         )
                     else:
@@ -1379,9 +1318,9 @@ async def callback_query_handlers(call):
                                 InlineKeyboardButton(text='🔁 Перевыдать ключ', callback_data='tgproxy:reissue')
                             )
                             proxy_markup.add(InlineKeyboardButton(text='🔙 Назад', callback_data='back'))
-                            await bot.send_message(
-                                call.message.chat.id,
-                                text=(
+                            await edit_screen(
+                                call,
+                                (
                                     f"🛰 MTProto Proxy\n\n"
                                     f"{status_text}\n\n"
                                     f"Ссылка для Telegram:\n<code>{key.tg_proxy_link}</code>\n\n"
@@ -1390,9 +1329,9 @@ async def callback_query_handlers(call):
                                 reply_markup=proxy_markup,
                             )
                         else:
-                            await bot.send_message(
-                                call.message.chat.id,
-                                text=status_text,
+                            await edit_screen(
+                                call,
+                                status_text,
                                 reply_markup=markup.start(user=user),
                             )
 
@@ -1420,24 +1359,25 @@ async def callback_query_handlers(call):
                         per_4 = user.special_offer.level_4_percentage
                         per_5 = user.special_offer.level_5_percentage
                     referral_link = f"Твоя реферальная ссылка: <code>https://t.me/{bot_username}?start={referral_code}</code>\n"
-                    await bot.send_message(call.message.chat.id,
-                                           text=referral_link + msg.referral.format(
-                                               inv_1_lvl, inv_2_lvl, inv_3_lvl, inv_4_lvl, inv_5_lvl, user_income,
-                                                per_1, per_2, per_3, per_4, per_5),
-                                           reply_markup=markup.withdraw_funds(call.message.chat.id))
+                    await edit_screen(
+                        call,
+                        referral_link + msg.referral.format(
+                            inv_1_lvl, inv_2_lvl, inv_3_lvl, inv_4_lvl, inv_5_lvl, user_income,
+                            per_1, per_2, per_3, per_4, per_5,
+                        ),
+                        reply_markup=markup.withdraw_funds(call.message.chat.id),
+                    )
 
                 elif 'withdraw' in data:
 
-                    # 1. Сначала проверяем минимальную сумму, чтобы не мучить базу лишними запросами
                     if user.income < 500:
-                        await bot.send_message(
-                            chat_id=call.message.chat.id,
-                            text=msg.withdraw_request_not_enough.format(user.income),
-                            reply_markup=markup.proceed_to_profile()
+                        await edit_screen(
+                            call,
+                            msg.withdraw_request_not_enough.format(user.income),
+                            reply_markup=markup.proceed_to_profile(),
                         )
-                        return  # Выходим из условия
+                        return
 
-                    # 2. Проверяем, был ли запрос сегодня (используем фильтр даты прямо в БД)
                     today = timezone.now().date()
                     has_requested_today = WithdrawalRequest.objects.filter(
                         user=user,
@@ -1445,14 +1385,13 @@ async def callback_query_handlers(call):
                     ).exists()
 
                     if has_requested_today:
-                        await bot.send_message(
-                            chat_id=call.message.chat.id,
-                            text=msg.withdraw_request_duplicate.format(user.income),
-                            reply_markup=markup.proceed_to_profile()
+                        await edit_screen(
+                            call,
+                            msg.withdraw_request_duplicate.format(user.income),
+                            reply_markup=markup.proceed_to_profile(),
                         )
                         return
 
-                    # 3. Если проверки пройдены
                     try:
                         request = WithdrawalRequest.objects.create(
                                 user=user,
@@ -1461,15 +1400,12 @@ async def callback_query_handlers(call):
                                 timestamp=datetime.now()
                             )
 
-
-                        # 4. Уведомляем пользователя
-                        await bot.send_message(
-                            chat_id=call.message.chat.id,
-                            text=msg.withdraw_request.format(user.income),
-                            reply_markup=markup.proceed_to_profile()
+                        await edit_screen(
+                            call,
+                            msg.withdraw_request.format(user.income),
+                            reply_markup=markup.proceed_to_profile(),
                         )
 
-                        # 5. Уведомляем администраторов (через цикл)
                         admin_text = (f"💰 Запрос на вывод!\nПользователь: {user.get_full_name()}\nСумма: {user.income} RUB\n"
                                       f"<a>{settings.CSRF_TRUSTED_ORIGINS[0]}/admindomvpnx/bot/withdrawalrequest/{str(request.id)}/change/</a>")
                         for admin_id in [7516224613]:
@@ -1482,28 +1418,16 @@ async def callback_query_handlers(call):
                     except Exception as e:
                         lg.objects.create(log_level='INFO', message=f'[BOT] [Ошибка при создании заявки: {e}]',
                                           datetime=datetime.now(),user=user)
-                        await bot.send_message(call.message.chat.id, text="Произошла ошибка. Попробуйте позже.")
+                        await edit_screen(call, "Произошла ошибка. Попробуйте позже.")
 
                 elif 'help' in data:
-                    await edit_callback_message(
-                        call,
-                        msg.help_message,
-                        reply_markup=markup.start(user=user),
-                    )
+                    await edit_screen(call, msg.help_message, reply_markup=markup.start(user=user))
 
                 elif 'common_info' in data:
-                    await edit_callback_message(
-                        call,
-                        msg.commom_info,
-                        reply_markup=markup.help_markup(),
-                    )
+                    await edit_screen(call, msg.commom_info, reply_markup=markup.help_markup())
 
                 elif 'back' in data:
-                    await edit_callback_message(
-                        call,
-                        msg.main_menu_choice,
-                        reply_markup=markup.start(user=user),
-                    )
+                    await edit_screen(call, msg.main_menu_choice, reply_markup=markup.start(user=user))
         except:
             ...
 
