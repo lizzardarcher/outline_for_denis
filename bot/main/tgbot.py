@@ -33,6 +33,7 @@ from bot.main.bot_ui import (
     active_key_summary,
     clear_ui_screen,
     format_screen,
+    parse_country_from_account_callback,
     resolve_country_key_screen,
     schedule_payment_reminder,
     set_ui_screen,
@@ -683,7 +684,7 @@ async def callback_query_handlers(call):
 
                     if 'swap_confirm' in call.data:
                         protocol = call.data.split(':')[1]
-                        country_name = call.data.split('_')[-1]
+                        country_name = parse_country_from_account_callback(call.data, protocol)
                         await edit_screen(
                             call,
                             msg.swap_key_confirm,
@@ -694,7 +695,7 @@ async def callback_query_handlers(call):
                         protocol = call.data.split(':')[1]
                         if user.subscription_status:
                             try:
-                                country_name = call.data.split('_')[-1]
+                                country_name = parse_country_from_account_callback(call.data, protocol)
                                 country_obj = Country.objects.filter(name=country_name).first()
                                 if not country_obj:
                                     await edit_screen(
@@ -757,6 +758,7 @@ async def callback_query_handlers(call):
                                 msg.no_subscription,
                                 reply_markup=markup.get_subscription(),
                             )
+
 
                     elif 'choose_payment' in data:
                         await edit_screen(call, msg.choose_subscription, reply_markup=markup.choose_subscription())

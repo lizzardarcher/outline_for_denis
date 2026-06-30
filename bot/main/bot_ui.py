@@ -13,6 +13,7 @@ from bot.models import Country, TelegramUser, VpnKey
 UI_SCREEN_CACHE_PREFIX = "bot_ui_screen:"
 UI_SCREEN_TTL = 120
 
+
 PROTOCOL_LABELS = {
     "outline": "OUTLINE",
     "vless": "VLESS",
@@ -87,7 +88,7 @@ def trail_for_callback(call_data: str, data: list) -> Tuple[str, ...]:
             return ("Главная", "Профиль", "Подписка отменена")
         if "swap_confirm" in call_data:
             proto = data[1] if len(data) > 1 else ""
-            country_name = call_data.split("_")[-1] if "_" in call_data else ""
+            country_name = parse_country_from_account_callback(call_data, proto)
             trail = ["Главная", "Управление VPN", _protocol_label(proto)]
             if country_name:
                 trail.append(_country_display(country_name))
@@ -95,7 +96,7 @@ def trail_for_callback(call_data: str, data: list) -> Tuple[str, ...]:
             return tuple(trail)
         if "get_new_key" in call_data or "swap_key" in call_data:
             proto = data[1] if len(data) > 1 else ""
-            country_name = call_data.split("_")[-1] if "_" in call_data else ""
+            country_name = parse_country_from_account_callback(call_data, proto)
             trail = ["Главная", "Управление VPN", _protocol_label(proto)]
             if country_name:
                 trail.append(_country_display(country_name))
@@ -150,6 +151,18 @@ def active_key_summary(user: TelegramUser) -> str:
     return f"<i>Активный ключ: {proto}, {country_label}</i>\n\n"
 
 
+def parse_country_from_account_callback(call_data: str, protocol: str) -> str:
+    """Извлекает country.name из callback вида account:{protocol}:swap_key_{country}."""
+    protocol = (protocol or "").lower()
+    for suffix in ("get_new_key_", "swap_key_", "swap_confirm_"):
+        marker = f":{protocol}:{suffix}"
+        if marker in call_data:
+            return call_data.split(marker, 1)[-1]
+    if "_" in call_data:
+        return call_data.rsplit("_", 1)[-1]
+    return call_data
+
+
 def resolve_country_key_screen(
     user: TelegramUser,
     country_name: str,
@@ -171,23 +184,31 @@ def resolve_country_key_screen(
             menu_country=country_name,
         )
 
-    key_country_name = country_name
     key_country_display = selected_display
     if key.server and key.server.country:
-        key_country_name = key.server.country.name
         key_country_display = key.server.country.name_for_app
 
-    body = f"{msg.key_avail}\n<code>{key.access_url}</code>"
-    if key.server and key.server.country and key.server.country.name != country_name:
+    same_country = (
+        key.server
+        and key.server.country
+        and key.server.country.name == country_name
+    )
+
+    if same_country:
+        body = f"{msg.key_avail}\n<code>{key.access_url}</code>"
+    else:
         body = (
-            f"<i>Ключ создан для {key_country_display}. "
-            f"Вы выбрали {selected_display}.</i>\n\n{body}"
+            f"<i>Сейчас активен ключ для {key_country_display}. "
+            f"Вы выбрали {selected_display}.</i>\n\n"
+            f"Нажмите «Заменить ключ», чтобы выдать ключ для {selected_display}.\n\n"
+            f"{msg.key_avail}\n<code>{key.access_url}</code>"
         )
 
+    # Кнопки всегда для выбранной страны, не для страны текущего ключа.
     return CountryKeyScreen(
         text=body,
-        reply_markup=markup.key_menu(key_country_name, protocol),
-        menu_country=key_country_name,
+        reply_markup=markup.key_menu(country_name, protocol),
+        menu_country=country_name,
     )
 
 
