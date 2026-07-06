@@ -51,7 +51,15 @@ RECAPTCHA_PUBLIC_KEY = os.getenv('RECAPTCHA_PUBLIC_KEY')
 RECAPTCHA_PRIVATE_KEY = os.getenv('RECAPTCHA_PRIVATE_KEY')
 RECAPTCHA_DEFAULT_LANGUAGE = 'ru'
 
+
 MARZBAN_API=os.getenv('MARZBAN_API')
+PASARGUARD_API = os.getenv('PASARGUARD_API')
+PASARGUARD_ADMIN_USERNAME = os.getenv('PASARGUARD_ADMIN_USERNAME')
+PASARGUARD_ADMIN_PASSWORD = os.getenv('PASARGUARD_ADMIN_PASSWORD')
+PASARGUARD_NODE_CERT_FILE = os.getenv('PASARGUARD_NODE_CERT_FILE')
+VPN_PASARGUARD_DUAL_WRITE = os.getenv('VPN_PASARGUARD_DUAL_WRITE', 'True').lower() in ('1', 'true', 'yes')
+VPN_VLESS_LINK_SOURCE = (os.getenv('VPN_VLESS_LINK_SOURCE') or 'pasarguard').strip().lower()
+VPN_MARZBAN_ENABLED = os.getenv('VPN_MARZBAN_ENABLED', 'True').lower() in ('1', 'true', 'yes')
 C3CELERYTY_API_ENDPOINT = os.getenv('C3CELERYTY_API_ENDPOINT')
 C3CELERYTY_API_KEY= os.getenv('C3CELERYTY_API_KEY')
 # Группа серверов в панели Celerity для POST /users (как в bot/main/celerity_deploy.py).

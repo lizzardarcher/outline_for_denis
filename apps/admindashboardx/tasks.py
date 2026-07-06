@@ -3,8 +3,13 @@ import traceback
 import paramiko
 from celery import shared_task
 
+
 from bot.main.MarzbanAPI import MarzbanAPI
+from bot.main.celerity_key_issue import try_delete_celerity_user
+from bot.main.pasarguard_key_issue import try_delete_pasarguard_user
+from bot.main.pasarguard_node_bootstrap import bootstrap_pasarguard_for_server
 from bot.models import GlobalSettings, Logging, Server
+from django.conf import settings
 
 @shared_task(name="admindashboardx.initialize_server_task")
 def initialize_server_task(server_id: int):
@@ -43,6 +48,28 @@ def initialize_server_task(server_id: int):
         """
     server = Server.objects.get(id=server_id)
     Logging.objects.create(category='admin', log_level='DEBUG', message=f'Initializing server {server.hosting}...')
+
+    def _log(panel: str, level: str, message: str) -> None:
+        Logging.objects.create(
+            category='admin',
+            log_level=level,
+            message=f'[{panel}] Initializing server {server.hosting}: {message}',
+        )
+
+    ok_pg, detail_pg = bootstrap_pasarguard_for_server(
+        server,
+        log_fn=lambda level, msg: _log("PasarGuard", level, msg),
+    )
+    if not ok_pg:
+        Logging.objects.create(
+            category='admin',
+            log_level='DEBUG',
+            message=f'PasarGuard init failed for {server.hosting}: {detail_pg}',
+        )
+
+    if not getattr(settings, "VPN_MARZBAN_ENABLED", True):
+        return None
+
     try:
         ssh_client = paramiko.SSHClient()
         ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
@@ -55,16 +82,30 @@ def initialize_server_task(server_id: int):
 
         try:
             marzban = MarzbanAPI()
-            new_node = marzban.add_node(ip=server.ip_address,
-                                        name=f'{server.country.name_for_app} {server.hosting}')
+            new_node = marzban.add_node(
+                ip=server.ip_address,
+                name=f'{server.country.name_for_app} {server.hosting}',
+            )
             if 'True' not in str(new_node):
-                ...
+                Logging.objects.create(
+                    category='admin',
+                    log_level='DEBUG',
+                    message=f'Marzban add_node не подтвердился: {server.hosting}',
+                )
             else:
                 server.is_activated_vless = True
-                server.save()
-                Logging.objects.create(category='admin', log_level='INFO', message=f'Initializing server {server.hosting}...Done')
-        except:
-            Logging.objects.create(category='admin', log_level='DEBUG', message=f'Initializing server {server.hosting}...Failed')
+                server.save(update_fields=['is_activated_vless'])
+                Logging.objects.create(
+                    category='admin',
+                    log_level='INFO',
+                    message=f'Initializing server {server.hosting}...Done (Marzban)',
+                )
+        except Exception:
+            Logging.objects.create(
+                category='admin',
+                log_level='DEBUG',
+                message=f'Initializing server {server.hosting}...Failed (Marzban)',
+            )
             print(traceback.format_exc())
 
     except paramiko.AuthenticationException:
@@ -79,8 +120,8 @@ def initialize_server_task(server_id: int):
         Logging.objects.create(category='admin', log_level='ERROR', message=f'Initializing server {server.hosting}...Failed')
         print(f"Произошла ошибка: {e}")
         return None
-    else:
-        ...
+
+    return None
 
 
 @shared_task(bind=True, name="apps.admindashboardx.tasks.manual_ukassa_bot_attempt_recurring_payment")

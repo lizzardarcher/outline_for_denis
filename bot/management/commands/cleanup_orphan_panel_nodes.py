@@ -1,10 +1,11 @@
 """
-Удалить из Marzban и Celerity ноды, которых уже нет в Server (админке).
+Удалить из Marzban, PasarGuard и Celerity ноды, которых уже нет в Server (админке).
 
 Примеры:
   python manage.py cleanup_orphan_panel_nodes --dry-run
   python manage.py cleanup_orphan_panel_nodes
   python manage.py cleanup_orphan_panel_nodes --marzban-only
+  python manage.py cleanup_orphan_panel_nodes --pasarguard-only
   python manage.py cleanup_orphan_panel_nodes --celerity-only
 """
 from django.core.management.base import BaseCommand, CommandError
@@ -14,11 +15,9 @@ from bot.main.server_panel_cleanup import (
     delete_orphan_panel_nodes,
 )
 
-
-
 class Command(BaseCommand):
     help = (
-        "Удалить из Marzban/Celerity ноды, IP которых отсутствует в Server (админке)."
+        "Удалить из Marzban/PasarGuard/Celerity ноды, IP которых отсутствует в Server (админке)."
     )
 
     def add_arguments(self, parser):
@@ -33,17 +32,30 @@ class Command(BaseCommand):
             help="Проверить/чистить только Marzban.",
         )
         parser.add_argument(
+            "--pasarguard-only",
+            action="store_true",
+            help="Проверить/чистить только PasarGuard.",
+        )
+        parser.add_argument(
             "--celerity-only",
             action="store_true",
             help="Проверить/чистить только Celerity.",
         )
 
     def handle(self, *args, **options):
-        if options["marzban_only"] and options["celerity_only"]:
-            raise CommandError("Укажите только один из флагов: --marzban-only или --celerity-only.")
+        only_flags = sum(
+            1
+            for k in ("marzban_only", "pasarguard_only", "celerity_only")
+            if options[k]
+        )
+        if only_flags > 1:
+            raise CommandError(
+                "Укажите не более одного флага: --marzban-only, --pasarguard-only или --celerity-only."
+            )
 
-        include_marzban = not options["celerity_only"]
-        include_celerity = not options["marzban_only"]
+        include_marzban = not options["pasarguard_only"] and not options["celerity_only"]
+        include_pasarguard = not options["marzban_only"] and not options["celerity_only"]
+        include_celerity = not options["marzban_only"] and not options["pasarguard_only"]
         dry_run = options["dry_run"]
 
         known_ips = collect_known_server_ips()
@@ -53,6 +65,7 @@ class Command(BaseCommand):
             result = delete_orphan_panel_nodes(
                 dry_run=dry_run,
                 include_marzban=include_marzban,
+                include_pasarguard=include_pasarguard,
                 include_celerity=include_celerity,
             )
         except RuntimeError as exc:
@@ -60,11 +73,17 @@ class Command(BaseCommand):
 
         if include_marzban:
             self._print_orphans("Marzban", result["marzban_orphans"])
+        if include_pasarguard:
+            self._print_orphans("PasarGuard", result["pasarguard_orphans"])
         if include_celerity:
             self._print_orphans("Celerity", result["celerity_orphans"])
 
         if dry_run:
-            total = len(result["marzban_orphans"]) + len(result["celerity_orphans"])
+            total = (
+                len(result["marzban_orphans"])
+                + len(result["pasarguard_orphans"])
+                + len(result["celerity_orphans"])
+            )
             if total:
                 self.stdout.write(
                     self.style.WARNING(
@@ -80,6 +99,7 @@ class Command(BaseCommand):
             self.style.SUCCESS(
                 "Готово: "
                 f"Marzban deleted={result['marzban_deleted']} failed={result['marzban_failed']}, "
+                f"PasarGuard deleted={result['pasarguard_deleted']} failed={result['pasarguard_failed']}, "
                 f"Celerity deleted={result['celerity_deleted']} failed={result['celerity_failed']}"
             )
         )

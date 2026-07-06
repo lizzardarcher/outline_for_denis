@@ -18,8 +18,10 @@ import django
 from django.utils import timezone
 
 from bot.main.MarzbanAPI import MarzbanAPI
+from bot.main.celerity_key_issue import try_delete_celerity_user
+from bot.main.pasarguard_key_issue import try_delete_pasarguard_user
+from django.conf import settings
 from bot.models import TelegramUser, VpnKey, Logging
-
 
 def _setup_django() -> None:
     os.environ.setdefault("DJANGO_SETTINGS_MODULE", "outline_for_denis.settings")
@@ -116,7 +118,10 @@ def delete_expired_keys():
     vpn_keys = VpnKey.objects.filter(user__subscription_status=False)
     for key in vpn_keys:
         try:
-            MarzbanAPI().delete_user(username=str(key.user.user_id))
+            if getattr(settings, "VPN_MARZBAN_ENABLED", True):
+                MarzbanAPI().delete_user(username=str(key.user.user_id))
+            try_delete_pasarguard_user(key.user.user_id)
+            try_delete_celerity_user(key.user.user_id)
             key.delete()
             print("User key deleted")
         except Exception:

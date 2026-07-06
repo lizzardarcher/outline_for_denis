@@ -1,7 +1,9 @@
 import traceback
 
+
 import paramiko
 from celery import shared_task
+from django.conf import settings
 from django.db.models import Q
 from django.utils import timezone
 from django.contrib.admin.models import LogEntry
@@ -11,8 +13,10 @@ from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 from apps.mtproxy.tasks import revoke_mtproxy_keys_for_user_task
 from bot.main.celerity_key_issue import try_delete_celerity_user
+from bot.main.pasarguard_key_issue import try_delete_pasarguard_user
 from bot.main.utils import msg
 from bot.main.MarzbanAPI import MarzbanAPI
+from bot.main.pasarguard_node_bootstrap import bootstrap_pasarguard_for_server
 from bot.main.celerity_node_bootstrap import bootstrap_celerity_for_server
 from bot.models import Logging, Transaction, IncomeInfo, TelegramUser, TelegramBot, VpnKey, TelegramMessage
 from bot.models import Server
@@ -195,7 +199,9 @@ def update_user_subscription_status():
     vpn_keys = VpnKey.objects.filter(user__subscription_status=False)
     for key in vpn_keys:
         try:
-            MarzbanAPI().delete_user(username=str(key.user.user_id))
+            if getattr(settings, "VPN_MARZBAN_ENABLED", True):
+                MarzbanAPI().delete_user(username=str(key.user.user_id))
+            try_delete_pasarguard_user(key.user.user_id)
             try_delete_celerity_user(key.user.user_id)
             key.delete()
         except Exception:
@@ -279,6 +285,73 @@ def init_celerity_servers():
         bootstrap_celerity_for_server(
             server,
             log_fn=_log,
+        )
+
+
+@shared_task
+def init_pasarguard_servers():
+    servers = Server.objects.filter(
+        is_active=True,
+        is_pasarguard_activated=False,
+    ).select_related("country")
+    for server in servers:
+        label = server.hosting or server.ip_address or f"pk={server.pk}"
+
+        def _log(level: str, msg: str) -> None:
+            Logging.objects.create(
+                category="vpn",
+                log_level=level,
+                message=f"[CELERY] [PasarGuard] [{label}] {msg}",
+            )
+
+        bootstrap_pasarguard_for_server(server, log_fn=_log)
+
+
+@shared_task
+def init_all_panel_servers():
+    """
+    Комбинированный прогон для нового VPS: PasarGuard-node, Marzban (если enabled), Celerity.
+    """
+    qs = (
+        Server.objects.filter(is_active=True)
+        .filter(
+            Q(is_pasarguard_activated=False)
+            | Q(is_c3celeryty_activated=False)
+            | Q(is_activated_vless=False)
+        )
+        .select_related("country")
+    )
+    for server in qs:
+        label = server.hosting or server.ip_address or f"pk={server.pk}"
+
+        def _log(panel: str, level: str, msg: str) -> None:
+            Logging.objects.create(
+                category="vpn",
+                log_level=level,
+                message=f"[CELERY] [{panel}] [{label}] {msg}",
+            )
+
+        if not server.is_pasarguard_activated:
+            bootstrap_pasarguard_for_server(
+                server,
+                log_fn=lambda level, msg: _log("PasarGuard", level, msg),
+            )
+            server.refresh_from_db(
+                fields=["is_pasarguard_activated", "is_activated_vless", "is_c3celeryty_activated"],
+            )
+
+        if getattr(settings, "VPN_MARZBAN_ENABLED", True) and not server.is_activated_vless:
+            _init_marzban_single_server(server, CLOUD_INIT_MARZBAN)
+            server.refresh_from_db(
+                fields=["is_pasarguard_activated", "is_activated_vless", "is_c3celeryty_activated"],
+            )
+
+        if server.is_c3celeryty_activated:
+            continue
+
+        bootstrap_celerity_for_server(
+            server,
+            log_fn=lambda level, msg: _log("Celerity", level, msg),
         )
 
 

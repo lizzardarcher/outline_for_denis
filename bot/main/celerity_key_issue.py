@@ -16,8 +16,8 @@ from django.conf import settings
 
 from bot.main.CelerityAPI import CelerityAPI
 from bot.main.MarzbanAPI import MarzbanAPI
+from bot.main.pasarguard_key_issue import try_delete_pasarguard_user
 from bot.models import Server
-
 
 def try_delete_celerity_user(telegram_user_id) -> None:
     """DELETE /users в Celerity; сетевые/прочие ошибки не пробрасываются (как на сайте)."""
@@ -141,10 +141,12 @@ def issue_hysteria2_tls_for_user(
     """
     uid = str(int(telegram_user_id))
     api = CelerityAPI()
-    try:
-        MarzbanAPI().delete_user(uid)
-    except Exception:
-        pass
+    if getattr(settings, "VPN_MARZBAN_ENABLED", True):
+        try:
+            MarzbanAPI().delete_user(uid)
+        except Exception:
+            pass
+    try_delete_pasarguard_user(telegram_user_id)
     ok_del, _ = api.delete_user(uid)
     if not ok_del:
         pass

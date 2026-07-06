@@ -267,6 +267,12 @@ class Server(models.Model):
     country = models.ForeignKey('Country', on_delete=models.CASCADE, null=True, blank=True, verbose_name='Страна')
     is_activated_vless = models.BooleanField(editable=False, default=False,
                                              verbose_name='MB')
+    is_pasarguard_activated = models.BooleanField(
+        editable=True,
+        default=False,
+        verbose_name='PasarGuard',
+        help_text='Нода marzban-node зарегистрирована в панели PasarGuard и готова к выдаче ключей.',
+    )
     is_c3celeryty_activated = models.BooleanField(
         editable=True,
         default=False,

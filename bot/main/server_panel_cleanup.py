@@ -1,15 +1,19 @@
 """
-Удаление VPN-ноды из панелей Marzban и Celerity при удалении Server из админки.
+Удаление VPN-ноды из панелей Marzban, PasarGuard и Celerity при удалении Server из админки.
 
 Ошибки API не блокируют удаление записи в Django — пишем в Logging.
 """
 from __future__ import annotations
+
 
 from typing import Callable, List, Optional, Tuple, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from bot.main.CelerityAPI import CelerityAPI
     from bot.main.MarzbanAPI import MarzbanAPI
+    from bot.main.PasarGuardAPI import PasarGuardAPI
+
+from django.conf import settings
 
 from bot.models import Logging, Server
 
@@ -92,16 +96,47 @@ def delete_server_from_celerity(
     return _delete_nodes_by_ids("Celerity", label, data, celerity.delete_node)
 
 
+def delete_server_from_pasarguard(
+    server: Server,
+    *,
+    api: Optional["PasarGuardAPI"] = None,
+) -> Tuple[int, int]:
+    from bot.main.PasarGuardAPI import PasarGuardAPI
+
+    ip = (server.ip_address or "").strip()
+    label = _server_label(server)
+    if not ip:
+        _log("DEBUG", f"[PasarGuard] Пропуск удаления для {label}: пустой ip_address")
+        return 0, 0
+
+    panel = api or PasarGuardAPI()
+    ok, data = panel.find_node_ids_by_ip(ip)
+    if not ok:
+        _log("DEBUG", f"[PasarGuard] Нода не найдена для {label}: {data}")
+        return 0, 0
+
+    return _delete_nodes_by_ids("PasarGuard", label, data, panel.delete_node)
+
+
 def delete_server_from_panels(server: Server) -> None:
     """Вызывается перед удалением Server из БД."""
     label = _server_label(server)
     _log("INFO", f"[Server delete] Удаление нод в панелях для {label}")
 
     try:
-        mb_deleted, mb_failed = delete_server_from_marzban(server)
+        if getattr(settings, "VPN_MARZBAN_ENABLED", True):
+            mb_deleted, mb_failed = delete_server_from_marzban(server)
+        else:
+            mb_deleted, mb_failed = 0, 0
     except Exception as exc:
         mb_deleted, mb_failed = 0, 1
         _log("ERROR", f"[Marzban] Исключение при удалении {label}: {exc!r}")
+
+    try:
+        pg_deleted, pg_failed = delete_server_from_pasarguard(server)
+    except Exception as exc:
+        pg_deleted, pg_failed = 0, 1
+        _log("ERROR", f"[PasarGuard] Исключение при удалении {label}: {exc!r}")
 
     try:
         ce_deleted, ce_failed = delete_server_from_celerity(server)
@@ -114,6 +149,7 @@ def delete_server_from_panels(server: Server) -> None:
         (
             f"[Server delete] Готово для {label}: "
             f"Marzban deleted={mb_deleted} failed={mb_failed}, "
+            f"PasarGuard deleted={pg_deleted} failed={pg_failed}, "
             f"Celerity deleted={ce_deleted} failed={ce_failed}"
         ),
     )
@@ -180,27 +216,57 @@ def iter_celerity_panel_nodes(api=None):
         }
 
 
+def iter_pasarguard_panel_nodes(api=None):
+    from bot.main.PasarGuardAPI import PasarGuardAPI
+
+    panel = api or PasarGuardAPI()
+    ok, data = panel.list_nodes()
+    if not ok:
+        raise RuntimeError(f"PasarGuard list_nodes: {data!r}")
+
+    for item in data:
+        if not isinstance(item, dict):
+            continue
+        raw_id = item.get("id")
+        ip = str(item.get("address") or item.get("ip") or "").strip()
+        if raw_id is None or not ip:
+            continue
+        yield {
+            "id": int(raw_id),
+            "ip": ip,
+            "name": str(item.get("name") or "").strip(),
+        }
+
+
 def find_orphan_panel_nodes(
     known_ips=None,
     *,
     marzban_api=None,
+    pasarguard_api=None,
     celerity_api=None,
     include_marzban=True,
+    include_pasarguard=True,
     include_celerity=True,
 ):
     """
     Ноды в панелях, IP которых нет ни у одного Server в Django.
 
     Returns:
-        (marzban_orphans, celerity_orphans) — списки dict с полями id, ip, name.
+        (marzban_orphans, pasarguard_orphans, celerity_orphans)
     """
     known = known_ips if known_ips is not None else collect_known_server_ips()
 
     marzban_orphans = []
-    if include_marzban:
+    if include_marzban and getattr(settings, "VPN_MARZBAN_ENABLED", True):
         for node in iter_marzban_panel_nodes(marzban_api):
             if node["ip"] not in known:
                 marzban_orphans.append(node)
+
+    pasarguard_orphans = []
+    if include_pasarguard:
+        for node in iter_pasarguard_panel_nodes(pasarguard_api):
+            if node["ip"] not in known:
+                pasarguard_orphans.append(node)
 
     celerity_orphans = []
     if include_celerity:
@@ -208,38 +274,43 @@ def find_orphan_panel_nodes(
             if node["ip"] not in known:
                 celerity_orphans.append(node)
 
-    return marzban_orphans, celerity_orphans
+    return marzban_orphans, pasarguard_orphans, celerity_orphans
 
 
 def delete_orphan_panel_nodes(
     *,
     dry_run=False,
     include_marzban=True,
+    include_pasarguard=True,
     include_celerity=True,
     marzban_api=None,
+    pasarguard_api=None,
     celerity_api=None,
 ) -> dict:
     """
-    Удаляет из Marzban/Celerity ноды, IP которых отсутствует в Server.
-
-    Returns:
-        dict со счётчиками и списками orphan-нод.
+    Удаляет из Marzban/PasarGuard/Celerity ноды, IP которых отсутствует в Server.
     """
     from bot.main.CelerityAPI import CelerityAPI
     from bot.main.MarzbanAPI import MarzbanAPI
+    from bot.main.PasarGuardAPI import PasarGuardAPI
 
-    marzban_orphans, celerity_orphans = find_orphan_panel_nodes(
+    marzban_orphans, pasarguard_orphans, celerity_orphans = find_orphan_panel_nodes(
         marzban_api=marzban_api,
+        pasarguard_api=pasarguard_api,
         celerity_api=celerity_api,
         include_marzban=include_marzban,
+        include_pasarguard=include_pasarguard,
         include_celerity=include_celerity,
     )
 
     result = {
         "marzban_orphans": marzban_orphans,
+        "pasarguard_orphans": pasarguard_orphans,
         "celerity_orphans": celerity_orphans,
         "marzban_deleted": 0,
         "marzban_failed": 0,
+        "pasarguard_deleted": 0,
+        "pasarguard_failed": 0,
         "celerity_deleted": 0,
         "celerity_failed": 0,
         "dry_run": dry_run,
@@ -248,7 +319,7 @@ def delete_orphan_panel_nodes(
     if dry_run:
         return result
 
-    if marzban_orphans:
+    if marzban_orphans and getattr(settings, "VPN_MARZBAN_ENABLED", True):
         marzban = marzban_api or MarzbanAPI()
         for node in marzban_orphans:
             label = f"{node['name'] or node['ip']} ({node['ip']})"
@@ -260,6 +331,19 @@ def delete_orphan_panel_nodes(
             )
             result["marzban_deleted"] += deleted
             result["marzban_failed"] += failed
+
+    if pasarguard_orphans:
+        panel = pasarguard_api or PasarGuardAPI()
+        for node in pasarguard_orphans:
+            label = f"{node['name'] or node['ip']} ({node['ip']})"
+            deleted, failed = _delete_nodes_by_ids(
+                "PasarGuard",
+                label,
+                [node["id"]],
+                panel.delete_node,
+            )
+            result["pasarguard_deleted"] += deleted
+            result["pasarguard_failed"] += failed
 
     if celerity_orphans:
         celerity = celerity_api or CelerityAPI()
@@ -279,6 +363,7 @@ def delete_orphan_panel_nodes(
         (
             "[Orphan cleanup] "
             f"Marzban deleted={result['marzban_deleted']} failed={result['marzban_failed']}, "
+            f"PasarGuard deleted={result['pasarguard_deleted']} failed={result['pasarguard_failed']}, "
             f"Celerity deleted={result['celerity_deleted']} failed={result['celerity_failed']}"
         ),
     )

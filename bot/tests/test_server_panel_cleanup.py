@@ -6,8 +6,10 @@ from django.test import SimpleTestCase
 from bot.main.server_panel_cleanup import (
     delete_server_from_celerity,
     delete_server_from_marzban,
+    delete_server_from_pasarguard,
     find_orphan_panel_nodes,
 )
+
 from bot.models import Server
 
 class ServerPanelCleanupTests(SimpleTestCase):
@@ -63,25 +65,43 @@ class ServerPanelCleanupTests(SimpleTestCase):
         self.assertEqual(deleted, 0)
         self.assertEqual(failed, 0)
         api.delete_node.assert_not_called()
+    @patch("bot.main.server_panel_cleanup._log")
+    def test_delete_pasarguard_by_ip(self, log_mock):
+        server = self._server()
+        api = MagicMock()
+        api.find_node_ids_by_ip.return_value = (True, [5])
+        api.delete_node.return_value = (True, None)
+
+        deleted, failed = delete_server_from_pasarguard(server, api=api)
+
+        self.assertEqual(deleted, 1)
+        self.assertEqual(failed, 0)
+        api.delete_node.assert_called_once_with(5)
 
 
 class OrphanPanelNodesTests(SimpleTestCase):
+    @patch("bot.main.server_panel_cleanup.iter_pasarguard_panel_nodes")
     @patch("bot.main.server_panel_cleanup.iter_celerity_panel_nodes")
     @patch("bot.main.server_panel_cleanup.iter_marzban_panel_nodes")
-    def test_find_orphans(self, marzban_iter, celerity_iter):
+    def test_find_orphans(self, marzban_iter, celerity_iter, pasarguard_iter):
         marzban_iter.return_value = [
             {"id": 1, "ip": "1.1.1.1", "name": "keep"},
             {"id": 2, "ip": "2.2.2.2", "name": "orphan-mb"},
+        ]
+        pasarguard_iter.return_value = [
+            {"id": 3, "ip": "4.4.4.4", "name": "orphan-pg"},
         ]
         celerity_iter.return_value = [
             {"id": "aaa", "ip": "1.1.1.1", "name": "keep", "type": "hysteria"},
             {"id": "bbb", "ip": "3.3.3.3", "name": "orphan-ce", "type": "hysteria"},
         ]
 
-        mb, ce = find_orphan_panel_nodes({"1.1.1.1"})
+        mb, pg, ce = find_orphan_panel_nodes({"1.1.1.1"})
 
         self.assertEqual(len(mb), 1)
         self.assertEqual(mb[0]["ip"], "2.2.2.2")
+        self.assertEqual(len(pg), 1)
+        self.assertEqual(pg[0]["ip"], "4.4.4.4")
         self.assertEqual(len(ce), 1)
         self.assertEqual(ce[0]["ip"], "3.3.3.3")
 
@@ -92,6 +112,7 @@ class OrphanPanelNodesTests(SimpleTestCase):
 
         find_mock.return_value = (
             [{"id": 9, "ip": "9.9.9.9", "name": "x"}],
+            [{"id": 10, "ip": "7.7.7.7", "name": "pg"}],
             [{"id": "z", "ip": "8.8.8.8", "name": "y", "type": "hysteria"}],
         )
 
@@ -100,4 +121,5 @@ class OrphanPanelNodesTests(SimpleTestCase):
         self.assertTrue(result["dry_run"])
         self.assertEqual(result["marzban_deleted"], 0)
         self.assertEqual(len(result["marzban_orphans"]), 1)
+        self.assertEqual(len(result["pasarguard_orphans"]), 1)
         find_mock.assert_called_once()

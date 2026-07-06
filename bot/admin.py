@@ -580,10 +580,28 @@ def set_is_activated_vless_false(modeladmin, request, queryset):
     modeladmin.message_user(request, f'Флаг MB снят у {updated} сервер(ов).')
 
 
+
+@admin.action(description='PG: is_pasarguard_activated = True')
+def set_is_pasarguard_activated_true(modeladmin, request, queryset):
+    updated = queryset.update(is_pasarguard_activated=True)
+    modeladmin.message_user(request, f'Флаг PasarGuard включён у {updated} сервер(ов).')
+
+
+@admin.action(description='PG: is_pasarguard_activated = False')
+def set_is_pasarguard_activated_false(modeladmin, request, queryset):
+    updated = queryset.update(is_pasarguard_activated=False)
+    modeladmin.message_user(request, f'Флаг PasarGuard снят у {updated} сервер(ов).')
+
+
 @admin.register(Server)
 class ServerAdmin(BaseAdmin):
 
-    actions = [set_is_activated_vless_true, set_is_activated_vless_false]
+    actions = [
+        set_is_activated_vless_true,
+        set_is_activated_vless_false,
+        set_is_pasarguard_activated_true,
+        set_is_pasarguard_activated_false,
+    ]
 
     def get_key_generated(self, obj):
         if 0 < obj.keys_generated <= 100:
@@ -597,13 +615,12 @@ class ServerAdmin(BaseAdmin):
     get_key_generated.short_description = 'Всего ключей'
 
     list_display = (
-        'hosting', 'ip_address', 'user', 'password', 'rental_price', 'max_keys', 'get_key_generated', 'is_active',
-        'country', 'created_at', 'is_activated_vless', 'is_c3celeryty_activated',
-        'hysteria_tls_sni', 'hysteria_pin_sha256')
+        'hosting', 'country', 'ip_address', 'user', 'password', 'rental_price',  'is_active',
+         'is_activated_vless', 'is_pasarguard_activated', 'is_c3celeryty_activated', 'get_key_generated','created_at')
     list_display_links = ('hosting',)
     fields = (
         'hosting', 'ip_address', 'user', 'password', 'rental_price', 'max_keys', 'is_active', 'country',
-        'created_at', 'is_c3celeryty_activated',
+        'created_at', 'is_pasarguard_activated', 'is_c3celeryty_activated',
         'hysteria_tls_sni', 'hysteria_pin_sha256', 'hysteria_cert_synced_at',
     )
     readonly_fields = ('max_keys', 'created_at', 'hysteria_cert_synced_at')
