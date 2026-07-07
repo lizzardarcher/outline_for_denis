@@ -10,9 +10,22 @@ from urllib.parse import quote
 import requests
 from celery import shared_task
 from django.conf import settings
+from django.db import transaction as db_transaction
 from django.utils import timezone
 from yookassa import Payment, Configuration
 
+
+from apps.payment.robokassa_subscription import (
+    RECURRING_CHARGE,
+    RECURRING_REPAIR_AND_SKIP,
+    RECURRING_SKIP,
+    evaluate_robokassa_recurring_charge,
+    extend_telegram_user_subscription,
+    repair_subscription_from_transaction,
+    resolve_subscription_days,
+    set_robokassa_recurring_parent_if_needed,
+    verify_robokassa_recurring_parent,
+)
 from bot.models import TelegramUser, Prices, Logging, Transaction, IncomeInfo, TelegramReferral, ReferralSettings, \
     ReferralTransaction
 
@@ -367,25 +380,20 @@ def _fetch_robokassa_payment_info(inv_id: str, merchant_login: str, password_2: 
         return None
 
 
-def _resolve_subscription_days(amount_value: Decimal) -> int:
-    prices = Prices.objects.get(pk=1)
-    amount_int = int(amount_value)
-    if amount_int == prices.price_1:
-        return 31
-    if amount_int == prices.price_2:
-        return 93
-    if amount_int == prices.price_3:
-        return 184
-    if amount_int == prices.price_4:
-        return 366
-    if amount_int == prices.price_5:
-        return 3
-    return 0
-
-
 def _apply_robokassa_success(transaction: Transaction, amount_value: Decimal, source_label: str,
                              merchant_login: str, password_2: str):
     if transaction.status == 'succeeded':
+        if repair_subscription_from_transaction(transaction):
+            Logging.objects.create(
+                category="payment",
+                log_level="INFO",
+                message=(
+                    f'[{source_label}] [pending-check] Подписка восстановлена для уже succeeded '
+                    f'InvId={transaction.robokassa_invoice_id or transaction.id}'
+                ),
+                datetime=datetime.now(),
+                user=transaction.user,
+            )
         return
 
     telegram_user = transaction.user
@@ -397,10 +405,7 @@ def _apply_robokassa_success(transaction: Transaction, amount_value: Decimal, so
         )
         return
 
-    transaction.status = 'succeeded'
-    transaction.paid = True
-    transaction.amount = amount_value
-    transaction.currency = transaction.currency or 'RUB'
+    days = resolve_subscription_days(amount_value)
 
     payment_info = _fetch_robokassa_payment_info(
         inv_id=str(transaction.robokassa_invoice_id or transaction.id),
@@ -410,62 +415,65 @@ def _apply_robokassa_success(transaction: Transaction, amount_value: Decimal, so
     robox_id = (payment_info or {}).get("RoboxID") or (payment_info or {}).get("PaymentID") or \
                (payment_info or {}).get("TransactionID") or (payment_info or {}).get("ID")
     if robox_id:
-        transaction.payment_id = str(robox_id)
-    elif not transaction.payment_id:
-        transaction.payment_id = f"ROBOX_INV_{transaction.robokassa_invoice_id or transaction.id}"
-
-    transaction.robokassa_invoice_id = transaction.robokassa_invoice_id or str(transaction.id)
-    transaction.save()
-
-    days = _resolve_subscription_days(amount_value)
-    if telegram_user.subscription_status:
-        telegram_user.subscription_expiration = telegram_user.subscription_expiration + timedelta(days=days)
-        telegram_user.permission_revoked = False
+        payment_id = str(robox_id)
+    elif transaction.payment_id:
+        payment_id = transaction.payment_id
     else:
-        telegram_user.subscription_status = True
-        telegram_user.subscription_expiration = datetime.now() + timedelta(days=days)
-        telegram_user.permission_revoked = False
+        payment_id = f"ROBOX_INV_{transaction.robokassa_invoice_id or transaction.id}"
 
-    if transaction.robokassa_is_recurring_parent and not (telegram_user.robokassa_recurring_parent_inv_id or '').strip():
-        telegram_user.robokassa_recurring_parent_inv_id = str(transaction.robokassa_invoice_id or transaction.id)
-    telegram_user.save()
+    with db_transaction.atomic():
+        extend_telegram_user_subscription(telegram_user, days)
+        set_robokassa_recurring_parent_if_needed(
+            telegram_user,
+            transaction,
+            transaction.robokassa_invoice_id or transaction.id,
+        )
+        telegram_user.save()
 
-    referral_percentages = {
-        1: ReferralSettings.objects.get(pk=1).level_1_percentage,
-        2: ReferralSettings.objects.get(pk=1).level_2_percentage,
-        3: ReferralSettings.objects.get(pk=1).level_3_percentage,
-        4: ReferralSettings.objects.get(pk=1).level_4_percentage,
-        5: ReferralSettings.objects.get(pk=1).level_5_percentage,
-    }
-    referred_list = TelegramReferral.objects.filter(referred=telegram_user).select_related('referrer')
-    if referred_list:
-        user_ids_to_pay = [r.referrer.user_id for r in referred_list]
-        users_to_pay = {
-            u.user_id: u for u in TelegramUser.objects.filter(user_id__in=user_ids_to_pay)
+        transaction.status = 'succeeded'
+        transaction.paid = True
+        transaction.amount = amount_value
+        transaction.currency = transaction.currency or 'RUB'
+        transaction.payment_id = payment_id
+        transaction.robokassa_invoice_id = transaction.robokassa_invoice_id or str(transaction.id)
+        transaction.save()
+
+        referral_percentages = {
+            1: ReferralSettings.objects.get(pk=1).level_1_percentage,
+            2: ReferralSettings.objects.get(pk=1).level_2_percentage,
+            3: ReferralSettings.objects.get(pk=1).level_3_percentage,
+            4: ReferralSettings.objects.get(pk=1).level_4_percentage,
+            5: ReferralSettings.objects.get(pk=1).level_5_percentage,
         }
-        for r in referred_list:
-            level = r.level
-            user_to_pay = users_to_pay.get(r.referrer.user_id)
-            if not user_to_pay:
-                continue
-            percent = referral_percentages.get(level)
-            if user_to_pay.special_offer:
-                referral_percentages_2 = {
-                    1: user_to_pay.special_offer.level_1_percentage,
-                    2: user_to_pay.special_offer.level_2_percentage,
-                    3: user_to_pay.special_offer.level_3_percentage,
-                    4: user_to_pay.special_offer.level_4_percentage,
-                    5: user_to_pay.special_offer.level_5_percentage,
-                }
-                percent = referral_percentages_2.get(level)
-            if percent:
-                user_to_pay.income = Decimal(user_to_pay.income) + (Decimal(amount_value) * Decimal(percent) / 100)
-                user_to_pay.save()
-                ReferralTransaction.objects.create(
-                    referral=r,
-                    amount=Decimal(amount_value) * Decimal(percent) / 100,
-                    transaction=transaction,
-                )
+        referred_list = TelegramReferral.objects.filter(referred=telegram_user).select_related('referrer')
+        if referred_list:
+            user_ids_to_pay = [r.referrer.user_id for r in referred_list]
+            users_to_pay = {
+                u.user_id: u for u in TelegramUser.objects.filter(user_id__in=user_ids_to_pay)
+            }
+            for r in referred_list:
+                level = r.level
+                user_to_pay = users_to_pay.get(r.referrer.user_id)
+                if not user_to_pay:
+                    continue
+                percent = referral_percentages.get(level)
+                if user_to_pay.special_offer:
+                    referral_percentages_2 = {
+                        1: user_to_pay.special_offer.level_1_percentage,
+                        2: user_to_pay.special_offer.level_2_percentage,
+                        3: user_to_pay.special_offer.level_3_percentage,
+                        4: user_to_pay.special_offer.level_4_percentage,
+                        5: user_to_pay.special_offer.level_5_percentage,
+                    }
+                    percent = referral_percentages_2.get(level)
+                if percent:
+                    user_to_pay.income = Decimal(user_to_pay.income) + (Decimal(amount_value) * Decimal(percent) / 100)
+                    user_to_pay.save()
+                    ReferralTransaction.objects.create(
+                        referral=r,
+                        amount=Decimal(amount_value) * Decimal(percent) / 100,
+                        transaction=transaction,
+                    )
 
     Logging.objects.create(
         category="payment",
@@ -583,89 +591,139 @@ def robokassa_check_pending_site(self):
             )
 
 
-@shared_task
-def robokassa_bot_attempt_recurring_payment():
+def _run_robokassa_recurring(
+    *,
+    channel: str,
+    payment_system: str,
+    merchant_login: str,
+    password_1: str,
+    is_test: bool,
+    recurring_description: str,
+    success_log_message: str,
+):
     """
-    Рекуррент RoboKassa для бота: POST /Merchant/Recurring.
-    Факт оплаты и продление подписки — в RobokassaBotResultView (ResultURL).
-    Зарегистрировать задачу в django-celery-beat (интервал как у ukassa_bot_attempt_recurring_payment).
+    Рекуррент RoboKassa: POST /Merchant/Recurring.
+    Факт оплаты и продление подписки — в Robokassa*ResultView (ResultURL) или pending-check.
     """
     Logging.objects.create(
         category="payment",
         log_level="INFO",
-        message=f'[CELERY] [BOT] [RoboKassa рекуррент]',
+        message=f'[CELERY] [{channel}] [RoboKassa рекуррент]',
         datetime=datetime.now(),
     )
 
-    users_to_charge = TelegramUser.objects.filter(
-        subscription_status=False,
-        permission_revoked=False,
-    ).exclude(robokassa_recurring_parent_inv_id='')
+    user_ids = list(
+        TelegramUser.objects.filter(
+            subscription_status=False,
+            permission_revoked=False,
+        )
+        .exclude(robokassa_recurring_parent_inv_id='')
+        .values_list('pk', flat=True)
+    )
 
     Logging.objects.create(
         category="payment",
         log_level="INFO",
-        message=f'[CELERY] [BOT] [RoboKassa рекуррент] [Начало] [пользователей: {users_to_charge.count()}]',
+        message=f'[CELERY] [{channel}] [RoboKassa рекуррент] [Начало] [пользователей: {len(user_ids)}]',
         datetime=datetime.now(),
     )
+
     success_init = 0
+    skipped = 0
     failed = 0
-
-    merchant_login = settings.ROBOKASSA_MERCHANT_LOGIN_BOT
-    password_1 = settings.ROBOKASSA_PASSWORD_1_BOT
-    is_test = getattr(settings, 'ROBOKASSA_BOT_IS_TEST', False)
     amount_to_charge = Decimal(Prices.objects.get(pk=1).price_1)
+    income_info = IncomeInfo.objects.get(pk=1)
 
-    for user in users_to_charge:
-        parent_inv = (user.robokassa_recurring_parent_inv_id or '').strip()
-        if not parent_inv:
-            continue
+    for user_pk in user_ids:
         try:
-            tx = Transaction.objects.create(
-                user=user,
-                amount=amount_to_charge,
-                currency='RUB',
-                side='Приход средств',
-                status='pending',
-                paid=False,
-                income_info=IncomeInfo.objects.get(pk=1),
-                description='Рекуррентный платёж (RoboKassa BOT)',
-                payment_system='RoboKassaBot',
-                robokassa_is_recurring_parent=False,
-                robokassa_recurring_previous_inv_id=parent_inv,
-            )
-            tx.robokassa_invoice_id = str(tx.id)
-            tx.save(update_fields=['robokassa_invoice_id'])
+            with db_transaction.atomic():
+                user = TelegramUser.objects.select_for_update().get(pk=user_pk)
 
-            ok, body = post_robokassa_bot_recurring_invoice(
-                merchant_login=merchant_login,
-                password_1=password_1,
-                invoice_id=tx.id,
-                previous_invoice_id=parent_inv,
-                out_sum=amount_to_charge,
-                description=f'Подписка DomVPN рекуррент user={user.user_id}',
-                is_test=is_test,
-            )
-            if ok:
-                success_init += 1
-                Logging.objects.create(
-                    category="payment",
-                    log_level="INFO",
-                    message=f'Платежный запрос на автосписание Робокасса Бот отправлен успешно',
-                    datetime=datetime.now(),
-                    user=user
-                )
-            else:
-                failed += 1
-                tx.status = 'failed'
-                tx.save(update_fields=['status'])
-                Logging.objects.create(
-                    category="payment",
-                    log_level="WARNING",
-                    message=f'Списание {body}',
-                    datetime=datetime.now(),
+                parent_inv = (user.robokassa_recurring_parent_inv_id or '').strip()
+                if not parent_inv:
+                    skipped += 1
+                    continue
+
+                if not verify_robokassa_recurring_parent(user, parent_inv, payment_system):
+                    skipped += 1
+                    Logging.objects.create(
+                        category="payment",
+                        log_level="INFO",
+                        message=(
+                            f'[CELERY] [{channel}] [RoboKassa рекуррент] [Пропуск] '
+                            f'user_id={user.user_id} причина=parent не из {payment_system}'
+                        ),
+                        datetime=datetime.now(),
+                        user=user,
+                    )
+                    continue
+
+                action, reason = evaluate_robokassa_recurring_charge(user, payment_system)
+                if action in (RECURRING_SKIP, RECURRING_REPAIR_AND_SKIP):
+                    skipped += 1
+                    Logging.objects.create(
+                        category="payment",
+                        log_level="INFO",
+                        message=(
+                            f'[CELERY] [{channel}] [RoboKassa рекуррент] [Пропуск] '
+                            f'user_id={user.user_id} причина={reason or action}'
+                        ),
+                        datetime=datetime.now(),
+                        user=user,
+                    )
+                    continue
+
+                if action != RECURRING_CHARGE:
+                    skipped += 1
+                    continue
+
+                tx = Transaction.objects.create(
                     user=user,
+                    amount=amount_to_charge,
+                    currency='RUB',
+                    side='Приход средств',
+                    status='pending',
+                    paid=False,
+                    income_info=income_info,
+                    description=recurring_description,
+                    payment_system=payment_system,
+                    robokassa_is_recurring_parent=False,
+                    robokassa_recurring_previous_inv_id=parent_inv,
                 )
+                tx.robokassa_invoice_id = str(tx.id)
+                tx.save(update_fields=['robokassa_invoice_id'])
+
+                ok, body = post_robokassa_bot_recurring_invoice(
+                    merchant_login=merchant_login,
+                    password_1=password_1,
+                    invoice_id=tx.id,
+                    previous_invoice_id=parent_inv,
+                    out_sum=amount_to_charge,
+                    description=f'Подписка DomVPN рекуррент {channel} user={user.user_id}',
+                    is_test=is_test,
+                )
+                if ok:
+                    success_init += 1
+                    Logging.objects.create(
+                        category="payment",
+                        log_level="INFO",
+                        message=success_log_message,
+                        datetime=datetime.now(),
+                        user=user,
+                    )
+                else:
+                    failed += 1
+                    tx.status = 'failed'
+                    tx.save(update_fields=['status'])
+                    Logging.objects.create(
+                        category="payment",
+                        log_level="WARNING",
+                        message=f'Списание {body}',
+                        datetime=datetime.now(),
+                        user=user,
+                    )
+        except TelegramUser.DoesNotExist:
+            skipped += 1
         except Exception as e:
             failed += 1
             Logging.objects.create(
@@ -673,128 +731,45 @@ def robokassa_bot_attempt_recurring_payment():
                 log_level="FATAL",
                 message=f'{e}',
                 datetime=datetime.now(),
-                user=user,
             )
 
     Logging.objects.create(
         category="payment",
         log_level="INFO",
-        message=f'[CELERY] [BOT] [RoboKassa рекуррент] [Конец] инициировано: {success_init}, ошибок: {failed}',
+        message=(
+            f'[CELERY] [{channel}] [RoboKassa рекуррент] [Конец] '
+            f'инициировано: {success_init}, пропущено: {skipped}, ошибок: {failed}'
+        ),
         datetime=datetime.now(),
+    )
+
+
+@shared_task
+def robokassa_bot_attempt_recurring_payment():
+    """
+    Рекуррент RoboKassa для бота: POST /Merchant/Recurring.
+    Зарегистрировать задачу в django-celery-beat (интервал как у ukassa_bot_attempt_recurring_payment).
+    """
+    _run_robokassa_recurring(
+        channel='BOT',
+        payment_system='RoboKassaBot',
+        merchant_login=settings.ROBOKASSA_MERCHANT_LOGIN_BOT,
+        password_1=settings.ROBOKASSA_PASSWORD_1_BOT,
+        is_test=getattr(settings, 'ROBOKASSA_BOT_IS_TEST', False),
+        recurring_description='Рекуррентный платёж (RoboKassa BOT)',
+        success_log_message='Платежный запрос на автосписание Робокасса Бот отправлен успешно',
     )
 
 
 @shared_task
 def robokassa_site_attempt_recurring_payment():
-    """
-    Рекуррент RoboKassa для сайта: POST /Merchant/Recurring.
-    Факт оплаты и продление подписки — в RobokassaSiteResultView (ResultURL).
-    """
-    Logging.objects.create(
-        category="payment",
-        log_level="INFO",
-        message='[CELERY] [SITE] [RoboKassa рекуррент]',
-        datetime=datetime.now(),
-    )
-
-    users_to_charge = TelegramUser.objects.filter(
-        subscription_status=False,
-        permission_revoked=False,
-    ).exclude(robokassa_recurring_parent_inv_id='')
-
-
-    Logging.objects.create(
-        category="payment",
-        log_level="INFO",
-        message=f'[CELERY] [SITE] [RoboKassa рекуррент] [Начало] [пользователей: {users_to_charge.count()}]',
-        datetime=datetime.now(),
-    )
-    success_init = 0
-    skipped = 0
-    failed = 0
-
-    merchant_login = settings.ROBOKASSA_MERCHANT_LOGIN_SITE
-    password_1 = settings.ROBOKASSA_PASSWORD_1_SITE
-    is_test = getattr(settings, 'ROBOKASSA_SITE_IS_TEST', False)
-
-    amount_to_charge = Decimal(Prices.objects.get(pk=1).price_1)
-    for user in users_to_charge:
-        parent_inv = (user.robokassa_recurring_parent_inv_id or '').strip()
-        if not parent_inv:
-            skipped += 1
-            continue
-
-        # Для сайта берем только цепочки, где parent счёт был оплачен через RoboKassaSite.
-        parent_tx = Transaction.objects.filter(
-            user=user,
-            robokassa_invoice_id=parent_inv,
-            payment_system='RoboKassaSite',
-            status='succeeded',
-            paid=True,
-        ).first()
-        if not parent_tx:
-            skipped += 1
-            continue
-
-        try:
-            tx = Transaction.objects.create(
-                user=user,
-                amount=amount_to_charge,
-                currency='RUB',
-                side='Приход средств',
-                status='pending',
-                paid=False,
-                income_info=IncomeInfo.objects.get(pk=1),
-                description='Рекуррентный платёж (RoboKassa SITE)',
-                payment_system='RoboKassaSite',
-                robokassa_is_recurring_parent=False,
-                robokassa_recurring_previous_inv_id=parent_inv,
-            )
-            tx.robokassa_invoice_id = str(tx.id)
-            tx.save(update_fields=['robokassa_invoice_id'])
-
-            ok, body = post_robokassa_bot_recurring_invoice(
-                merchant_login=merchant_login,
-                password_1=password_1,
-                invoice_id=tx.id,
-                previous_invoice_id=parent_inv,
-                out_sum=amount_to_charge,
-                description=f'Подписка DomVPN рекуррент SITE user={user.user_id}',
-                is_test=is_test,
-            )
-            if ok:
-                success_init += 1
-                Logging.objects.create(
-                    category="payment",
-                    log_level="INFO",
-                    message=f'Платежный запрос на автосписание Робокасса Бот отправлен успешно',
-                    datetime=datetime.now(),
-                    user=user,
-                )
-            else:
-                failed += 1
-                tx.status = 'failed'
-                tx.save(update_fields=['status'])
-                Logging.objects.create(
-                    category="payment",
-                    log_level="WARNING",
-                    message=f'Списание {body}',
-                    datetime=datetime.now(),
-                    user=user,
-                )
-        except Exception as e:
-            failed += 1
-            Logging.objects.create(
-                category="payment",
-                log_level="FATAL",
-                message=f'{e}',
-                datetime=datetime.now(),
-                user=user,
-            )
-
-    Logging.objects.create(
-        category="payment",
-        log_level="INFO",
-        message=f'[CELERY] [SITE] [RoboKassa рекуррент] [Конец] инициировано: {success_init}, пропущено: {skipped}, ошибок: {failed}',
-        datetime=datetime.now(),
+    """Рекуррент RoboKassa для сайта: POST /Merchant/Recurring."""
+    _run_robokassa_recurring(
+        channel='SITE',
+        payment_system='RoboKassaSite',
+        merchant_login=settings.ROBOKASSA_MERCHANT_LOGIN_SITE,
+        password_1=settings.ROBOKASSA_PASSWORD_1_SITE,
+        is_test=getattr(settings, 'ROBOKASSA_SITE_IS_TEST', False),
+        recurring_description='Рекуррентный платёж (RoboKassa SITE)',
+        success_log_message='Платежный запрос на автосписание Робокасса Site отправлен успешно',
     )

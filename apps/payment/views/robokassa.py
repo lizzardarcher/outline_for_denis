@@ -6,8 +6,10 @@ import hashlib
 from urllib.parse import urlencode, quote
 import xml.etree.ElementTree as ET
 
+
 import requests
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.db import transaction as db_transaction
 from django.urls import reverse
 from django.views.generic import TemplateView
 from django.shortcuts import redirect
@@ -17,6 +19,12 @@ from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 from django.http import HttpResponse
 
+from apps.payment.robokassa_subscription import (
+    extend_telegram_user_subscription,
+    repair_subscription_from_transaction,
+    resolve_subscription_days,
+    set_robokassa_recurring_parent_if_needed,
+)
 from bot.models import TelegramUser, Transaction, IncomeInfo, Logging, Prices, TelegramReferral, ReferralSettings, \
     ReferralTransaction
 
@@ -70,6 +78,119 @@ def get_robokassa_payment_info(inv_id: str, merchant_login: str, password_2: str
             datetime=datetime.now(),
         )
         return None
+
+
+def _apply_robokassa_referrals(telegram_user, transaction, amount_value: Decimal) -> None:
+    referral_percentages = {
+        1: ReferralSettings.objects.get(pk=1).level_1_percentage,
+        2: ReferralSettings.objects.get(pk=1).level_2_percentage,
+        3: ReferralSettings.objects.get(pk=1).level_3_percentage,
+        4: ReferralSettings.objects.get(pk=1).level_4_percentage,
+        5: ReferralSettings.objects.get(pk=1).level_5_percentage,
+    }
+
+    referred_list = TelegramReferral.objects.filter(referred=telegram_user).select_related('referrer')
+    if not referred_list:
+        return
+
+    user_ids_to_pay = [r.referrer.user_id for r in referred_list]
+    users_to_pay = {u.user_id: u for u in TelegramUser.objects.filter(user_id__in=user_ids_to_pay)}
+
+    for r in referred_list:
+        level = r.level
+        user_to_pay = users_to_pay.get(r.referrer.user_id)
+        if not user_to_pay:
+            continue
+
+        percent = referral_percentages.get(level)
+        if user_to_pay.special_offer:
+            referral_percentages_2 = {
+                1: user_to_pay.special_offer.level_1_percentage,
+                2: user_to_pay.special_offer.level_2_percentage,
+                3: user_to_pay.special_offer.level_3_percentage,
+                4: user_to_pay.special_offer.level_4_percentage,
+                5: user_to_pay.special_offer.level_5_percentage,
+            }
+            percent = referral_percentages_2.get(level)
+
+        if percent:
+            income = Decimal(user_to_pay.income) + (Decimal(amount_value) * Decimal(percent) / 100)
+            user_to_pay.income = income
+            user_to_pay.save()
+            ReferralTransaction.objects.create(
+                referral=r,
+                amount=Decimal(amount_value) * Decimal(percent) / 100,
+                transaction=transaction,
+            )
+
+
+def _complete_robokassa_result_payment(
+    *,
+    transaction: Transaction,
+    telegram_user: TelegramUser,
+    inv_id,
+    amount_value: Decimal,
+    merchant_login: str,
+    password_2: str,
+    payment_system: str,
+    log_prefix: str,
+) -> None:
+    """Подписка и рефералы — до пометки транзакции succeeded (атомарно)."""
+    payment_info = get_robokassa_payment_info(
+        inv_id=str(inv_id),
+        merchant_login=merchant_login,
+        password_2=password_2,
+    )
+    if payment_info and payment_info.get("RoboxID"):
+        payment_id = str(payment_info["RoboxID"])
+        Logging.objects.create(
+            category="payment",
+            log_level="INFO",
+            message=f"{log_prefix} [ID Robox получен через API] {payment_id} для InvId={inv_id}",
+            datetime=datetime.now(),
+        )
+    else:
+        payment_id = f"ROBOX_INV_{inv_id}"
+        Logging.objects.create(
+            category="payment",
+            log_level="WARNING",
+            message=f"{log_prefix} [ID Robox не получен через API, используем InvId] {inv_id}",
+            datetime=datetime.now(),
+        )
+
+    days = resolve_subscription_days(amount_value)
+
+    with db_transaction.atomic():
+        extend_telegram_user_subscription(telegram_user, days)
+        set_robokassa_recurring_parent_if_needed(telegram_user, transaction, inv_id)
+        telegram_user.save()
+
+        Logging.objects.create(
+            category="payment",
+            log_level="INFO",
+            message=f"{log_prefix} [Обработка платежа] [Сумма: {amount_value}] [Дни: {days}]",
+            datetime=datetime.now(),
+            user=telegram_user,
+        )
+
+        _apply_robokassa_referrals(telegram_user, transaction, amount_value)
+
+        transaction.status = 'succeeded'
+        transaction.paid = True
+        transaction.amount = amount_value
+        transaction.currency = transaction.currency or 'RUB'
+        transaction.payment_id = payment_id
+        transaction.payment_system = transaction.payment_system or payment_system
+        transaction.robokassa_invoice_id = transaction.robokassa_invoice_id or str(inv_id)
+        transaction.save()
+
+    Logging.objects.create(
+        category="payment",
+        log_level="SUCCESS",
+        message=f"{log_prefix} [Платёж на сумму {amount_value} р. прошёл] [InvId={inv_id}]",
+        datetime=datetime.now(),
+        user=telegram_user,
+    )
 
 
 class CreateRobokassaPaymentView(LoginRequiredMixin, View):
@@ -273,6 +394,7 @@ class RobokassaSiteResultView(View):
             return HttpResponse(f"OK{inv_id}", content_type='text/plain')
 
         if transaction.status == 'succeeded':
+            repair_subscription_from_transaction(transaction)
             return HttpResponse(f"OK{inv_id}", content_type='text/plain')
 
         telegram_user = transaction.user
@@ -291,122 +413,15 @@ class RobokassaSiteResultView(View):
             amount_value = transaction.amount
 
         try:
-            transaction.status = 'succeeded'
-            transaction.paid = True
-            transaction.amount = amount_value
-            transaction.currency = transaction.currency or 'RUB'
-
-            # Пытаемся получить ID Robox через API RoboKassa
-            payment_info = get_robokassa_payment_info(
-                inv_id=str(inv_id),
+            _complete_robokassa_result_payment(
+                transaction=transaction,
+                telegram_user=telegram_user,
+                inv_id=inv_id,
+                amount_value=amount_value,
                 merchant_login=settings.ROBOKASSA_MERCHANT_LOGIN_SITE,
                 password_2=settings.ROBOKASSA_PASSWORD_2_SITE,
-            )
-            if payment_info and payment_info.get("RoboxID"):
-                transaction.payment_id = str(payment_info["RoboxID"])
-                Logging.objects.create(
-                    category="payment",
-                    log_level="INFO",
-                    message=f"[ROBO-SITE] [ID Robox получен через API] {payment_info['RoboxID']} для InvId={inv_id}",
-                    datetime=datetime.now(),
-                )
-            else:
-                transaction.payment_id = f"ROBOX_INV_{inv_id}"
-                Logging.objects.create(
-                    category="payment",
-                    log_level="WARNING",
-                    message=f"[ROBO-SITE] [ID Robox не получен через API, используем InvId] {inv_id}",
-                    datetime=datetime.now(),
-                )
-            transaction.payment_system = transaction.payment_system or 'RoboKassaSite'
-            transaction.robokassa_invoice_id = transaction.robokassa_invoice_id or str(inv_id)
-            transaction.save()
-
-            prices = Prices.objects.get(pk=1)
-            days = 0
-            if int(amount_value) == prices.price_1:
-                days = 31
-            elif int(amount_value) == prices.price_2:
-                days = 93
-            elif int(amount_value) == prices.price_3:
-                days = 184
-            elif int(amount_value) == prices.price_4:
-                days = 366
-            elif int(amount_value) == prices.price_5:
-                days = 3
-
-            if telegram_user.subscription_status:
-                telegram_user.subscription_expiration = telegram_user.subscription_expiration + timedelta(days=days)
-                telegram_user.permission_revoked = False
-            else:
-                telegram_user.subscription_status = True
-                telegram_user.subscription_expiration = datetime.now() + timedelta(days=days)
-                telegram_user.permission_revoked = False
-            if transaction.robokassa_is_recurring_parent:
-                if not (telegram_user.robokassa_recurring_parent_inv_id or '').strip():
-                    telegram_user.robokassa_recurring_parent_inv_id = str(inv_id)
-            telegram_user.save()
-
-            Logging.objects.create(
-                category="payment",
-                log_level="INFO",
-                message=f"[ROBO-SITE] [Обработка платежа] [Сумма: {amount_value}] [Дни: {days}]",
-                datetime=datetime.now(),
-                user=telegram_user,
-            )
-            referral_percentages = {
-                1: ReferralSettings.objects.get(pk=1).level_1_percentage,
-                2: ReferralSettings.objects.get(pk=1).level_2_percentage,
-                3: ReferralSettings.objects.get(pk=1).level_3_percentage,
-                4: ReferralSettings.objects.get(pk=1).level_4_percentage,
-                5: ReferralSettings.objects.get(pk=1).level_5_percentage,
-            }
-
-            referred_list = TelegramReferral.objects.filter(
-                referred=telegram_user
-            ).select_related('referrer')
-
-            if referred_list:
-                user_ids_to_pay = [r.referrer.user_id for r in referred_list]
-                users_to_pay = {
-                    u.user_id: u for u in TelegramUser.objects.filter(user_id__in=user_ids_to_pay)
-                }
-
-                for r in referred_list:
-                    level = r.level
-                    user_to_pay = users_to_pay.get(r.referrer.user_id)
-                    if not user_to_pay:
-                        continue
-
-                    percent = referral_percentages.get(level)
-                    if user_to_pay.special_offer:
-                        referral_percentages_2 = {
-                            1: user_to_pay.special_offer.level_1_percentage,
-                            2: user_to_pay.special_offer.level_2_percentage,
-                            3: user_to_pay.special_offer.level_3_percentage,
-                            4: user_to_pay.special_offer.level_4_percentage,
-                            5: user_to_pay.special_offer.level_5_percentage,
-                        }
-                        percent = referral_percentages_2.get(level)
-
-                    if percent:
-                        income = Decimal(user_to_pay.income) + (
-                                Decimal(amount_value) * Decimal(percent) / 100
-                        )
-                        user_to_pay.income = income
-                        user_to_pay.save()
-                        ReferralTransaction.objects.create(
-                            referral=r,
-                            amount=Decimal(amount_value) * Decimal(percent) / 100,
-                            transaction=transaction,
-                        )
-
-            Logging.objects.create(
-                category="payment",
-                log_level="SUCCESS",
-                message=f"[ROBO-SITE] [Платёж на сумму {amount_value} р. прошёл] [InvId={inv_id}]",
-                datetime=datetime.now(),
-                user=telegram_user,
+                payment_system='RoboKassaSite',
+                log_prefix='[ROBO-SITE]',
             )
         except Exception:
             Logging.objects.create(
@@ -484,8 +499,9 @@ class RobokassaBotResultView(View):
             )
             return HttpResponse(f"OK{inv_id}", content_type='text/plain')
 
-        # Если уже обработано ранее — просто подтверждаем (идемпотентность)
+        # Если уже обработано ранее — подтверждаем и при необходимости восстанавливаем подписку
         if transaction.status == 'succeeded':
+            repair_subscription_from_transaction(transaction)
             return HttpResponse(f"OK{inv_id}", content_type='text/plain')
 
         telegram_user = transaction.user  # ForeignKey на TelegramUser
@@ -504,129 +520,15 @@ class RobokassaBotResultView(View):
             amount_value = transaction.amount  # fallback
 
         try:
-            # Обновляем транзакцию
-            transaction.status = 'succeeded'
-            transaction.paid = True
-            transaction.amount = amount_value
-            transaction.currency = transaction.currency or 'RUB'
-
-            # Пытаемся получить ID Robox через API RoboKassa
-            payment_info = get_robokassa_payment_info(
-                inv_id=str(inv_id),
+            _complete_robokassa_result_payment(
+                transaction=transaction,
+                telegram_user=telegram_user,
+                inv_id=inv_id,
+                amount_value=amount_value,
                 merchant_login=settings.ROBOKASSA_MERCHANT_LOGIN_BOT,
                 password_2=settings.ROBOKASSA_PASSWORD_2_BOT,
-            )
-
-            if payment_info and payment_info.get("RoboxID"):
-                transaction.payment_id = str(payment_info["RoboxID"])
-                Logging.objects.create(
-                    category="payment",
-                    log_level="INFO",
-                    message=f"[ROBO-BOT] [ID Robox получен через API] {payment_info['RoboxID']} для InvId={inv_id}",
-                    datetime=datetime.now(),
-                )
-            else:
-                # Fallback: сохраняем InvId (хотя это не ID Robox, но для связи транзакций сойдёт)
-                transaction.payment_id = f"ROBOX_INV_{inv_id}"  # Префикс для понимания, что это не настоящий ID Robox
-                Logging.objects.create(
-                    category="payment",
-                    log_level="WARNING",
-                    message=f"[ROBO-BOT] [ID Robox не получен через API, используем InvId] {inv_id}",
-                    datetime=datetime.now(),
-                )
-            transaction.payment_system = transaction.payment_system or 'RoboKassaBot'
-            transaction.robokassa_invoice_id = transaction.robokassa_invoice_id or str(inv_id)
-            transaction.save()
-
-            # Определяем срок подписки по сумме (как в YookassaTGBOTWebhookView)
-            prices = Prices.objects.get(pk=1)
-            days = 0
-            if int(amount_value) == prices.price_1:
-                days = 31
-            elif int(amount_value) == prices.price_2:
-                days = 93
-            elif int(amount_value) == prices.price_3:
-                days = 184
-            elif int(amount_value) == prices.price_4:
-                days = 366
-            elif int(amount_value) == prices.price_5:
-                days = 3
-
-            # Подписка; для материнского рекуррентного счёта сохраняем InvId для /Merchant/Recurring
-            if telegram_user.subscription_status:
-                telegram_user.subscription_expiration = telegram_user.subscription_expiration + timedelta(days=days)
-                telegram_user.permission_revoked = False
-            else:
-                telegram_user.subscription_status = True
-                telegram_user.subscription_expiration = datetime.now() + timedelta(days=days)
-                telegram_user.permission_revoked = False
-            if transaction.robokassa_is_recurring_parent:
-                if not (telegram_user.robokassa_recurring_parent_inv_id or '').strip():
-                    telegram_user.robokassa_recurring_parent_inv_id = str(inv_id)
-            telegram_user.save()
-
-            Logging.objects.create(
-                category="payment",
-                log_level="INFO",
-                message=f"[ROBO-BOT] [Обработка платежа] [Сумма: {amount_value}] [Дни: {days}]",
-                datetime=datetime.now(),
-                user=telegram_user,
-            )
-            # Реферальные начисления (копия логики из бот-вебхука YooKassa)
-            referral_percentages = {
-                1: ReferralSettings.objects.get(pk=1).level_1_percentage,
-                2: ReferralSettings.objects.get(pk=1).level_2_percentage,
-                3: ReferralSettings.objects.get(pk=1).level_3_percentage,
-                4: ReferralSettings.objects.get(pk=1).level_4_percentage,
-                5: ReferralSettings.objects.get(pk=1).level_5_percentage,
-            }
-
-            referred_list = TelegramReferral.objects.filter(
-                referred=telegram_user
-            ).select_related('referrer')
-
-            if referred_list:
-                user_ids_to_pay = [r.referrer.user_id for r in referred_list]
-                users_to_pay = {
-                    u.user_id: u for u in TelegramUser.objects.filter(user_id__in=user_ids_to_pay)
-                }
-
-                for r in referred_list:
-                    level = r.level
-                    user_to_pay = users_to_pay.get(r.referrer.user_id)
-                    if not user_to_pay:
-                        continue
-
-                    percent = referral_percentages.get(level)
-
-                    if user_to_pay.special_offer:
-                        referral_percentages_2 = {
-                            1: user_to_pay.special_offer.level_1_percentage,
-                            2: user_to_pay.special_offer.level_2_percentage,
-                            3: user_to_pay.special_offer.level_3_percentage,
-                            4: user_to_pay.special_offer.level_4_percentage,
-                            5: user_to_pay.special_offer.level_5_percentage,
-                        }
-                        percent = referral_percentages_2.get(level)
-
-                    if percent:
-                        income = Decimal(user_to_pay.income) + (
-                                Decimal(amount_value) * Decimal(percent) / 100
-                        )
-                        user_to_pay.income = income
-                        user_to_pay.save()
-                        ReferralTransaction.objects.create(
-                            referral=r,
-                            amount=Decimal(amount_value) * Decimal(percent) / 100,
-                            transaction=transaction,
-                        )
-
-            Logging.objects.create(
-                category="payment",
-                log_level="SUCCESS",
-                message=f"[ROBO-BOT] [Платёж на сумму {amount_value} р. прошёл] [InvId={inv_id}]",
-                datetime=datetime.now(),
-                user=telegram_user,
+                payment_system='RoboKassaBot',
+                log_prefix='[ROBO-BOT]',
             )
         except Exception:
             Logging.objects.create(
