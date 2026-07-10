@@ -4,8 +4,10 @@ from decimal import Decimal
 import json
 import hashlib
 
+
 from django.views.generic import TemplateView
 from django.shortcuts import redirect
+from django.urls import reverse
 from django.conf import settings
 from django.views import View
 from django.views.decorators.csrf import csrf_exempt
@@ -52,6 +54,8 @@ class CreatePaymentView(View):
             Configuration.account_id = settings.YOOKASSA_SHOP_ID_SITE
             Configuration.secret_key = settings.YOOKASSA_SECRET_SITE
             email = request.user.email if request.user.email else "noemail@noemail.ru"
+            return_url = request.build_absolute_uri(reverse('payment_success'))
+            return_url += f'?date={datetime.now()}&amount={amount}'
             payment = Payment.create({
                 "amount": {
                     "value": str(amount),
@@ -59,7 +63,7 @@ class CreatePaymentView(View):
                 },
                 "confirmation": {
                     "type": "redirect",
-                    "return_url": f'{settings.ALIAS_DOMAIN}/payment/payment-success/?id=&date={datetime.now()}&amount={amount}',
+                    "return_url": return_url,
                     "enforce": False
                 },
                 "capture": True,

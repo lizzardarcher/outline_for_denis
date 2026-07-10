@@ -8,6 +8,7 @@
       <sshConfig authType="PASSWORD" connectionConfig="{&quot;serverAliveInterval&quot;:300}" host="154.222.8.12" id="08aa63b2-efec-4b49-8411-0e4c32f6781a" port="22" customName="hiddify manager" nameFormat="CUSTOM" username="root" useOpenSSHConfig="true">
         <option name="customName" value="hiddify manager" />
       </sshConfig>
+      <sshConfig authType="PASSWORD" host="145.63.138.174" id="db233899-0bf6-433f-b0c1-20a7cef61922" port="22" nameFormat="DESCRIPTIVE" username="root" useOpenSSHConfig="true" />
     </configs>
   </component>
 </project>
