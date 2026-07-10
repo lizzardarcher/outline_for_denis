@@ -215,6 +215,18 @@ class Transaction(models.Model):
                               verbose_name='Статус')
     payment_system = models.CharField(max_length=255, blank=True, null=True, default='YooKassaBot', choices=PAYMENT_SYSTEM, verbose_name='Платёжная система')
 
+    @property
+    def is_recurring_autodebit(self):
+        if (self.robokassa_recurring_previous_inv_id or '').strip():
+            return True
+        return 'рекуррент' in (self.description or '').lower()
+
+    @property
+    def lk_payment_type_label(self):
+        if self.is_recurring_autodebit:
+            return 'Автосписание'
+        return 'Приобретение подписки'
+
     def __str__(self):
         if self.status == 'pending':
             return f"⌚ {self.amount} {self.timestamp.strftime('%D-%m-%Y')}"
@@ -253,6 +265,7 @@ class VpnKey(models.Model):
         verbose_name = 'VPN Ключ'
         verbose_name_plural = 'VPN Ключи'
 
+
 class Server(models.Model):
     hosting = models.CharField(max_length=1000, blank=True, null=True, verbose_name='Хостинг')
     ip_address = models.CharField(max_length=1000, blank=True, null=True, verbose_name='IP Address')
@@ -265,8 +278,8 @@ class Server(models.Model):
     is_active = models.BooleanField(default=True, verbose_name='Сервер Активен')
     created_at = models.DateField(auto_now_add=True, verbose_name='Дата создания')
     country = models.ForeignKey('Country', on_delete=models.CASCADE, null=True, blank=True, verbose_name='Страна')
-    is_activated_vless = models.BooleanField(editable=False, default=False,
-                                             verbose_name='MB')
+    is_activated_vless = models.BooleanField(editable=True, default=False,
+                                             verbose_name='MarzBan')
     is_pasarguard_activated = models.BooleanField(
         editable=True,
         default=False,

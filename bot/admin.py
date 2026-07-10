@@ -3,6 +3,7 @@ import os
 from django.conf import settings
 from django.contrib import admin
 from django.contrib.auth import get_user_model
+from django.contrib.auth.admin import UserAdmin as DjangoUserAdmin
 from django.contrib.auth.models import Group
 from django.contrib.admin.sites import NotRegistered
 from django.db.models import Q, Sum
@@ -14,13 +15,19 @@ from django_admin_inline_paginator.admin import TabularInlinePaginated
 from apps.admindashboardx.models import ManualTaskRun
 from bot.models import *
 
+
 User = get_user_model()
 DEBUG = settings.DEBUG
 SUPPORT_ACCOUNT = settings.SUPPORT_ACCOUNT
 DEV_ACCOUNT = settings.DEV_ACCOUNT
+
+
+def _is_support_user(request):
+    return request.user.username == SUPPORT_ACCOUNT
+
 admin.site.site_header = "Админ Панель"
-admin.site.site_title = "DomVPN BOT"
-admin.site.index_title = "Добро пожаловать в DomVPN BOT Админ Панель"
+admin.site.site_title = "DomVPN"
+admin.site.index_title = "Админ Панель"
 admin.site.unregister(Group)
 try:
     admin.site.unregister(User)
@@ -614,13 +621,14 @@ class ServerAdmin(BaseAdmin):
     get_key_generated.allow_tags = True
     get_key_generated.short_description = 'Всего ключей'
 
+
     list_display = (
         'hosting', 'country', 'ip_address', 'user', 'password', 'rental_price',  'is_active',
          'is_activated_vless', 'is_pasarguard_activated', 'is_c3celeryty_activated', 'get_key_generated','created_at')
     list_display_links = ('hosting',)
     fields = (
         'hosting', 'ip_address', 'user', 'password', 'rental_price', 'max_keys', 'is_active', 'country',
-        'created_at', 'is_pasarguard_activated', 'is_c3celeryty_activated',
+        'created_at', 'is_activated_vless', 'is_pasarguard_activated', 'is_c3celeryty_activated',
         'hysteria_tls_sni', 'hysteria_pin_sha256', 'hysteria_cert_synced_at',
     )
     readonly_fields = ('max_keys', 'created_at', 'hysteria_cert_synced_at')
@@ -721,7 +729,7 @@ class LoggingAdmin(BaseAdmin):
 
 
 @admin.register(User)
-class UserAdmin(BaseAdmin):
+class UserAdmin(DjangoUserAdmin, BaseAdmin):
     search_fields = ('username', 'first_name', 'last_name', 'id')
 
     def has_add_permission(self, request):
@@ -730,6 +738,20 @@ class UserAdmin(BaseAdmin):
     def has_delete_permission(self, request, obj=None):
         return False
 
+    def has_view_permission(self, request, obj=None):
+        if _is_support_user(request):
+            return request.user.is_active and request.user.is_staff
+        return super().has_view_permission(request, obj)
+
+    def has_change_permission(self, request, obj=None):
+        if _is_support_user(request):
+            return request.user.is_active and request.user.is_staff
+        return super().has_change_permission(request, obj)
+
+    def get_queryset(self, request):
+        if _is_support_user(request):
+            return super(BaseAdmin, self).get_queryset(request)
+        return super().get_queryset(request)
 
 
 @admin.register(Prices)

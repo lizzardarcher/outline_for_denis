@@ -1,26 +1,157 @@
 <h2 class="h5 font-weight-bold mb-3 dv-panel-title" style="color: #13056e;">
     <i class="fa fa-credit-card mr-2" aria-hidden="true"></i>Платежи
 </h2>
-<ul class="list-unstyled mb-0">
-    {% for transaction in transactions %}
-        <li class="mb-2 p-3 rounded border-0" style="background: #fafbfc; border-radius: 10px !important;">
-            <div class="d-flex align-items-center justify-content-between flex-wrap">
-                <div>
-                    <span class="text-muted small d-block">{{ transaction.timestamp }}</span>
-                    <span class="font-weight-bold">{{ transaction.amount }} {{ transaction.currency }}</span>
-                </div>
-                {% with status=transaction.status %}
-                    <span class="badge {% if status == 'succeeded' %}badge-success{% elif status == 'pending' %}badge-warning{% elif status == 'canceled' %}badge-secondary{% else %}badge-secondary{% endif %}">
-                        {{ status }}
-                    </span>
-                {% endwith %}
-            </div>
-        </li>
-    {% empty %}
-        <li class="text-center text-muted py-4 rounded" style="background: #fafbfc;">
-            <i class="fa fa-inbox d-block mb-2" style="opacity: .45;" aria-hidden="true"></i>
-            Пока нет платежей.
-        </li>
-    {% endfor %}
-</ul>
 
+
+{% if transactions %}
+    <ul class="list-unstyled mb-0 dv-tx-list">
+        {% for transaction in transactions %}
+            <li class="dv-tx-item mb-3">
+                <div class="d-flex align-items-start justify-content-between flex-wrap">
+                    <div class="d-flex align-items-start mr-3 mb-2 mb-md-0">
+                        <div class="dv-tx-icon mr-3 flex-shrink-0 {% if transaction.is_recurring_autodebit %}dv-tx-icon--recurring{% else %}dv-tx-icon--purchase{% endif %}"
+                             aria-hidden="true">
+                            {% if transaction.is_recurring_autodebit %}
+                                <i class="fa fa-refresh"></i>
+                            {% else %}
+                                <i class="fa fa-shopping-bag"></i>
+                            {% endif %}
+                        </div>
+                        <div>
+                            <div class="font-weight-bold text-dark mb-1">
+                                {{ transaction.lk_payment_type_label }}
+                            </div>
+                            <div class="dv-tx-amount mb-1">
+                                {{ transaction.amount }} {{ transaction.currency|default:"RUB" }}
+                            </div>
+                            <div class="text-muted small">
+                                <i class="fa fa-clock-o mr-1" aria-hidden="true"></i>
+                                {{ transaction.timestamp|date:"d.m.Y H:i" }}
+                            </div>
+                            {% if transaction.get_payment_system_display %}
+                                <div class="text-muted small mt-1">
+                                    {{ transaction.get_payment_system_display }}
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    {% with status=transaction.status %}
+                        <span class="dv-tx-status dv-tx-status--{{ status|default:'unknown' }}">
+                            {% if status == 'succeeded' %}
+                                <i class="fa fa-check-circle mr-1" aria-hidden="true"></i> Успешно
+                            {% elif status == 'pending' %}
+                                <i class="fa fa-hourglass-half mr-1" aria-hidden="true"></i> В ожидании
+                            {% elif status == 'failed' %}
+                                <i class="fa fa-times-circle mr-1" aria-hidden="true"></i> Ошибка
+                            {% elif status == 'canceled' %}
+                                <i class="fa fa-ban mr-1" aria-hidden="true"></i> Отменено
+                            {% elif status == 'refunded' %}
+                                <i class="fa fa-undo mr-1" aria-hidden="true"></i> Возврат
+                            {% elif status == 'captured' %}
+                                <i class="fa fa-check mr-1" aria-hidden="true"></i> Захвачено
+                            {% else %}
+                                <i class="fa fa-question-circle mr-1" aria-hidden="true"></i> {{ transaction.get_status_display|default:status }}
+                            {% endif %}
+                        </span>
+                    {% endwith %}
+                </div>
+            </li>
+        {% endfor %}
+    </ul>
+{% else %}
+    <div class="text-center text-muted py-4 rounded dv-tx-empty">
+        <i class="fa fa-inbox d-block mb-2" style="opacity: .45; font-size: 1.75rem;" aria-hidden="true"></i>
+        Пока нет платежей.
+    </div>
+{% endif %}
+
+<style>
+    .dv-tx-list {
+        margin: 0;
+    }
+
+    .dv-tx-item {
+        padding: 1rem 1.1rem;
+        background: #fafbfc;
+        border-radius: 12px;
+        border: 1px solid rgba(19, 5, 110, 0.06);
+        transition: box-shadow 0.15s ease;
+    }
+
+    .dv-tx-item:hover {
+        box-shadow: 0 4px 16px rgba(19, 5, 110, 0.06);
+    }
+
+    .dv-tx-icon {
+        width: 42px;
+        height: 42px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1rem;
+    }
+
+    .dv-tx-icon--purchase {
+        background: rgba(19, 5, 110, 0.08);
+        color: #13056e;
+    }
+
+    .dv-tx-icon--recurring {
+        background: rgba(13, 110, 253, 0.1);
+        color: #0d6efd;
+    }
+
+    .dv-tx-amount {
+        font-size: 1.15rem;
+        font-weight: 700;
+        color: #13056e;
+    }
+
+    .dv-tx-status {
+        display: inline-flex;
+        align-items: center;
+        padding: 0.35rem 0.75rem;
+        border-radius: 999px;
+        font-size: 0.82rem;
+        font-weight: 600;
+        white-space: nowrap;
+    }
+
+    .dv-tx-status--succeeded,
+    .dv-tx-status--captured {
+        background: rgba(25, 135, 84, 0.12);
+        color: #198754;
+    }
+
+    .dv-tx-status--pending {
+        background: rgba(255, 193, 7, 0.18);
+        color: #b58100;
+    }
+
+    .dv-tx-status--failed {
+        background: rgba(220, 53, 69, 0.12);
+        color: #dc3545;
+    }
+
+    .dv-tx-status--canceled {
+        background: rgba(108, 117, 125, 0.15);
+        color: #6c757d;
+    }
+
+    .dv-tx-status--refunded {
+        background: rgba(13, 110, 253, 0.12);
+        color: #0d6efd;
+    }
+
+    .dv-tx-status--unknown {
+        background: rgba(108, 117, 125, 0.12);
+        color: #6c757d;
+    }
+
+    .dv-tx-empty {
+        background: #fafbfc;
+        border-radius: 12px;
+    }
+</style>
