@@ -231,6 +231,17 @@ class VpnKeyInline(admin.TabularInline):
 class ServerInline(admin.TabularInline):
     model = Server
     extra = 1
+    fields = (
+        'hosting', 'ip_address', 'user', 'password', 'rental_price',
+        'is_active', 'panels_active',
+    )
+    readonly_fields = ('panels_active',)
+
+    @admin.display(description='Активна в панелях', boolean=True)
+    def panels_active(self, obj):
+        if not obj or not obj.pk:
+            return False
+        return bool(obj.is_activated_vless and obj.is_c3celeryty_activated)
 
     def has_add_permission(self, request, obj=None):
         if request.user.username == SUPPORT_ACCOUNT:
@@ -575,29 +586,16 @@ class VpnKey(BaseAdmin):
     #     return False
 
 
-@admin.action(description='MB: is_activated_vless = True')
+@admin.action(description='is_activated_vless = True')
 def set_is_activated_vless_true(modeladmin, request, queryset):
     updated = queryset.update(is_activated_vless=True)
-    modeladmin.message_user(request, f'Флаг MB включён у {updated} сервер(ов).')
+    modeladmin.message_user(request, f'is_activated_vless включён у {updated} сервер(ов).')
 
 
-@admin.action(description='MB: is_activated_vless = False')
+@admin.action(description='is_activated_vless = False')
 def set_is_activated_vless_false(modeladmin, request, queryset):
     updated = queryset.update(is_activated_vless=False)
-    modeladmin.message_user(request, f'Флаг MB снят у {updated} сервер(ов).')
-
-
-
-@admin.action(description='PG: is_pasarguard_activated = True')
-def set_is_pasarguard_activated_true(modeladmin, request, queryset):
-    updated = queryset.update(is_pasarguard_activated=True)
-    modeladmin.message_user(request, f'Флаг PasarGuard включён у {updated} сервер(ов).')
-
-
-@admin.action(description='PG: is_pasarguard_activated = False')
-def set_is_pasarguard_activated_false(modeladmin, request, queryset):
-    updated = queryset.update(is_pasarguard_activated=False)
-    modeladmin.message_user(request, f'Флаг PasarGuard снят у {updated} сервер(ов).')
+    modeladmin.message_user(request, f'is_activated_vless снят у {updated} сервер(ов).')
 
 
 @admin.register(Server)
@@ -606,9 +604,8 @@ class ServerAdmin(BaseAdmin):
     actions = [
         set_is_activated_vless_true,
         set_is_activated_vless_false,
-        set_is_pasarguard_activated_true,
-        set_is_pasarguard_activated_false,
     ]
+
 
     def get_key_generated(self, obj):
         if 0 < obj.keys_generated <= 100:
@@ -621,17 +618,21 @@ class ServerAdmin(BaseAdmin):
     get_key_generated.allow_tags = True
     get_key_generated.short_description = 'Всего ключей'
 
+    @admin.display(description='Активна в панелях', boolean=True)
+    def panels_active(self, obj):
+        return bool(obj.is_activated_vless and obj.is_c3celeryty_activated)
 
     list_display = (
-        'hosting', 'country', 'ip_address', 'user', 'password', 'rental_price',  'is_active',
-         'is_activated_vless', 'is_pasarguard_activated', 'is_c3celeryty_activated', 'get_key_generated','created_at')
+        'hosting', 'country', 'ip_address', 'user', 'password', 'rental_price', 'is_active',
+        'panels_active', 'get_key_generated', 'created_at',
+    )
     list_display_links = ('hosting',)
     fields = (
         'hosting', 'ip_address', 'user', 'password', 'rental_price', 'max_keys', 'is_active', 'country',
-        'created_at', 'is_activated_vless', 'is_pasarguard_activated', 'is_c3celeryty_activated',
+        'created_at', 'panels_active',
         'hysteria_tls_sni', 'hysteria_pin_sha256', 'hysteria_cert_synced_at',
     )
-    readonly_fields = ('max_keys', 'created_at', 'hysteria_cert_synced_at')
+    readonly_fields = ('max_keys', 'created_at', 'panels_active', 'hysteria_cert_synced_at')
     ordering = ('country', 'ip_address')
 
 
