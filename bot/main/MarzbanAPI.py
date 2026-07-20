@@ -12,7 +12,7 @@ MARZBAN_INBOUNDS_BY_PROTOCOL = {
         "shadowsocks": ["Shadowsocks TCP"],
     },
     "vless": {
-        "vless": ["VLESS TCP REALITY"],
+        "vless": ["VLESS XHTTP REALITY"],
     },
 }
 
