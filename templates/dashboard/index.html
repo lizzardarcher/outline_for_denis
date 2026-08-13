@@ -1,7 +1,8 @@
 {% extends 'layouts/base.html' %}
 {% load static %}
 
-{% block title %}Личный кабинет DomVPN{% endblock title %}
+
+{% block title %}Личный кабинет DomVPS{% endblock title %}
 
 {% block content %}
     <div class="hero_area dashboard-lk">
@@ -31,6 +32,18 @@
                                    aria-controls="main-info"
                                    tabindex="0">
                                     <i class="fa fa-key fa-fw mr-2" aria-hidden="true"></i> Ключи
+                                </a>
+                            </li>
+                            <li class="nav-item" role="none">
+                                <a class="nav-link dashboard-lk-tab"
+                                   href="{% url 'profile' %}?section=app-links"
+                                   data-target="app-links"
+                                   id="tab-app-links"
+                                   role="tab"
+                                   aria-selected="false"
+                                   aria-controls="app-links"
+                                   tabindex="-1">
+                                    <i class="fa fa-download fa-fw mr-2" aria-hidden="true"></i> Приложения
                                 </a>
                             </li>
                             <li class="nav-item" role="none">
@@ -162,6 +175,7 @@
                         <label for="dv-section-select" class="mb-1 small font-weight-bold text-muted">Раздел</label>
                         <select id="dv-section-select" class="form-control form-control-sm" aria-label="Перейти к разделу личного кабинета">
                             <option value="main-info">Ключи и подписка</option>
+                            <option value="app-links">Приложения</option>
                             <option value="user-info">Профиль</option>
                             <option value="servers">Доступные локации</option>
                             <option value="referral">Реферальная программа</option>
@@ -177,7 +191,7 @@
                     </div>
 
                     <div class="dv-page-heading mb-3 mb-md-4 d-none d-md-block">
-                        <h1 class="h4 mb-0 font-weight-bold" style="color: #13056e;">Личный кабинет DomVPN</h1>
+                        <h1 class="h4 mb-0 font-weight-bold" style="color: #13056e;">Личный кабинет DomVPS</h1>
                         <p class="small text-muted mb-0 mt-1">Ключи, подписка и настройки аккаунта</p>
                     </div>
 
@@ -221,6 +235,9 @@
                     </div>
                     <div id="main-info" class="content-section dv-panel-section" tabindex="-1">
                         {% include 'dashboard/includes/main-info.html' %}
+                    </div>
+                    <div id="app-links" class="content-section dv-panel-section" tabindex="-1">
+                        {% include 'home/sections/app_links_body.html' %}
                     </div>
                     <div id="servers" class="content-section dv-panel-section" tabindex="-1">
                         {% include 'dashboard/includes/servers.html' %}

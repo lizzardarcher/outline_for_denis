@@ -1,8 +1,18 @@
 <!-- footer section -->
 <section class="footer_section">
+
+    <style>
+        .footer_section .footer-legal {
+            color: #00204a;
+            line-height: 1.6;
+        }
+        .footer_section .footer-legal a {
+            color: inherit;
+        }
+    </style>
     <div class="container">
         <p>
-            &copy; <span id="displayYear"></span> <a href="#">DomVPN</a>
+            &copy; <span id="displayYear"></span> <a href="{% url 'home' %}">DomVPS</a>
         </p>
     </div>
 </section>

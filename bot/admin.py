@@ -16,6 +16,9 @@ from apps.admindashboardx.models import ManualTaskRun
 from bot.models import *
 
 
+from django.http import HttpResponse
+from openpyxl import Workbook
+
 User = get_user_model()
 DEBUG = settings.DEBUG
 SUPPORT_ACCOUNT = settings.SUPPORT_ACCOUNT
@@ -375,6 +378,93 @@ class TelegramUserAdmin(admin.ModelAdmin):
             del actions['delete_selected']
         return actions
 
+    actions = [
+        # 'export_to_excel',
+        'export_usernames_with_at'
+    ]
+
+    def export_to_excel(self, request, queryset):
+        """Экспортирует все поля выбранных пользователей в Excel"""
+        response = HttpResponse(
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        response['Content-Disposition'] = 'attachment; filename=telegram_users.xlsx'
+
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Telegram Users"
+
+        # Заголовки столбцов
+        headers = [
+            'ID', 'user_id', 'username', 'first_name', 'last_name',
+            'photo_url', 'is_banned', 'balance', 'income',
+            'subscription_status', 'subscription_expiration', 'data_limit',
+            'top_up_balance_listener', 'withdrawal_listener', 'payment_method_id',
+            'robokassa_recurring_parent_inv_id', 'permission_revoked',
+            'next_payment_date', 'special_offer', 'join_date'
+        ]
+        ws.append(headers)
+
+        # Данные
+        for user in queryset:
+            row = [
+                user.id,
+                user.user_id,
+                user.username or '',
+                user.first_name or '',
+                user.last_name or '',
+                user.photo_url or '',
+                user.is_banned,
+                str(user.balance),
+                str(user.income),
+                user.subscription_status,
+                user.subscription_expiration,
+                user.data_limit,
+                user.top_up_balance_listener,
+                user.withdrawal_listener,
+                user.payment_method_id or '',
+                user.robokassa_recurring_parent_inv_id or '',
+                user.permission_revoked,
+                user.next_payment_date,
+                str(user.special_offer) if user.special_offer else '',
+                user.join_date
+            ]
+            ws.append(row)
+
+        wb.save(response)
+        return response
+
+    export_to_excel.short_description = "📥 Выгрузить выбранных пользователей в Excel"
+
+    def export_usernames_with_at(self, request, queryset):
+        """Экспортирует только username, содержащие символ @"""
+        # Фильтруем queryset - оставляем только username с "@"
+        filtered_queryset = TelegramUser.objects.filter(username__contains='@')
+
+        if not filtered_queryset.exists():
+            self.message_user(request, "Пользователи с email не найдены", level='warning')
+            return None
+
+        response = HttpResponse(
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        response['Content-Disposition'] = 'attachment; filename=usernames_with_at.xlsx'
+
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Usernames with @"
+
+        # Заголовок
+        ws.append(['username'])
+
+        # Данные
+        for user in filtered_queryset:
+            ws.append([user.username])
+
+        wb.save(response)
+        return response
+
+    export_usernames_with_at.short_description = "📥 Выгрузить email в Excel"
 
 @admin.register(ReferralSpecialOffer)
 class ReferralSpecialOfferAdmin(BaseAdmin):
