@@ -1,11 +1,11 @@
+
+
+from __future__ import annotations
+
 import json
 import traceback
-import urllib
 from datetime import timedelta, datetime
 from decimal import Decimal
-import hashlib
-import xml.etree.ElementTree as ET
-from urllib.parse import quote
 
 import requests
 from celery import shared_task
@@ -19,10 +19,13 @@ from apps.payment.robokassa_subscription import (
     RECURRING_CHARGE,
     RECURRING_REPAIR_AND_SKIP,
     RECURRING_SKIP,
+    classify_robokassa_opstate,
     evaluate_robokassa_recurring_charge,
     extend_telegram_user_subscription,
+    fetch_robokassa_opstate,
     repair_subscription_from_transaction,
     resolve_subscription_days,
+    robokassa_md5,
     set_robokassa_recurring_parent_if_needed,
     verify_robokassa_recurring_parent,
 )
@@ -299,16 +302,12 @@ def ukassa_check_pending_site(self):
 ### RoboKassa
 
 ROBOKASSA_RECURRING_URL = 'https://auth.robokassa.ru/Merchant/Recurring'
-ROBOKASSA_OPSTATE_URL = 'https://auth.robokassa.ru/Merchant/WebService/Service.asmx/OpState'
-
-
-def robokassa_md5(s: str) -> str:
-    return hashlib.md5(s.encode('utf-8')).hexdigest().upper()
+ROBOKASSA_PENDING_LOOKBACK_DAYS = 30
 
 
 def post_robokassa_bot_recurring_invoice(*, merchant_login: str, password_1: str, invoice_id: int,
                                          previous_invoice_id: str, out_sum: Decimal, description: str,
-                                         is_test: bool) -> tuple[bool, str]:
+                                         is_test: bool) -> tuple[bool | None, str]:
     """
     Отправка рекуррентного платежа в Робокассу с чеком по 54-ФЗ.
 
@@ -354,34 +353,23 @@ def post_robokassa_bot_recurring_invoice(*, merchant_login: str, password_1: str
     if is_test:
         data['IsTest'] = '1'
 
-    resp = requests.post(ROBOKASSA_RECURRING_URL, data=data, timeout=60)
-    text = (resp.text or '').strip()
-    ok = resp.ok and text.upper().startswith('OK')
-    return ok, text
+    try:
+        resp = requests.post(ROBOKASSA_RECURRING_URL, data=data, timeout=60)
+        text = (resp.text or '').strip()
+        ok = resp.ok and text.upper().startswith('OK')
+        return ok, text
+    except requests.Timeout as exc:
+        return None, f'timeout: {exc}'
+    except requests.RequestException as exc:
+        return None, f'network: {exc}'
 
 
 def _fetch_robokassa_payment_info(inv_id: str, merchant_login: str, password_2: str):
-    signature = robokassa_md5(f"{merchant_login}:{inv_id}:{password_2}")
-    params = {
-        "MerchantLogin": merchant_login,
-        "InvoiceID": inv_id,
-        "Signature": signature,
-    }
-    try:
-        resp = requests.get(ROBOKASSA_OPSTATE_URL, params=params, timeout=15)
-        resp.raise_for_status()
-        root = ET.fromstring(resp.text)
-        result = {}
-        for child in root:
-            key = child.tag.split('}')[-1]
-            result[key] = child.text
-        return result
-    except Exception:
-        return None
+    return fetch_robokassa_opstate(inv_id, merchant_login, password_2)
 
 
 def _apply_robokassa_success(transaction: Transaction, amount_value: Decimal, source_label: str,
-                             merchant_login: str, password_2: str):
+                             merchant_login: str, password_2: str, payment_info=None):
     if transaction.status == 'succeeded':
         if repair_subscription_from_transaction(transaction):
             Logging.objects.create(
@@ -407,13 +395,15 @@ def _apply_robokassa_success(transaction: Transaction, amount_value: Decimal, so
 
     days = resolve_subscription_days(amount_value)
 
-    payment_info = _fetch_robokassa_payment_info(
-        inv_id=str(transaction.robokassa_invoice_id or transaction.id),
-        merchant_login=merchant_login,
-        password_2=password_2,
-    )
+    if payment_info is None:
+        payment_info = _fetch_robokassa_payment_info(
+            inv_id=str(transaction.robokassa_invoice_id or transaction.id),
+            merchant_login=merchant_login,
+            password_2=password_2,
+        )
     robox_id = (payment_info or {}).get("RoboxID") or (payment_info or {}).get("PaymentID") or \
-               (payment_info or {}).get("TransactionID") or (payment_info or {}).get("ID")
+               (payment_info or {}).get("OpKey") or (payment_info or {}).get("TransactionID") or \
+               (payment_info or {}).get("ID")
     if robox_id:
         payment_id = str(robox_id)
     elif transaction.payment_id:
@@ -485,6 +475,119 @@ def _apply_robokassa_success(transaction: Transaction, amount_value: Decimal, so
 
 
 
+def _reconcile_robokassa_pending_transaction(
+    transaction: Transaction,
+    *,
+    merchant_login: str,
+    password_2: str,
+    source_label: str,
+    log_missing: bool = True,
+) -> str:
+    """
+    Сверяет pending-транзакцию с OpState.
+    Возвращает: paid | canceled | pending | error | unknown
+    """
+    inv_id = str(transaction.robokassa_invoice_id or transaction.id)
+    payment_info = _fetch_robokassa_payment_info(inv_id, merchant_login, password_2)
+    if not payment_info:
+        if log_missing:
+            Logging.objects.create(
+                category="payment",
+                log_level="WARNING",
+                message=f'[{source_label}] [pending-check] OpState недоступен InvId={inv_id}',
+                datetime=timezone.now(),
+                user=transaction.user,
+            )
+        return 'error'
+
+    kind = classify_robokassa_opstate(payment_info)
+    state = payment_info.get('State') or ''
+    result_code = payment_info.get('ResultCode') or ''
+
+    if kind == 'paid':
+        _apply_robokassa_success(
+            transaction=transaction,
+            amount_value=transaction.amount,
+            source_label=source_label,
+            merchant_login=merchant_login,
+            password_2=password_2,
+            payment_info=payment_info,
+        )
+    elif kind == 'canceled':
+        transaction.status = 'canceled'
+        transaction.paid = False
+        transaction.save(update_fields=['status', 'paid'])
+        Logging.objects.create(
+            category="payment",
+            log_level="WARNING",
+            message=(
+                f'[{source_label}] [pending-check] Отменён InvId={inv_id} '
+                f'State={state} ResultCode={result_code}'
+            ),
+            datetime=timezone.now(),
+            user=transaction.user,
+        )
+    elif kind == 'error' and log_missing:
+        Logging.objects.create(
+            category="payment",
+            log_level="WARNING",
+            message=(
+                f'[{source_label}] [pending-check] Ошибка OpState InvId={inv_id} '
+                f'ResultCode={result_code} State={state}'
+            ),
+            datetime=timezone.now(),
+            user=transaction.user,
+        )
+    elif kind == 'unknown':
+        Logging.objects.create(
+            category="payment",
+            log_level="WARNING",
+            message=(
+                f'[{source_label}] [pending-check] Неизвестный State={state} '
+                f'InvId={inv_id} ResultCode={result_code}'
+            ),
+            datetime=timezone.now(),
+            user=transaction.user,
+        )
+    return kind
+
+
+def _check_robokassa_pending_transactions(*, payment_system: str, merchant_login: str, password_2: str,
+                                          source_label: str):
+    from django.db.models import Q
+
+    lookback = timezone.now() - timedelta(days=ROBOKASSA_PENDING_LOOKBACK_DAYS)
+    pending_qs = Transaction.objects.filter(
+        status="pending",
+        paid=False,
+        payment_system=payment_system,
+    ).filter(
+        Q(timestamp__gte=lookback)
+        | (
+            Q(robokassa_recurring_previous_inv_id__isnull=False)
+            & ~Q(robokassa_recurring_previous_inv_id='')
+        )
+    ).select_related('user')
+
+    for transaction in pending_qs:
+        inv_id = str(transaction.robokassa_invoice_id or transaction.id)
+        try:
+            _reconcile_robokassa_pending_transaction(
+                transaction,
+                merchant_login=merchant_login,
+                password_2=password_2,
+                source_label=source_label,
+            )
+        except Exception:
+            Logging.objects.create(
+                category="payment",
+                log_level="DANGER",
+                message=f'[{source_label}] [pending-check] Ошибка InvId={inv_id}\n{traceback.format_exc()}',
+                datetime=timezone.now(),
+                user=transaction.user if getattr(transaction, "user", None) else None,
+            )
+
+
 @shared_task(bind=True)
 def robokassa_check_pending_bot(self):
     merchant_login = getattr(settings, "ROBOKASSA_MERCHANT_LOGIN_BOT", None)
@@ -493,49 +596,17 @@ def robokassa_check_pending_bot(self):
         Logging.objects.create(
             category="payment",
             log_level="DANGER",
-            datetime=datetime.now(),
+            message='[BOT/ROBO] [pending-check] Не заданы ROBOKASSA_MERCHANT_LOGIN_BOT / PASSWORD_2_BOT',
+            datetime=timezone.now(),
         )
         return
 
-    pending_qs = Transaction.objects.filter(
-        status="pending",
-        paid=False,
+    _check_robokassa_pending_transactions(
         payment_system='RoboKassaBot',
-        timestamp__gte=datetime.now() - timedelta(days=3),
-    ).select_related('user')
-
-    for transaction in pending_qs:
-        try:
-            inv_id = str(transaction.robokassa_invoice_id or transaction.id)
-            payment_info = _fetch_robokassa_payment_info(inv_id, merchant_login, password_2)
-            if not payment_info:
-                continue
-            state = str(payment_info.get('State') or '').strip()
-            if state == '5':
-                _apply_robokassa_success(
-                    transaction=transaction,
-                    amount_value=transaction.amount,
-                    source_label='BOT/ROBO',
-                    merchant_login=merchant_login,
-                    password_2=password_2,
-                )
-            elif state in {'3', '10'}:
-                transaction.status = 'canceled'
-                transaction.paid = False
-                transaction.save(update_fields=['status', 'paid'])
-                Logging.objects.create(
-                    category="payment",
-                    log_level="WARNING",
-                    datetime=datetime.now(),
-                    user=transaction.user,
-                )
-        except Exception:
-            Logging.objects.create(
-                category="payment",
-                log_level="DANGER",
-                datetime=datetime.now(),
-                user=transaction.user if getattr(transaction, "user", None) else None,
-            )
+        merchant_login=merchant_login,
+        password_2=password_2,
+        source_label='BOT/ROBO',
+    )
 
 
 @shared_task(bind=True)
@@ -546,49 +617,17 @@ def robokassa_check_pending_site(self):
         Logging.objects.create(
             category="payment",
             log_level="DANGER",
-            datetime=datetime.now(),
+            message='[SITE/ROBO] [pending-check] Не заданы ROBOKASSA_MERCHANT_LOGIN_SITE / PASSWORD_2_SITE',
+            datetime=timezone.now(),
         )
         return
 
-    pending_qs = Transaction.objects.filter(
-        status="pending",
-        paid=False,
+    _check_robokassa_pending_transactions(
         payment_system='RoboKassaSite',
-        timestamp__gte=datetime.now() - timedelta(days=3),
-    ).select_related('user')
-
-    for transaction in pending_qs:
-        try:
-            inv_id = str(transaction.robokassa_invoice_id or transaction.id)
-            payment_info = _fetch_robokassa_payment_info(inv_id, merchant_login, password_2)
-            if not payment_info:
-                continue
-            state = str(payment_info.get('State') or '').strip()
-            if state == '5':
-                _apply_robokassa_success(
-                    transaction=transaction,
-                    amount_value=transaction.amount,
-                    source_label='SITE/ROBO',
-                    merchant_login=merchant_login,
-                    password_2=password_2,
-                )
-            elif state in {'3', '10'}:
-                transaction.status = 'canceled'
-                transaction.paid = False
-                transaction.save(update_fields=['status', 'paid'])
-                Logging.objects.create(
-                    category="payment",
-                    log_level="WARNING",
-                    datetime=datetime.now(),
-                    user=transaction.user,
-                )
-        except Exception:
-            Logging.objects.create(
-                category="payment",
-                log_level="DANGER",
-                datetime=datetime.now(),
-                user=transaction.user if getattr(transaction, "user", None) else None,
-            )
+        merchant_login=merchant_login,
+        password_2=password_2,
+        source_label='SITE/ROBO',
+    )
 
 
 def _run_robokassa_recurring(
@@ -597,13 +636,14 @@ def _run_robokassa_recurring(
     payment_system: str,
     merchant_login: str,
     password_1: str,
+    password_2: str,
     is_test: bool,
     recurring_description: str,
     success_log_message: str,
 ):
     """
-    Рекуррент RoboKassa: POST /Merchant/Recurring.
-    Факт оплаты и продление подписки — в Robokassa*ResultView (ResultURL) или pending-check.
+    Рекуррент RoboKassa: сначала commit pending-транзакции, затем POST /Merchant/Recurring.
+    Факт оплаты — ResultURL, немедленный OpState после OK, либо pending-check.
     """
     Logging.objects.create(
         category="payment",
@@ -633,8 +673,12 @@ def _run_robokassa_recurring(
     failed = 0
     amount_to_charge = Decimal(Prices.objects.get(pk=1).price_1)
     income_info = IncomeInfo.objects.get(pk=1)
+    source_label = f'{channel}/ROBO'
 
     for user_pk in user_ids:
+        tx = None
+        user = None
+        parent_inv = ''
         try:
             with db_transaction.atomic():
                 user = TelegramUser.objects.select_for_update().get(pk=user_pk)
@@ -693,35 +737,76 @@ def _run_robokassa_recurring(
                 tx.robokassa_invoice_id = str(tx.id)
                 tx.save(update_fields=['robokassa_invoice_id'])
 
-                ok, body = post_robokassa_bot_recurring_invoice(
-                    merchant_login=merchant_login,
-                    password_1=password_1,
-                    invoice_id=tx.id,
-                    previous_invoice_id=parent_inv,
-                    out_sum=amount_to_charge,
-                    description=f'Подписка DomVPN рекуррент {channel} user={user.user_id}',
-                    is_test=is_test,
+            if tx is None:
+                continue
+
+            ok, body = post_robokassa_bot_recurring_invoice(
+                merchant_login=merchant_login,
+                password_1=password_1,
+                invoice_id=tx.id,
+                previous_invoice_id=parent_inv,
+                out_sum=amount_to_charge,
+                description=f'Подписка DomVPN рекуррент {channel} user={user.user_id}',
+                is_test=is_test,
+            )
+
+            if ok is True:
+                success_init += 1
+                Logging.objects.create(
+                    category="payment",
+                    log_level="INFO",
+                    message=f'{success_log_message} InvId={tx.id} ответ={body}',
+                    datetime=datetime.now(),
+                    user=user,
                 )
-                if ok:
-                    success_init += 1
-                    Logging.objects.create(
-                        category="payment",
-                        log_level="INFO",
-                        message=success_log_message,
-                        datetime=datetime.now(),
-                        user=user,
-                    )
-                else:
+                _reconcile_robokassa_pending_transaction(
+                    tx,
+                    merchant_login=merchant_login,
+                    password_2=password_2,
+                    source_label=source_label,
+                    log_missing=False,
+                )
+            elif ok is False:
+                kind = _reconcile_robokassa_pending_transaction(
+                    tx,
+                    merchant_login=merchant_login,
+                    password_2=password_2,
+                    source_label=source_label,
+                    log_missing=False,
+                )
+                tx.refresh_from_db()
+                if tx.status == 'pending' and kind != 'paid':
                     failed += 1
                     tx.status = 'failed'
                     tx.save(update_fields=['status'])
                     Logging.objects.create(
                         category="payment",
                         log_level="WARNING",
-                        message=f'Списание {body}',
+                        message=f'Списание отклонено робокассой InvId={tx.id}: {body}',
                         datetime=datetime.now(),
                         user=user,
                     )
+                elif tx.status == 'succeeded':
+                    success_init += 1
+            else:
+                failed += 1
+                Logging.objects.create(
+                    category="payment",
+                    log_level="WARNING",
+                    message=(
+                        f'[CELERY] [{channel}] [RoboKassa рекуррент] '
+                        f'Неизвестный исход POST InvId={tx.id}, транзакция остаётся pending: {body}'
+                    ),
+                    datetime=datetime.now(),
+                    user=user,
+                )
+                _reconcile_robokassa_pending_transaction(
+                    tx,
+                    merchant_login=merchant_login,
+                    password_2=password_2,
+                    source_label=source_label,
+                    log_missing=False,
+                )
         except TelegramUser.DoesNotExist:
             skipped += 1
         except Exception as e:
@@ -729,8 +814,12 @@ def _run_robokassa_recurring(
             Logging.objects.create(
                 category="payment",
                 log_level="FATAL",
-                message=f'{e}',
+                message=(
+                    f'[CELERY] [{channel}] [RoboKassa рекуррент] {e} '
+                    f'InvId={getattr(tx, "id", None)}'
+                ),
                 datetime=datetime.now(),
+                user=user,
             )
 
     Logging.objects.create(
@@ -755,6 +844,7 @@ def robokassa_bot_attempt_recurring_payment():
         payment_system='RoboKassaBot',
         merchant_login=settings.ROBOKASSA_MERCHANT_LOGIN_BOT,
         password_1=settings.ROBOKASSA_PASSWORD_1_BOT,
+        password_2=settings.ROBOKASSA_PASSWORD_2_BOT,
         is_test=getattr(settings, 'ROBOKASSA_BOT_IS_TEST', False),
         recurring_description='Рекуррентный платёж (RoboKassa BOT)',
         success_log_message='Платежный запрос на автосписание Робокасса Бот отправлен успешно',
@@ -769,6 +859,7 @@ def robokassa_site_attempt_recurring_payment():
         payment_system='RoboKassaSite',
         merchant_login=settings.ROBOKASSA_MERCHANT_LOGIN_SITE,
         password_1=settings.ROBOKASSA_PASSWORD_1_SITE,
+        password_2=settings.ROBOKASSA_PASSWORD_2_SITE,
         is_test=getattr(settings, 'ROBOKASSA_SITE_IS_TEST', False),
         recurring_description='Рекуррентный платёж (RoboKassa SITE)',
         success_log_message='Платежный запрос на автосписание Робокасса Site отправлен успешно',

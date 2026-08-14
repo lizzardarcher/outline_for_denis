@@ -24,116 +24,36 @@ os.environ['DJANGO_SETTINGS_MODULE'] = 'outline_for_denis.settings'
 os.environ["DJANGO_ALLOW_ASYNC_UNSAFE"] = "true"
 django.setup()
 
-import hashlib
-import requests
-import xml.etree.ElementTree as ET
 from django.conf import settings
 from bot.models import Transaction
 
 
-def robokassa_md5(s: str) -> str:
-    """Создание MD5 подписи для RoboKassa"""
-    return hashlib.md5(s.encode('utf-8')).hexdigest().upper()
-
-
 def get_robokassa_payment_info(inv_id: str, merchant_login: str, password_2: str):
-    """
-    Получает информацию о платеже через API RoboKassa.
-    Возвращает словарь с данными, включая ID Robox (если доступен).
-    """
-    url = "https://auth.robokassa.ru/Merchant/WebService/Service.asmx/OpState"
+    """Информация о платеже через общий OpStateExt-парсер."""
+    from apps.payment.robokassa_subscription import fetch_robokassa_opstate
 
-    signature = robokassa_md5(f"{merchant_login}:{inv_id}:{password_2}")
-
-    params = {
-        "MerchantLogin": merchant_login,
-        "InvoiceID": inv_id,
-        "Signature": signature,
-    }
-
-    try:
-        print(f"  Запрос к API RoboKassa...")
-        print(f"    URL: {url}")
-        print(f"    MerchantLogin: {merchant_login}")
-        print(f"    InvoiceID: {inv_id}")
-        print(f"    Signature: {signature}")
-
-        resp = requests.get(url, params=params, timeout=10)
-        resp.raise_for_status()
-
-        print(f"  Ответ получен (статус: {resp.status_code})")
-        
-        # Работаем с bytes для правильной обработки BOM
-        xml_bytes = resp.content
-        
-        # Удаляем UTF-8 BOM (Byte Order Mark): \xef\xbb\xbf
-        if xml_bytes.startswith(b'\xef\xbb\xbf'):
-            xml_bytes = xml_bytes[3:]
-            print(f"  ✓ BOM удалён из ответа")
-        
-        # Декодируем в строку
-        xml_text = xml_bytes.decode('utf-8')
-        print(f"  XML ответ (первые 200 символов): {xml_text[:200]}...")
-
-        # Парсим XML
-        root = ET.fromstring(xml_text)
-
-        # Обрабатываем namespaces
-        # RoboKassa использует namespace, например: {http://merchant.roboxchange.com/WebService/}State
-        result = {}
-        
-        # Извлекаем данные из всех дочерних элементов
-        for child in root:
-            # Убираем namespace из имени тега
-            tag_name = child.tag
-            if tag_name.startswith('{'):
-                tag_name = tag_name.split('}')[-1]
-            
-            result[tag_name] = child.text if child.text else None
-
-        print(f"  ✓ XML успешно распарсен")
-        print(f"  Найдено полей: {list(result.keys())}")
-
-        # Проверяем статус
-        if result.get("State") == "5":  # 5 = оплачен
-            # ID Robox может быть в разных полях, зависит от версии API
-            # Обычно это поле "PaymentID" или "TransactionID"
-            robox_id = result.get("PaymentID") or result.get("TransactionID") or result.get("ID")
-            if robox_id:
-                result["RoboxID"] = robox_id
-                print(f"  ✓ ID Robox найден: {robox_id}")
-
-        return result
-
-    except requests.exceptions.RequestException as e:
-        print(f"  ❌ Ошибка при запросе к API: {e}")
-        if hasattr(e, 'response') and e.response is not None:
-            print(f"  Ответ сервера: {e.response.text}")
-        return None
-    except ET.ParseError as e:
-        print(f"  ❌ Ошибка парсинга XML: {e}")
-        if 'resp' in locals():
-            print(f"  Первые 200 символов XML (repr): {repr(resp.text[:200])}")
-            print(f"  Первые 200 байт (hex): {resp.content[:200].hex()}")
-        return None
-    except Exception as e:
-        print(f"  ❌ Неожиданная ошибка: {e}")
-        import traceback
-        print(traceback.format_exc())
-        return None
+    print("  Запрос к API RoboKassa (OpStateExt)...")
+    print(f"    MerchantLogin: {merchant_login}")
+    print(f"    InvoiceID: {inv_id}")
+    result = fetch_robokassa_opstate(inv_id, merchant_login, password_2)
+    if result:
+        print(f"  ✓ XML успешно распарсен: {result}")
+    else:
+        print("  ❌ Не удалось получить OpState")
+    return result
 
 
 
 def get_state_description(state: str) -> str:
-    """Описание состояния платежа"""
+    """Описание State.Code из документации RoboKassa OpStateExt."""
     states = {
-        "1": "Создан",
-        "2": "Ожидает оплаты",
-        "3": "В обработке",
-        "4": "Отменён",
-        "5": "Оплачен",
-        "6": "Возвращён",
-        "7": "Частично возвращён",
+        "5": "Инициализирована, оплата не подтверждена",
+        "10": "Отменена",
+        "20": "HOLD",
+        "50": "Средства получены, зачисление",
+        "60": "Отказ в зачислении, деньги возвращены",
+        "80": "Приостановлена",
+        "100": "Оплачен",
     }
     return states.get(state, f"Неизвестное состояние ({state})")
 

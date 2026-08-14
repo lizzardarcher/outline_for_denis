@@ -1,13 +1,11 @@
 import json
 import traceback
-from datetime import datetime, timedelta
+
+
+from datetime import datetime
 from decimal import Decimal
-import hashlib
 from urllib.parse import urlencode, quote
-import xml.etree.ElementTree as ET
 
-
-import requests
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db import transaction as db_transaction
 from django.urls import reverse
@@ -21,63 +19,30 @@ from django.http import HttpResponse
 
 from apps.payment.robokassa_subscription import (
     extend_telegram_user_subscription,
+    fetch_robokassa_opstate,
     repair_subscription_from_transaction,
     resolve_subscription_days,
+    robokassa_md5,
     set_robokassa_recurring_parent_if_needed,
 )
 from bot.models import TelegramUser, Transaction, IncomeInfo, Logging, Prices, TelegramReferral, ReferralSettings, \
     ReferralTransaction
 
 
-def robokassa_md5(s: str) -> str:
-    return hashlib.md5(s.encode('utf-8')).hexdigest().upper()
-
-
-
 def get_robokassa_payment_info(inv_id: str, merchant_login: str, password_2: str):
     """
-    Получает информацию о платеже через API RoboKassa.
-    Возвращает словарь с данными, включая ID Robox (если доступен).
+    Получает информацию о платеже через OpStateExt (запасной — OpState).
+    State — код состояния (100 = оплачен). RoboxID/OpKey — id операции.
     """
-    url = "https://auth.robokassa.ru/Merchant/WebService/Service.asmx/OpState"
-
-    signature = robokassa_md5(f"{merchant_login}:{inv_id}:{password_2}")
-
-    params = {
-        "MerchantLogin": merchant_login,
-        "InvoiceID": inv_id,
-        "Signature": signature,
-    }
-
-    try:
-        resp = requests.get(url, params=params, timeout=10)
-        resp.raise_for_status()
-
-        # RoboKassa возвращает XML
-        root = ET.fromstring(resp.text)
-
-        result = {}
-        for child in root:
-            result[child.tag] = child.text
-
-        # Проверяем статус
-        if result.get("State") == "5":  # 5 = оплачен
-            # ID Robox может быть в разных полях, зависит от версии API
-            # Обычно это поле "PaymentID" или "TransactionID"
-            robox_id = result.get("PaymentID") or result.get("TransactionID") or result.get("ID")
-            if robox_id:
-                result["RoboxID"] = robox_id
-
-        return result
-
-    except Exception as e:
+    result = fetch_robokassa_opstate(inv_id, merchant_login, password_2)
+    if result is None:
         Logging.objects.create(
             category="payment",
             log_level="WARNING",
-            message=f"[ROBO-BOT] [API] Ошибка получения информации о платеже InvId={inv_id}: {e}",
+            message=f"[ROBO] [API] Не удалось получить OpState InvId={inv_id}",
             datetime=datetime.now(),
         )
-        return None
+    return result
 
 
 def _apply_robokassa_referrals(telegram_user, transaction, amount_value: Decimal) -> None:
@@ -342,204 +307,133 @@ class CreateRobokassaPaymentView(LoginRequiredMixin, View):
             return redirect('profile')
 
 
+def _handle_robokassa_result(
+    request,
+    *,
+    merchant_login: str,
+    password_2: str,
+    payment_system: str,
+    log_prefix: str,
+):
+    """ResultURL: GET или POST. OK{InvId} — только после успешной записи платежа."""
+    all_params = dict(request.POST.items()) if hasattr(request.POST, 'items') else {}
+    all_get_params = dict(request.GET.items()) if hasattr(request.GET, 'items') else {}
+    Logging.objects.create(
+        category="payment",
+        log_level="INFO",
+        message=f"{log_prefix} [Webhook] Все POST параметры: {all_params}, Все GET параметры: {all_get_params}",
+        datetime=datetime.now(),
+    )
+    out_sum = request.POST.get('OutSum') or request.GET.get('OutSum')
+    inv_id = (
+        request.POST.get('InvId') or request.GET.get('InvId')
+        or request.POST.get('InvoiceID') or request.GET.get('InvoiceID')
+    )
+    signature = (request.POST.get('SignatureValue') or request.GET.get('SignatureValue') or '').upper()
+
+    if not out_sum or not inv_id or not signature:
+        return HttpResponse('Bad request', status=400)
+
+    expected = robokassa_md5(f"{out_sum}:{inv_id}:{password_2}")
+    Logging.objects.create(
+        category="payment",
+        log_level="INFO",
+        message=f"{log_prefix} [Webhook] OutSum={out_sum}, InvId={inv_id}, Signature={signature}, Expected={expected}",
+        datetime=datetime.now(),
+    )
+    if signature != expected:
+        return HttpResponse('bad sign', status=403)
+
+    try:
+        inv_id_int = int(inv_id)
+    except ValueError:
+        return HttpResponse('Bad InvId', status=400)
+
+    transaction = Transaction.objects.select_related('user').filter(id=inv_id_int).first()
+    if not transaction:
+        Logging.objects.create(
+            category="payment",
+            log_level="WARNING",
+            message=f"{log_prefix} [Result] Транзакция с id={inv_id_int} не найдена",
+            datetime=datetime.now(),
+        )
+        return HttpResponse(f"OK{inv_id}", content_type='text/plain')
+
+    if transaction.status == 'succeeded':
+        repair_subscription_from_transaction(transaction)
+        return HttpResponse(f"OK{inv_id}", content_type='text/plain')
+
+    telegram_user = transaction.user
+    if not telegram_user:
+        Logging.objects.create(
+            category="payment",
+            log_level="WARNING",
+            message=f"{log_prefix} [Result] У транзакции id={inv_id_int} нет привязанного TelegramUser",
+            datetime=datetime.now(),
+        )
+        return HttpResponse(f"OK{inv_id}", content_type='text/plain')
+
+    try:
+        amount_value = Decimal(out_sum)
+    except Exception:
+        amount_value = transaction.amount
+
+    try:
+        _complete_robokassa_result_payment(
+            transaction=transaction,
+            telegram_user=telegram_user,
+            inv_id=inv_id,
+            amount_value=amount_value,
+            merchant_login=merchant_login,
+            password_2=password_2,
+            payment_system=payment_system,
+            log_prefix=log_prefix,
+        )
+    except Exception:
+        Logging.objects.create(
+            category="payment",
+            log_level="DANGER",
+            message=f"{log_prefix} [Ошибка при обработке ResultURL]\n{traceback.format_exc()}",
+            datetime=datetime.now(),
+            user=telegram_user,
+        )
+        return HttpResponse('processing error', status=500)
+
+    return HttpResponse(f"OK{inv_id}", content_type='text/plain')
+
+
 @method_decorator(csrf_exempt, name='dispatch')
 class RobokassaSiteResultView(View):
-    """
-    ResultURL для RoboKassa.
-    Здесь проверяем подпись, помечаем Transaction как succeeded
-    и продлеваем подписку / считаем реферальные начисления.
-    """
+    """ResultURL для RoboKassa (сайт). Принимает GET и POST."""
+
+    def get(self, request, *args, **kwargs):
+        return self.post(request, *args, **kwargs)
 
     def post(self, request, *args, **kwargs):
-        # Логируем входящие параметры для отладки
-        all_params = dict(request.POST.items()) if hasattr(request.POST, 'items') else {}
-        all_get_params = dict(request.GET.items()) if hasattr(request.GET, 'items') else {}
-        Logging.objects.create(
-            category="payment",
-            log_level="INFO",
-            message=f"[ROBO-SITE] [Webhook] Все POST параметры: {all_params}, Все GET параметры: {all_get_params}",
-            datetime=datetime.now(),
+        return _handle_robokassa_result(
+            request,
+            merchant_login=settings.ROBOKASSA_MERCHANT_LOGIN_SITE,
+            password_2=settings.ROBOKASSA_PASSWORD_2_SITE,
+            payment_system='RoboKassaSite',
+            log_prefix='[ROBO-SITE]',
         )
-        out_sum = request.POST.get('OutSum') or request.GET.get('OutSum')
-        inv_id = request.POST.get('InvId') or request.GET.get('InvId')
-        signature = (request.POST.get('SignatureValue') or request.GET.get('SignatureValue') or '').upper()
-
-        if not out_sum or not inv_id or not signature:
-            return HttpResponse('Bad request', status=400)
-
-        # Подпись для ResultURL: MD5(OutSum:InvId:Password2Site)
-        expected = robokassa_md5(f"{out_sum}:{inv_id}:{settings.ROBOKASSA_PASSWORD_2_SITE}")
-        Logging.objects.create(
-            category="payment",
-            log_level="INFO",
-            message=f"[ROBO-SITE] [Webhook] OutSum={out_sum}, InvId={inv_id}, Signature={signature}, Expected={expected}",
-            datetime=datetime.now(),
-        )
-        if signature != expected:
-            return HttpResponse('bad sign', status=403)
-
-        try:
-            inv_id_int = int(inv_id)
-        except ValueError:
-            return HttpResponse('Bad InvId', status=400)
-
-        transaction = Transaction.objects.select_related('user').filter(id=inv_id_int).first()
-        if not transaction:
-            Logging.objects.create(
-                category="payment",
-                log_level="WARNING",
-                message=f"[ROBO-SITE] [Result] Транзакция с id={inv_id_int} не найдена",
-                datetime=datetime.now(),
-            )
-            return HttpResponse(f"OK{inv_id}", content_type='text/plain')
-
-        if transaction.status == 'succeeded':
-            repair_subscription_from_transaction(transaction)
-            return HttpResponse(f"OK{inv_id}", content_type='text/plain')
-
-        telegram_user = transaction.user
-        if not telegram_user:
-            Logging.objects.create(
-                category="payment",
-                log_level="WARNING",
-                message=f"[ROBO-SITE] [Result] У транзакции id={inv_id_int} нет привязанного TelegramUser",
-                datetime=datetime.now(),
-            )
-            return HttpResponse(f"OK{inv_id}", content_type='text/plain')
-
-        try:
-            amount_value = Decimal(out_sum)
-        except Exception:
-            amount_value = transaction.amount
-
-        try:
-            _complete_robokassa_result_payment(
-                transaction=transaction,
-                telegram_user=telegram_user,
-                inv_id=inv_id,
-                amount_value=amount_value,
-                merchant_login=settings.ROBOKASSA_MERCHANT_LOGIN_SITE,
-                password_2=settings.ROBOKASSA_PASSWORD_2_SITE,
-                payment_system='RoboKassaSite',
-                log_prefix='[ROBO-SITE]',
-            )
-        except Exception:
-            Logging.objects.create(
-                category="payment",
-                log_level="DANGER",
-                message=f"[ROBO-SITE] [Ошибка при обработке ResultURL]\n{traceback.format_exc()}",
-                datetime=datetime.now(),
-                user=telegram_user,
-            )
-        return HttpResponse(f"OK{inv_id}", content_type='text/plain')
 
 
 @method_decorator(csrf_exempt, name='dispatch')
 class RobokassaBotResultView(View):
-    """
-    ResultURL для магазина Robokassa, используемого Telegram-ботом.
-    Здесь:
-      - проверяем подпись (Password2 бота),
-      - помечаем Transaction как succeeded,
-      - продлеваем подписку TelegramUser,
-      - считаем реферальные начисления.
-    """
+    """ResultURL для RoboKassa (бот). Принимает GET и POST."""
+
+    def get(self, request, *args, **kwargs):
+        return self.post(request, *args, **kwargs)
 
     def post(self, request, *args, **kwargs):
-
-        # Логируем ВСЕ параметры для отладки
-        all_params = dict(request.POST.items()) if hasattr(request.POST, 'items') else {}
-        all_get_params = dict(request.GET.items()) if hasattr(request.GET, 'items') else {}
-
-        Logging.objects.create(
-            category="payment",
-            log_level="INFO",
-            message=f"[ROBO-BOT] [Webhook] Все POST параметры: {all_params}, Все GET параметры: {all_get_params}",
-            datetime=datetime.now(),
+        return _handle_robokassa_result(
+            request,
+            merchant_login=settings.ROBOKASSA_MERCHANT_LOGIN_BOT,
+            password_2=settings.ROBOKASSA_PASSWORD_2_BOT,
+            payment_system='RoboKassaBot',
+            log_prefix='[ROBO-BOT]',
         )
-        out_sum = request.POST.get('OutSum') or request.GET.get('OutSum')
-        inv_id = request.POST.get('InvId') or request.GET.get('InvId')
-        signature = (request.POST.get('SignatureValue') or request.GET.get('SignatureValue') or '').upper()
-
-        # Возможные параметры с ID Robox (проверь документацию RoboKassa):
-        robox_id = request.POST.get('PaymentID') or request.GET.get('PaymentID') or \
-                   request.POST.get('MerchantOrderId') or request.GET.get('MerchantOrderId') or \
-                   request.POST.get('RoboxID') or request.GET.get('RoboxID') or \
-                   request.POST.get('TransactionID') or request.GET.get('TransactionID')
-
-        if not out_sum or not inv_id or not signature:
-            return HttpResponse('Bad request', status=400)
-
-        # Подпись для ResultURL бота: MD5(OutSum:InvId:Password2Bot)
-        expected = robokassa_md5(f"{out_sum}:{inv_id}:{settings.ROBOKASSA_PASSWORD_2_BOT}")
-
-        Logging.objects.create(
-            category="payment",
-            log_level="INFO",
-            message=f"[ROBO-BOT] [Webhook] OutSum={out_sum}, InvId={inv_id}, Signature={signature}, Expected={expected}",
-            datetime=datetime.now(),
-        )
-        if signature != expected:
-            return HttpResponse('bad sign', status=403)
-
-        try:
-            inv_id_int = int(inv_id)
-        except ValueError:
-            return HttpResponse('Bad InvId', status=400)
-
-        # Предполагаем, что для бота тоже используешь InvId = Transaction.id
-        transaction = Transaction.objects.select_related('user').filter(id=inv_id_int).first()
-
-        if not transaction:
-            Logging.objects.create(
-                category="payment",
-                log_level="WARNING",
-                message=f"[ROBO-BOT] [Result] Транзакция с id={inv_id_int} не найдена",
-                datetime=datetime.now(),
-            )
-            return HttpResponse(f"OK{inv_id}", content_type='text/plain')
-
-        # Если уже обработано ранее — подтверждаем и при необходимости восстанавливаем подписку
-        if transaction.status == 'succeeded':
-            repair_subscription_from_transaction(transaction)
-            return HttpResponse(f"OK{inv_id}", content_type='text/plain')
-
-        telegram_user = transaction.user  # ForeignKey на TelegramUser
-        if not telegram_user:
-            Logging.objects.create(
-                category="payment",
-                log_level="WARNING",
-                message=f"[ROBO-BOT] [Result] У транзакции id={inv_id_int} нет привязанного TelegramUser",
-                datetime=datetime.now(),
-            )
-            return HttpResponse(f"OK{inv_id}", content_type='text/plain')
-
-        try:
-            amount_value = Decimal(out_sum)
-        except Exception:
-            amount_value = transaction.amount  # fallback
-
-        try:
-            _complete_robokassa_result_payment(
-                transaction=transaction,
-                telegram_user=telegram_user,
-                inv_id=inv_id,
-                amount_value=amount_value,
-                merchant_login=settings.ROBOKASSA_MERCHANT_LOGIN_BOT,
-                password_2=settings.ROBOKASSA_PASSWORD_2_BOT,
-                payment_system='RoboKassaBot',
-                log_prefix='[ROBO-BOT]',
-            )
-        except Exception:
-            Logging.objects.create(
-                category="payment",
-                log_level="DANGER",
-                message=f"[ROBO-BOT] [Ошибка при обработке ResultURL]\n{traceback.format_exc()}",
-                datetime=datetime.now(),
-                user=telegram_user,
-            )
-        # Обязательный ответ RoboKassa
-        return HttpResponse(f"OK{inv_id}", content_type='text/plain')
 
 
 class RobokassaSuccessView(TemplateView):

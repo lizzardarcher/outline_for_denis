@@ -1,21 +1,157 @@
 """
-Общая логика подписки и защиты от повторного рекуррентного списания RoboKassa.
+Общая логика подписки, OpState и защиты от повторного рекуррентного списания RoboKassa.
 Используется в Celery-задачах и ResultURL views.
 """
+from __future__ import annotations
+
+import hashlib
+import xml.etree.ElementTree as ET
 from datetime import timedelta
 from decimal import Decimal
+from typing import Optional
 
+import requests
 from django.conf import settings
 from django.utils import timezone
 
 from bot.models import Prices, TelegramUser, Transaction
 
-ROBOKASSA_RECURRING_PENDING_HOURS = getattr(settings, 'ROBOKASSA_RECURRING_PENDING_HOURS', 72)
+ROBOKASSA_OPSTATE_EXT_URL = 'https://auth.robokassa.ru/Merchant/WebService/Service.asmx/OpStateExt'
+ROBOKASSA_OPSTATE_URL = 'https://auth.robokassa.ru/Merchant/WebService/Service.asmx/OpState'
+
+# https://docs.robokassa.ru/ru/xml-interfaces — State.Code
+ROBOKASSA_PAID_STATE_CODES = frozenset({'50', '100'})
+ROBOKASSA_CANCELED_STATE_CODES = frozenset({'10', '60'})
+ROBOKASSA_PENDING_STATE_CODES = frozenset({'5', '20', '80'})
+
 ROBOKASSA_RECURRING_COOLDOWN_DAYS = getattr(settings, 'ROBOKASSA_RECURRING_COOLDOWN_DAYS', 3)
 
 RECURRING_CHARGE = 'charge'
 RECURRING_SKIP = 'skip'
 RECURRING_REPAIR_AND_SKIP = 'repair_and_skip'
+
+
+def robokassa_md5(s: str) -> str:
+    return hashlib.md5(s.encode('utf-8')).hexdigest().upper()
+
+
+def _xml_local_name(tag: str) -> str:
+    if not tag:
+        return ''
+    return tag.split('}')[-1]
+
+
+def _xml_find_child(parent, local_name: str):
+    if parent is None:
+        return None
+    for child in parent:
+        if _xml_local_name(child.tag) == local_name:
+            return child
+    return None
+
+
+def _xml_child_text(parent, local_name: str) -> str:
+    child = _xml_find_child(parent, local_name)
+    if child is None:
+        return ''
+    return (child.text or '').strip()
+
+
+def parse_robokassa_opstate_xml(xml_text) -> dict:
+    """
+    Разбор ответа OpState / OpStateExt (вложенный XML + namespace).
+
+    Возвращает плоский dict: ResultCode, State, OutSum, OpKey, PaymentID, RoboxID.
+    State — это State/Code (100 = оплачен, 5 = ещё не оплачен).
+
+    RoboKassa часто отдаёт UTF-8 BOM. requests при неверной charset декодирует BOM
+    как 'ï»¿' — оба варианта снимаем до парсинга.
+    """
+    if not xml_text:
+        return {}
+    if isinstance(xml_text, bytes):
+        text = xml_text.decode('utf-8-sig')
+    else:
+        text = xml_text
+        if text.startswith('\ufeff'):
+            text = text.lstrip('\ufeff')
+        # BOM, ошибочно декодированный как latin-1/cp1252
+        if text.startswith('ï»¿'):
+            text = text[3:]
+
+    root = ET.fromstring(text)
+    result_el = _xml_find_child(root, 'Result')
+    state_el = _xml_find_child(root, 'State')
+    info_el = _xml_find_child(root, 'Info')
+
+    result_code = _xml_child_text(result_el, 'Code')
+    state_code = _xml_child_text(state_el, 'Code')
+    if not state_code and state_el is not None:
+        state_code = (state_el.text or '').strip()
+
+    op_key = _xml_child_text(info_el, 'OpKey')
+    payment_id = (
+        _xml_child_text(info_el, 'PaymentID')
+        or _xml_child_text(info_el, 'TransactionID')
+        or _xml_child_text(root, 'PaymentID')
+        or op_key
+    )
+    parsed = {
+        'ResultCode': result_code,
+        'State': state_code,
+        'OutSum': _xml_child_text(info_el, 'OutSum'),
+        'OpKey': op_key,
+        'PaymentID': payment_id,
+        'IncSum': _xml_child_text(info_el, 'IncSum'),
+        'IncCurrLabel': _xml_child_text(info_el, 'IncCurrLabel'),
+    }
+    if payment_id:
+        parsed['RoboxID'] = payment_id
+    return parsed
+
+
+def classify_robokassa_opstate(parsed: Optional[dict]) -> str:
+    """paid | canceled | pending | error | unknown"""
+    if not parsed:
+        return 'error'
+    result_code = str(parsed.get('ResultCode') or '').strip()
+    if result_code and result_code != '0':
+        return 'error'
+    state = str(parsed.get('State') or '').strip()
+    if state in ROBOKASSA_PAID_STATE_CODES:
+        return 'paid'
+    if state in ROBOKASSA_CANCELED_STATE_CODES:
+        return 'canceled'
+    if state in ROBOKASSA_PENDING_STATE_CODES or not state:
+        return 'pending'
+    return 'unknown'
+
+
+def fetch_robokassa_opstate(
+    inv_id: str,
+    merchant_login: str,
+    password_2: str,
+    timeout: int = 15,
+) -> Optional[dict]:
+    """Запрос OpStateExt, при сетевой/HTTP ошибке — запасной OpState."""
+    signature = robokassa_md5(f"{merchant_login}:{inv_id}:{password_2}")
+    params = {
+        'MerchantLogin': merchant_login,
+        'InvoiceID': str(inv_id),
+        'Signature': signature,
+    }
+    for url in (ROBOKASSA_OPSTATE_EXT_URL, ROBOKASSA_OPSTATE_URL):
+        try:
+            resp = requests.get(url, params=params, timeout=timeout)
+            resp.raise_for_status()
+            # content + utf-8-sig: RoboKassa BOM ломает resp.text при неверном charset
+            parsed = parse_robokassa_opstate_xml(resp.content)
+            if parsed:
+                return parsed
+        except Exception:
+            continue
+    return None
+
 
 def resolve_subscription_days(amount_value: Decimal) -> int:
     prices = Prices.objects.get(pk=1)
@@ -119,13 +255,12 @@ def verify_robokassa_recurring_parent(user: TelegramUser, parent_inv: str, payme
 
 
 def _has_pending_recurring_charge(user: TelegramUser, payment_system: str) -> bool:
-    cutoff = timezone.now() - timedelta(hours=ROBOKASSA_RECURRING_PENDING_HOURS)
+    """Любой незакрытый рекуррент блокирует новое списание, без TTL."""
     return Transaction.objects.filter(
         user=user,
         payment_system=payment_system,
         status='pending',
         paid=False,
-        timestamp__gte=cutoff,
         robokassa_recurring_previous_inv_id__isnull=False,
     ).exclude(robokassa_recurring_previous_inv_id='').exists()
 

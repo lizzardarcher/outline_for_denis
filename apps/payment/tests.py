@@ -12,6 +12,13 @@ from bot.models import (
     TelegramUser, Transaction, IncomeInfo, Logging, Prices,
     TelegramReferral, ReferralSettings, ReferralTransaction, UserProfile
 )
+
+
+from apps.payment.robokassa_subscription import (
+    classify_robokassa_opstate,
+    parse_robokassa_opstate_xml,
+    robokassa_md5 as subscription_robokassa_md5,
+)
 from apps.payment.views.robokassa import (
     robokassa_md5,
     CreateRobokassaPaymentView,
@@ -265,6 +272,12 @@ class RobokassaSiteResultViewTest(TestCase):
             side='Приход средств',
             description='Тестовая транзакция',
         )
+        opstate_patcher = patch(
+            'apps.payment.views.robokassa.get_robokassa_payment_info',
+            return_value=None,
+        )
+        self.addCleanup(opstate_patcher.stop)
+        opstate_patcher.start()
         
 
     @patch('apps.payment.views.robokassa.settings.ROBOKASSA_PASSWORD_2_SITE', 'test_password_2')
@@ -312,6 +325,44 @@ class RobokassaSiteResultViewTest(TestCase):
         self.assertEqual(self.telegram_user.subscription_status, True)
         self.assertGreater(self.telegram_user.subscription_expiration, datetime.now().date())
         print("  ✓ Подписка активирована")
+
+    @patch('apps.payment.views.robokassa.settings.ROBOKASSA_PASSWORD_2_SITE', 'test_password_2')
+    def test_result_webhook_accepts_get(self):
+        out_sum = "500.00"
+        inv_id = str(self.transaction.id)
+        signature = robokassa_md5(f"{out_sum}:{inv_id}:test_password_2")
+        response = self.client.get(
+            reverse('robokassa_result_site'),
+            {
+                'OutSum': out_sum,
+                'InvId': inv_id,
+                'SignatureValue': signature,
+            },
+            secure=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.content.decode(), f"OK{inv_id}")
+        self.transaction.refresh_from_db()
+        self.assertEqual(self.transaction.status, 'succeeded')
+
+    @patch('apps.payment.views.robokassa._complete_robokassa_result_payment', side_effect=RuntimeError('boom'))
+    @patch('apps.payment.views.robokassa.settings.ROBOKASSA_PASSWORD_2_SITE', 'test_password_2')
+    def test_result_webhook_processing_error_does_not_ack(self, _mock_complete):
+        out_sum = "500.00"
+        inv_id = str(self.transaction.id)
+        signature = robokassa_md5(f"{out_sum}:{inv_id}:test_password_2")
+        response = self.client.post(
+            reverse('robokassa_result_site'),
+            {
+                'OutSum': out_sum,
+                'InvId': inv_id,
+                'SignatureValue': signature,
+            },
+            secure=True,
+        )
+        self.assertEqual(response.status_code, 500)
+        self.transaction.refresh_from_db()
+        self.assertEqual(self.transaction.status, 'pending')
 
     @patch('apps.payment.views.robokassa.settings.ROBOKASSA_PASSWORD_2_SITE', 'test_password_2')
     def test_result_webhook_invalid_signature(self):
@@ -713,6 +764,12 @@ class RobokassaReferralTest(TestCase):
             side='Приход средств',
             description='Тестовая транзакция',
         )
+        opstate_patcher = patch(
+            'apps.payment.views.robokassa.get_robokassa_payment_info',
+            return_value=None,
+        )
+        self.addCleanup(opstate_patcher.stop)
+        opstate_patcher.start()
 
     @patch('apps.payment.views.robokassa.get_robokassa_payment_info')
     @patch('apps.payment.views.robokassa.settings.ROBOKASSA_PASSWORD_2_BOT', 'test_password_2_bot')
@@ -762,246 +819,335 @@ class RobokassaReferralTest(TestCase):
         print("  ✓ ReferralTransaction создана корректно")
 
 
-class GetRobokassaPaymentInfoTest(TestCase):
-    """Тесты для функции получения информации о платеже через API"""
+OPSTATE_PAID_XML = '''<?xml version="1.0" encoding="utf-8"?>
+<OperationStateResponse xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://merchant.roboxchange.com/WebService/">
+  <Result>
+    <Code>0</Code>
+  </Result>
+  <State>
+    <Code>100</Code>
+    <RequestDate>2026-08-13T12:00:00</RequestDate>
+    <StateDate>2026-08-13T12:00:00</StateDate>
+  </State>
+  <Info>
+    <OutSum>500.00</OutSum>
+    <OpKey>479920410</OpKey>
+  </Info>
+</OperationStateResponse>'''
 
-    @patch('apps.payment.views.robokassa.requests.get')
-    def test_get_payment_info_success(self, mock_get):
-        """Проверка успешного получения информации о платеже"""
-        print("\n[TEST] Проверка успешного получения информации о платеже...")
-        # Мокаем XML ответ от RoboKassa
+OPSTATE_INIT_XML = '''<?xml version="1.0" encoding="utf-8"?>
+<OperationStateResponse xmlns="http://merchant.roboxchange.com/WebService/">
+  <Result><Code>0</Code></Result>
+  <State><Code>5</Code></State>
+</OperationStateResponse>'''
+
+
+class ParseRobokassaOpStateTest(TestCase):
+    def test_nested_namespace_paid_state_100(self):
+        parsed = parse_robokassa_opstate_xml(OPSTATE_PAID_XML)
+        self.assertEqual(parsed.get('ResultCode'), '0')
+        self.assertEqual(parsed.get('State'), '100')
+        self.assertEqual(parsed.get('OpKey'), '479920410')
+        self.assertEqual(parsed.get('RoboxID'), '479920410')
+        self.assertEqual(classify_robokassa_opstate(parsed), 'paid')
+
+    def test_state_5_is_pending_not_paid(self):
+        parsed = parse_robokassa_opstate_xml(OPSTATE_INIT_XML)
+        self.assertEqual(parsed.get('State'), '5')
+        self.assertEqual(classify_robokassa_opstate(parsed), 'pending')
+
+    def test_flat_state_fallback(self):
+        parsed = parse_robokassa_opstate_xml(
+            '''<?xml version="1.0" encoding="utf-8"?>
+            <OperationStateResponse>
+                <State>100</State>
+                <PaymentID>111</PaymentID>
+            </OperationStateResponse>'''
+        )
+        self.assertEqual(parsed.get('State'), '100')
+        self.assertEqual(parsed.get('RoboxID'), '111')
+        self.assertEqual(classify_robokassa_opstate(parsed), 'paid')
+
+    def test_canceled_and_error(self):
+        canceled = parse_robokassa_opstate_xml(
+            '''<?xml version="1.0"?><OperationStateResponse xmlns="http://merchant.roboxchange.com/WebService/">
+            <Result><Code>0</Code></Result><State><Code>10</Code></State>
+            </OperationStateResponse>'''
+        )
+        self.assertEqual(classify_robokassa_opstate(canceled), 'canceled')
+        not_found = parse_robokassa_opstate_xml(
+            '''<?xml version="1.0"?><OperationStateResponse xmlns="http://merchant.roboxchange.com/WebService/">
+            <Result><Code>3</Code></Result>
+            </OperationStateResponse>'''
+        )
+        self.assertEqual(classify_robokassa_opstate(not_found), 'error')
+
+    def test_utf8_bom_bytes(self):
+        payload = b'\xef\xbb\xbf' + OPSTATE_PAID_XML.encode('utf-8')
+        parsed = parse_robokassa_opstate_xml(payload)
+        self.assertEqual(parsed.get('State'), '100')
+        self.assertEqual(classify_robokassa_opstate(parsed), 'paid')
+
+    def test_misdecoded_bom_string(self):
+        # requests иногда декодирует BOM как latin-1 → 'ï»¿'
+        payload = 'ï»¿' + OPSTATE_PAID_XML
+        parsed = parse_robokassa_opstate_xml(payload)
+        self.assertEqual(parsed.get('State'), '100')
+
+    @patch('apps.payment.robokassa_subscription.requests.get')
+    def test_get_payment_info_uses_opstate_ext(self, mock_get):
         mock_response = MagicMock()
-        mock_response.text = '''<?xml version="1.0" encoding="utf-8"?>
-        <OperationStateResponse>
-            <State>5</State>
-            <PaymentID>479920410</PaymentID>
-        </OperationStateResponse>'''
+        mock_response.content = b'\xef\xbb\xbf' + OPSTATE_PAID_XML.encode('utf-8')
+        mock_response.text = 'ï»¿' + OPSTATE_PAID_XML  # как бывает у requests
         mock_response.raise_for_status = MagicMock()
         mock_get.return_value = mock_response
-        
-        print("  Запрашиваем информацию о платеже (InvId: 12345)...")
-        result = get_robokassa_payment_info(
-            inv_id='12345',
-            merchant_login='test_merchant',
-            password_2='test_password'
-        )
-        
-        print(f"  Результат получен: {result is not None}")
+        result = get_robokassa_payment_info('12345', 'test_merchant', 'test_password')
         self.assertIsNotNone(result)
-        if result:
-            print(f"  State: {result.get('State')}")
-            print(f"  RoboxID: {result.get('RoboxID')}")
-            self.assertEqual(result.get('State'), '5')
-            self.assertEqual(result.get('RoboxID'), '479920410')
-            print("  ✓ Данные корректны")
-
-    @patch('apps.payment.views.robokassa.requests.get')
-    def test_get_payment_info_api_error(self, mock_get):
-        """Проверка обработки ошибки API"""
-        print("\n[TEST] Проверка обработки ошибки API...")
-        mock_get.side_effect = Exception("API Error")
-        print("  API вызов замокан (исключение: API Error)")
-        
-        print("  Запрашиваем информацию о платеже (InvId: 12345)...")
-        result = get_robokassa_payment_info(
-            inv_id='12345',
-            merchant_login='test_merchant',
-            password_2='test_password'
+        self.assertEqual(result.get('State'), '100')
+        self.assertEqual(result.get('RoboxID'), '479920410')
+        mock_get.assert_called()
+        url = mock_get.call_args[0][0]
+        self.assertIn('OpStateExt', url)
+        params = mock_get.call_args[1]['params']
+        self.assertEqual(params['InvoiceID'], '12345')
+        self.assertEqual(
+            params['Signature'],
+            subscription_robokassa_md5('test_merchant:12345:test_password'),
         )
-        
-        print(f"  Результат: {result}")
+
+    @patch('apps.payment.robokassa_subscription.requests.get')
+    def test_get_payment_info_api_error(self, mock_get):
+        mock_get.side_effect = Exception('API Error')
+        result = get_robokassa_payment_info('12345', 'test_merchant', 'test_password')
         self.assertIsNone(result)
-        print("  ✓ Ошибка обработана корректно (возвращён None)")
 
-    @patch('apps.payment.views.robokassa.requests.get')
-    @patch('apps.payment.views.robokassa.settings.ROBOKASSA_MERCHANT_LOGIN_BOT', 'test_merchant_bot')
-    @patch('apps.payment.views.robokassa.settings.ROBOKASSA_PASSWORD_2_BOT', 'test_password_2_bot')
-    def test_get_payment_info_real_inv_ids(self, mock_get):
-        """Проверка получения информации о платеже для реальных InvId (49021, 49020)"""
-        # Тестовые данные для разных InvId
-        test_cases = [
-            {
-                'inv_id': '49021',
-                'xml_response': '''<?xml version="1.0" encoding="utf-8"?>
-                <OperationStateResponse>
-                    <State>5</State>
-                    <PaymentID>479920410</PaymentID>
-                    <Description>Подписка DomVPN на 3 дн.</Description>
-                </OperationStateResponse>''',
-                'expected_robox_id': '479920410',
-                'expected_state': '5'
-            },
-            {
-                'inv_id': '49020',
-                'xml_response': '''<?xml version="1.0" encoding="utf-8"?>
-                <OperationStateResponse>
-                    <State>5</State>
-                    <PaymentID>479920409</PaymentID>
-                    <Description>Подписка DomVPN на 3 дн.</Description>
-                </OperationStateResponse>''',
-                'expected_robox_id': '479920409',
-                'expected_state': '5'
-            }
-        ]
-        
-        for test_case in test_cases:
-            with self.subTest(inv_id=test_case['inv_id']):
-                # Настраиваем мок для каждого InvId
-                mock_response = MagicMock()
-                mock_response.text = test_case['xml_response']
-                mock_response.raise_for_status = MagicMock()
-                mock_get.return_value = mock_response
-                
-                # Вызываем функцию
-                result = get_robokassa_payment_info(
-                    inv_id=test_case['inv_id'],
-                    merchant_login='test_merchant_bot',
-                    password_2='test_password_2_bot'
-                )
-                
-                # Проверяем результат
-                print(f"    Результат получен: {result is not None}")
-                self.assertIsNotNone(result, f"Результат не должен быть None для InvId {test_case['inv_id']}")
-                
-                if result:
-                    print(f"    State: {result.get('State')} (ожидается: {test_case['expected_state']})")
-                    print(f"    RoboxID: {result.get('RoboxID')} (ожидается: {test_case['expected_robox_id']})")
-                    
-                    self.assertEqual(result.get('State'), test_case['expected_state'], 
-                                   f"State должен быть {test_case['expected_state']} для InvId {test_case['inv_id']}")
-                    self.assertEqual(result.get('RoboxID'), test_case['expected_robox_id'],
-                                   f"RoboxID должен быть {test_case['expected_robox_id']} для InvId {test_case['inv_id']}")
-                    print(f"    ✓ Данные корректны для InvId {test_case['inv_id']}")
-                
-                # Проверяем, что был вызван правильный URL с правильными параметрами
-                mock_get.assert_called()
-                call_args = mock_get.call_args
-                url = call_args[0][0] if call_args[0] else call_args[1].get('url', '')
-                print(f"    URL запроса: {url}")
-                self.assertIn('auth.robokassa.ru', url)
-                
-                # Проверяем параметры запроса
-                if 'params' in call_args[1]:
-                    params = call_args[1]['params']
-                    print(f"    Параметры запроса:")
-                    print(f"      MerchantLogin: {params.get('MerchantLogin')}")
-                    print(f"      InvoiceID: {params.get('InvoiceID')}")
-                    print(f"      Signature: {params.get('Signature')[:20]}...")
-                    
-                    self.assertEqual(params['MerchantLogin'], 'test_merchant_bot')
-                    self.assertEqual(params['InvoiceID'], test_case['inv_id'])
-                    self.assertIn('Signature', params)
-                    print(f"    ✓ Параметры запроса корректны")
 
-    @patch('apps.payment.views.robokassa.requests.get')
-    @patch('apps.payment.views.robokassa.settings.ROBOKASSA_MERCHANT_LOGIN_BOT', 'test_merchant_bot')
-    @patch('apps.payment.views.robokassa.settings.ROBOKASSA_PASSWORD_2_BOT', 'test_password_2_bot')
-    def test_get_payment_info_signature_calculation(self, mock_get):
-        """Проверка правильности расчёта подписи для InvId 49021 и 49020"""
-        print("\n[TEST] Проверка правильности расчёта подписи для InvId 49021 и 49020...")
-        test_inv_ids = ['49021', '49020']
-        
-        merchant_login = 'test_merchant_bot'
-        password_2 = 'test_password_2_bot'
-        
-        for inv_id in test_inv_ids:
-            with self.subTest(inv_id=inv_id):
-                print(f"\n  [SUBTEST] Проверка подписи для InvId: {inv_id}")
-                
-                mock_response = MagicMock()
-                mock_response.text = '''<?xml version="1.0" encoding="utf-8"?>
-                <OperationStateResponse>
-                    <State>5</State>
-                    <PaymentID>479920410</PaymentID>
-                </OperationStateResponse>'''
-                mock_response.raise_for_status = MagicMock()
-                mock_get.return_value = mock_response
-                
-                # Вызываем функцию
-                get_robokassa_payment_info(
-                    inv_id=inv_id,
-                    merchant_login=merchant_login,
-                    password_2=password_2
-                )
-                
-                # Проверяем, что подпись была рассчитана правильно
-                call_args = mock_get.call_args
-                if 'params' in call_args[1]:
-                    params = call_args[1]['params']
-                    signature_string = f"{merchant_login}:{inv_id}:{password_2}"
-                    expected_signature = robokassa_md5(signature_string)
-                    actual_signature = params['Signature']
-                    
-                    print(f"    Строка для подписи: {signature_string}")
-                    print(f"    Ожидаемая подпись: {expected_signature}")
-                    print(f"    Фактическая подпись: {actual_signature}")
-                    
-                    self.assertEqual(actual_signature, expected_signature,
-                                   f"Подпись должна быть рассчитана правильно для InvId {inv_id}")
-                    print(f"    ✓ Подпись рассчитана корректно")
+class RobokassaPendingCheckTest(TestCase):
+    def setUp(self):
+        self.telegram_user = TelegramUser.objects.create(
+            user_id=123456789,
+            username='testuser',
+            first_name='Test',
+            subscription_status=False,
+        )
+        IncomeInfo.objects.create(id=1, total_amount=Decimal('0.00'))
+        Prices.objects.create(
+            id=1, price_1=500, price_2=1400, price_3=2500, price_4=4500, price_5=25
+        )
+        ReferralSettings.objects.create(
+            id=1,
+            level_1_percentage=10,
+            level_2_percentage=5,
+            level_3_percentage=3,
+            level_4_percentage=2,
+            level_5_percentage=1,
+        )
+        self.transaction = Transaction.objects.create(
+            status='pending',
+            paid=False,
+            amount=Decimal('500'),
+            user=self.telegram_user,
+            currency='RUB',
+            income_info=IncomeInfo.objects.get(pk=1),
+            side='Приход средств',
+            description='Рекуррентный платёж (RoboKassa BOT)',
+            payment_system='RoboKassaBot',
+            robokassa_invoice_id='12345',
+            robokassa_recurring_previous_inv_id='100',
+        )
+        self.transaction.robokassa_invoice_id = str(self.transaction.id)
+        self.transaction.save(update_fields=['robokassa_invoice_id'])
 
-    @patch('apps.payment.views.robokassa.requests.get')
-    @patch('apps.payment.views.robokassa.settings.ROBOKASSA_MERCHANT_LOGIN_BOT', 'test_merchant_bot')
-    @patch('apps.payment.views.robokassa.settings.ROBOKASSA_PASSWORD_2_BOT', 'test_password_2_bot')
-    def test_get_payment_info_different_states(self, mock_get):
-        """Проверка обработки разных состояний платежа для InvId 49021 и 49020"""
-        print("\n[TEST] Проверка обработки разных состояний платежа для InvId 49021 и 49020...")
-        test_cases = [
-            {
-                'inv_id': '49021',
-                'state': '5',  # Оплачен
-                'should_have_robox_id': True
-            },
-            {
-                'inv_id': '49020',
-                'state': '3',  # В обработке
-                'should_have_robox_id': False
-            }
-        ]
-        
-        for test_case in test_cases:
-            with self.subTest(inv_id=test_case['inv_id'], state=test_case['state']):
-                mock_response = MagicMock()
-                if test_case['should_have_robox_id']:
-                    mock_response.text = f'''<?xml version="1.0" encoding="utf-8"?>
-                    <OperationStateResponse>
-                        <State>{test_case['state']}</State>
-                        <PaymentID>479920410</PaymentID>
-                    </OperationStateResponse>'''
-                else:
-                    mock_response.text = f'''<?xml version="1.0" encoding="utf-8"?>
-                    <OperationStateResponse>
-                        <State>{test_case['state']}</State>
-                    </OperationStateResponse>'''
-                mock_response.raise_for_status = MagicMock()
-                mock_get.return_value = mock_response
-                
-                print(f"\n  [SUBTEST] InvId: {test_case['inv_id']}, State: {test_case['state']}")
-                if test_case['should_have_robox_id']:
-                    print("    Ожидается RoboxID в ответе")
-                else:
-                    print("    RoboxID не ожидается в ответе")
-                
-                result = get_robokassa_payment_info(
-                    inv_id=test_case['inv_id'],
-                    merchant_login='test_merchant_bot',
-                    password_2='test_password_2_bot'
-                )
-                
-                print(f"    Результат получен: {result is not None}")
-                self.assertIsNotNone(result)
-                if result:
-                    print(f"    State: {result.get('State')}")
-                    print(f"    RoboxID: {result.get('RoboxID')}")
-                    self.assertEqual(result.get('State'), test_case['state'])
-                    
-                    if test_case['should_have_robox_id']:
-                        self.assertIn('RoboxID', result)
-                        self.assertIsNotNone(result.get('RoboxID'))
-                        print("    ✓ RoboxID присутствует")
-                    else:
-                        # Для состояния != 5, RoboxID может отсутствовать
-                        print("    ✓ RoboxID отсутствует (как и ожидалось)")
-                    pass
+    def _run_pending_check(self):
+        from apps.payment.tasks import _check_robokassa_pending_transactions
+
+        _check_robokassa_pending_transactions(
+            payment_system='RoboKassaBot',
+            merchant_login='test_merchant_bot',
+            password_2='test_password_2_bot',
+            source_label='BOT/ROBO',
+        )
+
+    @patch('apps.payment.tasks.fetch_robokassa_opstate')
+    def test_pending_check_closes_paid_state_100(self, mock_fetch):
+        mock_fetch.return_value = {
+            'ResultCode': '0',
+            'State': '100',
+            'RoboxID': '479920410',
+            'OpKey': '479920410',
+        }
+        self._run_pending_check()
+        self.transaction.refresh_from_db()
+        self.telegram_user.refresh_from_db()
+        self.assertEqual(self.transaction.status, 'succeeded')
+        self.assertTrue(self.transaction.paid)
+        self.assertEqual(self.transaction.payment_id, '479920410')
+        self.assertTrue(self.telegram_user.subscription_status)
+
+    @patch('apps.payment.tasks.fetch_robokassa_opstate')
+    def test_pending_check_does_not_close_state_5(self, mock_fetch):
+        mock_fetch.return_value = {'ResultCode': '0', 'State': '5'}
+        self._run_pending_check()
+        self.transaction.refresh_from_db()
+        self.telegram_user.refresh_from_db()
+        self.assertEqual(self.transaction.status, 'pending')
+        self.assertFalse(self.telegram_user.subscription_status)
+
+    @patch('apps.payment.tasks.fetch_robokassa_opstate')
+    def test_pending_check_cancels_state_10(self, mock_fetch):
+        mock_fetch.return_value = {'ResultCode': '0', 'State': '10'}
+        self._run_pending_check()
+        self.transaction.refresh_from_db()
+        self.assertEqual(self.transaction.status, 'canceled')
+        self.assertFalse(self.transaction.paid)
+
+
+class RobokassaRecurringChargeGuardTest(TestCase):
+    def setUp(self):
+        self.user = TelegramUser.objects.create(
+            user_id=555,
+            username='recurring',
+            first_name='Recurring',
+            subscription_status=False,
+            subscription_expiration=timezone.now().date() - timedelta(days=1),
+            robokassa_recurring_parent_inv_id='100',
+            permission_revoked=False,
+        )
+        IncomeInfo.objects.create(id=1, total_amount=Decimal('0.00'))
+        Prices.objects.create(
+            id=1, price_1=500, price_2=1400, price_3=2500, price_4=4500, price_5=25
+        )
+        ReferralSettings.objects.create(
+            id=1,
+            level_1_percentage=10,
+            level_2_percentage=5,
+            level_3_percentage=3,
+            level_4_percentage=2,
+            level_5_percentage=1,
+        )
+        self.parent = Transaction.objects.create(
+            status='succeeded',
+            paid=True,
+            amount=Decimal('500'),
+            user=self.user,
+            currency='RUB',
+            income_info=IncomeInfo.objects.get(pk=1),
+            side='Приход средств',
+            payment_system='RoboKassaBot',
+            robokassa_invoice_id='100',
+            robokassa_is_recurring_parent=True,
+            timestamp=timezone.now() - timedelta(days=40),
+        )
+        Transaction.objects.filter(pk=self.parent.pk).update(
+            timestamp=timezone.now() - timedelta(days=40),
+        )
+
+    def test_old_pending_blocks_new_charge(self):
+        from apps.payment.robokassa_subscription import (
+            RECURRING_SKIP,
+            evaluate_robokassa_recurring_charge,
+        )
+
+        pending = Transaction.objects.create(
+            status='pending',
+            paid=False,
+            amount=Decimal('500'),
+            user=self.user,
+            currency='RUB',
+            income_info=IncomeInfo.objects.get(pk=1),
+            side='Приход средств',
+            payment_system='RoboKassaBot',
+            robokassa_invoice_id='200',
+            robokassa_recurring_previous_inv_id='100',
+        )
+        Transaction.objects.filter(pk=pending.pk).update(
+            timestamp=timezone.now() - timedelta(hours=80),
+        )
+        action, reason = evaluate_robokassa_recurring_charge(self.user, 'RoboKassaBot')
+        self.assertEqual(action, RECURRING_SKIP)
+        self.assertEqual(reason, 'есть pending рекуррент')
+
+    @patch('apps.payment.tasks.fetch_robokassa_opstate')
+    @patch('apps.payment.tasks.post_robokassa_bot_recurring_invoice')
+    def test_ok_and_state_100_closes_immediately(self, mock_post, mock_fetch):
+        from apps.payment.tasks import _run_robokassa_recurring
+
+        mock_post.return_value = (True, 'OK')
+        mock_fetch.return_value = {
+            'ResultCode': '0',
+            'State': '100',
+            'RoboxID': 'op-1',
+            'OpKey': 'op-1',
+        }
+        _run_robokassa_recurring(
+            channel='BOT',
+            payment_system='RoboKassaBot',
+            merchant_login='login',
+            password_1='p1',
+            password_2='p2',
+            is_test=False,
+            recurring_description='Рекуррентный платёж (RoboKassa BOT)',
+            success_log_message='отправлен успешно',
+        )
+        tx = Transaction.objects.filter(
+            user=self.user,
+            robokassa_recurring_previous_inv_id='100',
+        ).latest('id')
+        self.user.refresh_from_db()
+        self.assertEqual(tx.status, 'succeeded')
+        self.assertTrue(self.user.subscription_status)
+        mock_post.assert_called_once()
+
+    @patch('apps.payment.tasks.fetch_robokassa_opstate')
+    @patch('apps.payment.tasks.post_robokassa_bot_recurring_invoice')
+    def test_timeout_keeps_pending_and_does_not_retry(self, mock_post, mock_fetch):
+        from apps.payment.robokassa_subscription import (
+            RECURRING_SKIP,
+            evaluate_robokassa_recurring_charge,
+        )
+        from apps.payment.tasks import _run_robokassa_recurring
+
+        mock_post.return_value = (None, 'timeout: read timed out')
+        mock_fetch.return_value = {'ResultCode': '0', 'State': '5'}
+        _run_robokassa_recurring(
+            channel='BOT',
+            payment_system='RoboKassaBot',
+            merchant_login='login',
+            password_1='p1',
+            password_2='p2',
+            is_test=False,
+            recurring_description='Рекуррентный платёж (RoboKassa BOT)',
+            success_log_message='отправлен успешно',
+        )
+        txs = Transaction.objects.filter(
+            user=self.user,
+            robokassa_recurring_previous_inv_id='100',
+            status='pending',
+        )
+        self.assertEqual(txs.count(), 1)
+        mock_post.assert_called_once()
+
+        action, reason = evaluate_robokassa_recurring_charge(self.user, 'RoboKassaBot')
+        self.assertEqual(action, RECURRING_SKIP)
+        self.assertEqual(reason, 'есть pending рекуррент')
+
+        _run_robokassa_recurring(
+            channel='BOT',
+            payment_system='RoboKassaBot',
+            merchant_login='login',
+            password_1='p1',
+            password_2='p2',
+            is_test=False,
+            recurring_description='Рекуррентный платёж (RoboKassa BOT)',
+            success_log_message='отправлен успешно',
+        )
+        self.assertEqual(mock_post.call_count, 1)
+        self.assertEqual(
+            Transaction.objects.filter(
+                user=self.user,
+                robokassa_recurring_previous_inv_id='100',
+            ).count(),
+            1,
+        )
 
 
