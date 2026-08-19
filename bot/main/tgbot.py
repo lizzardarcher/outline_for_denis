@@ -1419,9 +1419,23 @@ async def callback_query_handlers(call):
         except:
             ...
 
-if __name__ == '__main__':
+# if __name__ == '__main__':
+#     bot.add_custom_filter(asyncio_filters.StateFilter(bot))
+#     loop = asyncio.get_event_loop()
+#     loop.create_task(send_pending_messages())  # MAILING
+#     loop.create_task(bot.polling(non_stop=True, request_timeout=100, timeout=100, skip_pending=True))  # TELEGRAM BOT
+#     loop.run_forever()
+async def main():
     bot.add_custom_filter(asyncio_filters.StateFilter(bot))
-    loop = asyncio.get_event_loop()
-    loop.create_task(send_pending_messages())  # MAILING
-    loop.create_task(bot.polling(non_stop=True, request_timeout=100, timeout=100, skip_pending=True))  # TELEGRAM BOT
-    loop.run_forever()
+
+    await asyncio.gather(
+        send_pending_messages(),
+        bot.infinity_polling(
+            timeout=30,
+            request_timeout=60,
+            skip_pending=True,
+        ),
+    )
+
+if __name__ == "__main__":
+    asyncio.run(main())

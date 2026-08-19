@@ -239,7 +239,7 @@ class CreateNewKeyView(LoginRequiredMixin, View):
             Logging.objects.create(
                 category="web",
                 log_level=" FATAL",
-                message=f"[WEB] [ошибка создания ключа] [{protocol}] [{traceback.format_exc()}]",
+                message=f"[WEB] [ошибка создания ключа] [{protocol}]",
                 datetime=datetime.now(),
                 user=user,
             )
