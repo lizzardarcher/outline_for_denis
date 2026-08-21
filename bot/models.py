@@ -303,7 +303,7 @@ class Server(models.Model):
     created_at = models.DateField(auto_now_add=True, verbose_name='Дата создания')
     country = models.ForeignKey('Country', on_delete=models.CASCADE, null=True, blank=True, verbose_name='Страна')
     is_activated_vless = models.BooleanField(editable=True, default=False,
-                                             verbose_name='MarzBan')
+                                             verbose_name='Панель Vless/SS')
     is_pasarguard_activated = models.BooleanField(
         editable=True,
         default=False,
@@ -313,7 +313,7 @@ class Server(models.Model):
     is_c3celeryty_activated = models.BooleanField(
         editable=True,
         default=False,
-        verbose_name='C3 Celeryty',
+        verbose_name='Панель C3 Celeryty',
         help_text='Нода Hysteria2 в панели C3 Celeryty настроена и готова к выдаче ключей.',
     )
     hysteria_tls_sni = models.CharField(

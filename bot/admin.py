@@ -720,7 +720,7 @@ class ServerAdmin(BaseAdmin):
     list_display_links = ('hosting',)
     fields = (
         'hosting', 'ip_address', 'user', 'password', 'rental_price', 'max_keys', 'is_active', 'country',
-        'created_at', 'panels_active',
+        'created_at', 'panels_active', 'is_activated_vless',
         'hysteria_tls_sni', 'hysteria_pin_sha256', 'hysteria_cert_synced_at',
     )
     readonly_fields = ('max_keys', 'created_at', 'panels_active', 'hysteria_cert_synced_at')
