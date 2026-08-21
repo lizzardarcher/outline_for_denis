@@ -27,6 +27,28 @@ class TelegramUser(models.Model):
         verbose_name='RoboKassa InvId материнского счёта (рекуррент)',
         help_text='Успешный платёж с Recurring=true; для автосписаний — PreviousInvoiceID.',
     )
+
+    cloudpayments_token = models.CharField(
+        max_length=255,
+        blank=True,
+        default='',
+        verbose_name='CloudPayments Token',
+        help_text='Токен карты для tokens/charge (не путать с payment_method_id ЮKassa).',
+    )
+    cloudpayments_account_id = models.CharField(
+        max_length=255,
+        blank=True,
+        default='',
+        verbose_name='CloudPayments AccountId',
+        help_text='Стабильный AccountId в CP, обычно tg:{user_id}.',
+    )
+    cloudpayments_channel = models.CharField(
+        max_length=16,
+        blank=True,
+        default='',
+        verbose_name='CloudPayments канал',
+        help_text='bot или site — какой терминал/секрет использовать для рекуррента.',
+    )
     permission_revoked = models.BooleanField(default=False, verbose_name='Самостоятельно отменил автоплатёж')
     next_payment_date = models.DateField(default=None, blank=True, null=True, verbose_name='Следующее списание')
     special_offer = models.ForeignKey('ReferralSpecialOffer', default=None, null=True, blank=True, db_index=True, on_delete=models.SET_NULL, related_name='special_offers', verbose_name='Специальные проценты')
@@ -171,6 +193,8 @@ PAYMENT_SYSTEM = (
     ('RoboKassaSite', 'Робокасса Сайт'),
     ('CryptoBotBot', 'Криптобот Бот'),
     ('CryptoBotSite', 'Криптобот Сайт'),
+    ('CloudPaymentsBot', 'CloudPayments Бот'),
+    ('CloudPaymentsSite', 'CloudPayments Сайт'),
 )
 
 

@@ -1049,6 +1049,100 @@ async def callback_query_handlers(call):
                                     reply_markup=markup.start(user=user),
                                 )
 
+
+                        elif 'cloudpayments' in data:
+                            from apps.payment.cloudpayments_common import (
+                                default_account_id,
+                                is_cloudpayments_allowed_telegram_user,
+                            )
+                            from apps.payment.views.cloudpayments import make_bot_widget_token
+
+                            if not is_cloudpayments_allowed_telegram_user(user):
+                                await edit_screen(
+                                    call,
+                                    "CloudPayments временно недоступен.",
+                                    reply_markup=markup.start(user=user),
+                                )
+                            else:
+                                price = None
+                                days = None
+                                prices = Prices.objects.get(pk=1)
+
+                                if data[-1] == '1':
+                                    price = prices.price_1
+                                    days = 31
+                                elif data[-1] == '2':
+                                    price = prices.price_2
+                                    days = 93
+                                elif data[-1] == '3':
+                                    price = prices.price_3
+                                    days = 186
+                                elif data[-1] == '4':
+                                    price = prices.price_4
+                                    days = 366
+                                elif data[-1] == '3_days_trial':
+                                    price = prices.price_5
+                                    days = 3
+
+                                try:
+                                    amount_decimal = Decimal(str(price))
+                                    if not (user.cloudpayments_account_id or '').strip():
+                                        user.cloudpayments_account_id = default_account_id(user)
+                                        user.save(update_fields=['cloudpayments_account_id'])
+
+                                    transaction = Transaction.objects.create(
+                                        status='pending',
+                                        paid=False,
+                                        amount=amount_decimal,
+                                        user=user,
+                                        currency='RUB',
+                                        income_info=IncomeInfo.objects.get(pk=1),
+                                        side='Приход средств',
+                                        description=f'Приобретение подписки (CloudPayments BOT, {days} дн.)',
+                                        payment_system='CloudPaymentsBot',
+                                    )
+                                    token = make_bot_widget_token(transaction.id, user.user_id)
+                                    pay_url = f"{SITE_DOMAIN}/payment/bot/cloudpayments/widget/{token}/"
+
+                                    Logging.objects.create(
+                                        category="payment",
+                                        log_level="INFO",
+                                        message=f'[BOT] [CloudPayments] [Платёж tx={transaction.id} на {amount_decimal} р.]',
+                                        datetime=datetime.now(),
+                                        user=user,
+                                    )
+
+                                    payment_markup = InlineKeyboardMarkup()
+                                    payment_markup.add(
+                                        InlineKeyboardButton(
+                                            text=f'💳 Оплатить подписку {str(days)} дн. за {str(price)}р.',
+                                            url=pay_url,
+                                        )
+                                    )
+                                    payment_markup.add(
+                                        InlineKeyboardButton(
+                                            text='Договор оферты',
+                                            url=f'{SITE_DOMAIN}/oferta/',
+                                        )
+                                    )
+                                    payment_markup.add(
+                                        InlineKeyboardButton(text='🔙 Назад', callback_data='back')
+                                    )
+                                    await edit_screen(
+                                        call,
+                                        f"Для оплаты подписки на {days} дн. нажмите Оплатить "
+                                        f"(откроется защищённая форма CloudPayments):",
+                                        reply_markup=payment_markup,
+                                    )
+                                    _schedule_payment_followup(call, user)
+                                except Exception as e:
+                                    await edit_screen(
+                                        call,
+                                        f"Произошла ошибка при оформлении подписки через CloudPayments. "
+                                        f"Попробуйте позже. {e}",
+                                        reply_markup=markup.start(user=user),
+                                    )
+
                         elif 'cryptobot' in data:
                             # Создание платежа через CryptoBot (бот-магазин)
                             price = None
@@ -1173,6 +1267,8 @@ async def callback_query_handlers(call):
                                                datetime=datetime.now(), user=user)
                         user.payment_method_id = None
                         user.robokassa_recurring_parent_inv_id = ''
+                        user.cloudpayments_token = ''
+                        user.cloudpayments_channel = ''
                         user.permission_revoked = True
                         user.save()
                         revoke_all_user_keys(user, reason="manual_cancel_bot")
@@ -1272,7 +1368,11 @@ async def callback_query_handlers(call):
                     income = user.income
                     sub = str(user.subscription_expiration.strftime(
                         "%d.%m.%Y")) if user.subscription_status else 'Нет подписки'
-                    active = '📌  <b>Подписка:</b> ✅' if user.payment_method_id else ''
+                    active = '📌  <b>Подписка:</b> ✅' if (
+                        user.payment_method_id
+                        or (user.robokassa_recurring_parent_inv_id or '').strip()
+                        or (user.cloudpayments_token or '').strip()
+                    ) else ''
 
                     await edit_screen(
                         call,

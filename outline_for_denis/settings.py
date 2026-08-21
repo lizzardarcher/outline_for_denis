@@ -100,6 +100,20 @@ CRYPTOBOT_ASSET_SITE = os.getenv("CRYPTOBOT_ASSET_SITE", "USDT")
 CRYPTOBOT_ASSET_BOT = os.getenv("CRYPTOBOT_ASSET_BOT", "USDT")
 
 
+CLOUDPAYMENTS_PUBLIC_ID_BOT = os.getenv("CLOUDPAYMENTS_PUBLIC_ID_BOT")
+CLOUDPAYMENTS_API_SECRET_BOT = os.getenv("CLOUDPAYMENTS_API_SECRET_BOT")
+CLOUDPAYMENTS_PUBLIC_ID_SITE = os.getenv("CLOUDPAYMENTS_PUBLIC_ID_SITE")
+CLOUDPAYMENTS_API_SECRET_SITE = os.getenv("CLOUDPAYMENTS_API_SECRET_SITE")
+CLOUDPAYMENTS_IS_TEST = os.getenv("CLOUDPAYMENTS_IS_TEST", "true").lower() in ("1", "true", "yes")
+CLOUDPAYMENTS_API_BASE = os.getenv("CLOUDPAYMENTS_API_BASE", "https://api.cloudpayments.ru")
+# На этапе теста кнопка CloudPayments только для этих username (Django / Telegram).
+CLOUDPAYMENTS_TEST_USERNAMES = tuple(
+    u.strip().lower()
+    for u in os.getenv("CLOUDPAYMENTS_TEST_USERNAMES", "megafoll").split(",")
+    if u.strip()
+)
+
+
 INSTALLED_APPS = [
     'outline_for_denis.apps.OutlineForDenisConfig',
     'jazzmin',

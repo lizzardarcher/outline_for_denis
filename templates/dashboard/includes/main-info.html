@@ -238,6 +238,16 @@
                                             disabled>
                                         Робокасса (Банковская карта)
                                     </button>
+
+                                    {% if request.user.username|lower == 'megafoll' %}
+                                    <button type="button"
+                                            class="btn btn-primary btn-md choose-payment-system mt-2"
+                                            id="payCloudPaymentsButton"
+                                            data-payment-url="{% url 'create_payment_cloudpayments' %}"
+                                            disabled>
+                                        CloudPayments (Банковская карта)
+                                    </button>
+                                    {% endif %}
                                 </div>
                             </div>
                         </div>

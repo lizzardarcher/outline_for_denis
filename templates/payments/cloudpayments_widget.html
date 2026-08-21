@@ -1,0 +1,131 @@
+
+{% load static %}
+
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Оплата DomVPN — CloudPayments</title>
+    <script src="https://widget.cloudpayments.ru/bundles/cloudpayments.js"></script>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            background: #0f1419;
+            color: #e7ecf1;
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .box {
+            max-width: 420px;
+            padding: 2rem;
+            text-align: center;
+        }
+        .box h1 { font-size: 1.25rem; margin-bottom: 0.5rem; }
+        .box p { color: #9aa7b5; font-size: 0.95rem; }
+        .amount { font-size: 1.75rem; font-weight: 600; margin: 1rem 0; }
+        button {
+            background: #2f6fed;
+            color: #fff;
+            border: 0;
+            border-radius: 8px;
+            padding: 0.85rem 1.5rem;
+            font-size: 1rem;
+            cursor: pointer;
+        }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+        .hint { margin-top: 1rem; font-size: 0.8rem; color: #6b7785; }
+        .err { color: #f07178; margin-top: 1rem; }
+    </style>
+</head>
+<body>
+<div class="box">
+    <h1>Оплата подписки DomVPN</h1>
+    <p id="desc"></p>
+    <div class="amount"><span id="amountLabel"></span> ₽</div>
+    <button type="button" id="payButton">Оплатить картой</button>
+    <p class="hint">Карта сохранится для автопродления. После успешной оплаты можно вернуться в бот или кабинет.</p>
+    <p class="err" id="errorBox" hidden></p>
+</div>
+{{ widget_config|json_script:"cp-widget-config" }}
+<script>
+(function () {
+    const cfg = JSON.parse(document.getElementById("cp-widget-config").textContent);
+    const btn = document.getElementById("payButton");
+    const errorBox = document.getElementById("errorBox");
+    document.getElementById("desc").textContent = cfg.description;
+    document.getElementById("amountLabel").textContent = cfg.amount;
+
+    function showError(msg) {
+        errorBox.hidden = false;
+        errorBox.textContent = msg || "Ошибка оплаты";
+    }
+
+    if (!cfg.publicTerminalId) {
+        btn.disabled = true;
+        showError("CloudPayments не настроен (нет Public ID). Добавьте ключи в .env.");
+        return;
+    }
+
+    btn.addEventListener("click", function () {
+        btn.disabled = true;
+        const widget = new cp.CloudPayments();
+        const intentParams = {
+            publicTerminalId: cfg.publicTerminalId,
+            description: cfg.description,
+            paymentSchema: "Single",
+            currency: cfg.currency,
+            culture: "ru-RU",
+            amount: cfg.amount,
+            externalId: cfg.externalId,
+            tokenize: true,
+            emailBehavior: "Optional",
+            receiptEmail: cfg.email,
+            userInfo: {
+                accountId: cfg.accountId,
+                email: cfg.email
+            },
+            receipt: {
+                items: [{
+                    label: cfg.description,
+                    price: cfg.amount,
+                    quantity: 1.00,
+                    amount: cfg.amount,
+                    vat: null,
+                    method: 0,
+                    object: 4
+                }],
+                email: cfg.email,
+                amounts: {
+                    electronic: cfg.amount,
+                    advancePayment: 0.00,
+                    credit: 0.00,
+                    provision: 0.00
+                }
+            },
+            successRedirectUrl: cfg.successUrl,
+            failRedirectUrl: cfg.failUrl
+        };
+
+        widget.start(intentParams).then(function (result) {
+            if (result && result.status === "success") {
+                window.location.href = cfg.successUrl;
+                return;
+            }
+            btn.disabled = false;
+            if (result && result.type === "cancel") {
+                return;
+            }
+            showError((result && result.message) || "Оплата не завершена");
+        }).catch(function (err) {
+            btn.disabled = false;
+            showError((err && err.message) || String(err));
+        });
+    });
+})();
+</script>
+</body>
+</html>

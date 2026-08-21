@@ -183,6 +183,16 @@ def payment_menu(payment_type: str, user):
         )
     )
 
+
+    from apps.payment.cloudpayments_common import is_cloudpayments_allowed_telegram_user
+    if is_cloudpayments_allowed_telegram_user(user):
+        markup.add(
+            InlineKeyboardButton(
+                text='CloudPayments (Банковская карта)',
+                callback_data=f'account:payment:cloudpayments:{payment_type}'
+            )
+        )
+
     # markup.add(
     #     InlineKeyboardButton(
     #         text='Криптовалюта (USDT, TON)',

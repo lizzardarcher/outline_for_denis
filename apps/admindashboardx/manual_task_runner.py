@@ -3,6 +3,11 @@ from .models import ManualTaskLog, ManualTaskRun
 from .task_run_logging import TaskRunLogger
 from .ukassa_recurring import run_ukassa_bot_recurring, run_ukassa_site_recurring
 
+from .cloudpayments_recurring import (
+    run_cloudpayments_bot_recurring,
+    run_cloudpayments_site_recurring,
+)
+
 _TASK_RUNNERS = {
     "ukassa_bot_attempt_recurring_payment": (
         lambda logger, dry_run: run_ukassa_bot_recurring(logger, dry_run=dry_run),
@@ -10,6 +15,14 @@ _TASK_RUNNERS = {
     ),
     "ukassa_site_attempt_recurring_payment": (
         lambda logger, dry_run: run_ukassa_site_recurring(logger, dry_run=dry_run),
+        "SITE",
+    ),
+    "cloudpayments_bot_attempt_recurring_payment": (
+        lambda logger, dry_run: run_cloudpayments_bot_recurring(logger, dry_run=dry_run),
+        "BOT",
+    ),
+    "cloudpayments_site_attempt_recurring_payment": (
+        lambda logger, dry_run: run_cloudpayments_site_recurring(logger, dry_run=dry_run),
         "SITE",
     ),
 }

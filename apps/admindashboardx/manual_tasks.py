@@ -22,5 +22,24 @@ MANUAL_TASKS = {
         "celery_task_name": "apps.admindashboardx.tasks.manual_ukassa_site_attempt_recurring_payment",
         "supports_dry_run": True,
     },
+
+    "cloudpayments_bot_attempt_recurring_payment": {
+        "title": "CloudPayments Bot — рекуррентное списание",
+        "description": (
+            "Списание по токену CloudPayments (канал bot) у пользователей с неактивной подпиской."
+        ),
+        "icon": "bi-credit-card",
+        "celery_task_name": "apps.admindashboardx.tasks.manual_cloudpayments_bot_attempt_recurring_payment",
+        "supports_dry_run": True,
+    },
+    "cloudpayments_site_attempt_recurring_payment": {
+        "title": "CloudPayments Site — рекуррентное списание",
+        "description": (
+            "Списание по токену CloudPayments (канал site) у пользователей с неактивной подпиской."
+        ),
+        "icon": "bi-credit-card-2-front",
+        "celery_task_name": "apps.admindashboardx.tasks.manual_cloudpayments_site_attempt_recurring_payment",
+        "supports_dry_run": True,
+    },
 }
 

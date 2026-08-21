@@ -1,5 +1,6 @@
 from django.urls import path
-from .views import ukassa, robokassa, cryptobot, report
+from .views import ukassa, robokassa, cryptobot, report, cloudpayments
+
 
 
 urlpatterns = [
@@ -24,6 +25,53 @@ urlpatterns = [
     path('bot/cryptobot/webhook/', cryptobot.CryptoBotBotWebhookView.as_view(), name='cryptobot_bot_webhook'),
     path('site/cryptobot/success/', cryptobot.CryptoBotSuccessView.as_view(), name='cryptobot_success'),
     path('site/cryptobot/fail/', cryptobot.CryptoBotFailView.as_view(), name='cryptobot_fail'),
+
+    # CLOUDPAYMENTS
+    path(
+        'create-payment-cloudpayments/',
+        cloudpayments.CreateCloudPaymentsPaymentView.as_view(),
+        name='create_payment_cloudpayments',
+    ),
+    path(
+        'site/cloudpayments/widget/',
+        cloudpayments.CloudPaymentsSiteWidgetView.as_view(),
+        name='cloudpayments_widget_site',
+    ),
+    path(
+        'bot/cloudpayments/widget/<str:token>/',
+        cloudpayments.CloudPaymentsBotWidgetView.as_view(),
+        name='cloudpayments_widget_bot',
+    ),
+    path(
+        'site/cloudpayments/check/',
+        cloudpayments.CloudPaymentsSiteCheckView.as_view(),
+        name='cloudpayments_check_site',
+    ),
+    path(
+        'site/cloudpayments/pay/',
+        cloudpayments.CloudPaymentsSitePayView.as_view(),
+        name='cloudpayments_pay_site',
+    ),
+    path(
+        'site/cloudpayments/fail/',
+        cloudpayments.CloudPaymentsSiteFailView.as_view(),
+        name='cloudpayments_fail_site',
+    ),
+    path(
+        'bot/cloudpayments/check/',
+        cloudpayments.CloudPaymentsBotCheckView.as_view(),
+        name='cloudpayments_check_bot',
+    ),
+    path(
+        'bot/cloudpayments/pay/',
+        cloudpayments.CloudPaymentsBotPayView.as_view(),
+        name='cloudpayments_pay_bot',
+    ),
+    path(
+        'bot/cloudpayments/fail/',
+        cloudpayments.CloudPaymentsBotFailView.as_view(),
+        name='cloudpayments_fail_bot',
+    ),
 
     # RESULT EXCEL
     path('export/transactions/xlsx/', report.TransactionExcelExportView.as_view(), name='export_transactions_xlsx'),

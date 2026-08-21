@@ -318,6 +318,7 @@ class ReferralTransactionAdmin(BaseAdmin):
         return False
 
 
+
 @admin.register(TelegramUser)
 class TelegramUserAdmin(admin.ModelAdmin):
     list_display = (
@@ -328,7 +329,7 @@ class TelegramUserAdmin(admin.ModelAdmin):
     search_fields = ('first_name', 'last_name', 'username', 'user_id')
     fieldsets = ([
         ('Основная информация', {'fields': ['join_date','first_name','last_name','username','user_id','photo_url', ],}),
-        ('Подписка', {'fields': ['is_banned','subscription_expiration','subscription_status','payment_method_id','robokassa_recurring_parent_inv_id','permission_revoked',],}),
+        ('Подписка', {'fields': ['is_banned','subscription_expiration','subscription_status','payment_method_id','robokassa_recurring_parent_inv_id','cloudpayments_token','cloudpayments_account_id','cloudpayments_channel','permission_revoked',],}),
         ('Реферальная программа', {'fields':['income', 'special_offer']})
     ])
     readonly_fields = ('join_date', 'first_name', 'last_name', 'username', 'user_id')

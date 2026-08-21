@@ -148,10 +148,13 @@ class ManageMtProxyView(LoginRequiredMixin, View):
 
 class CancelSubscriptionView(LoginRequiredMixin, TemplateView):
 
+
     def get(self, request, *args, **kwargs):
         user = TelegramUser.objects.filter(user_id=self.request.user.profile.telegram_user.user_id).first()
         user.payment_method_id = None
         user.robokassa_recurring_parent_inv_id = ''
+        user.cloudpayments_token = ''
+        user.cloudpayments_channel = ''
         user.permission_revoked = True
         user.save()
         revoke_all_user_keys(user, reason="manual_cancel_site")

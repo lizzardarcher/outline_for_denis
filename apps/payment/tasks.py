@@ -54,6 +54,25 @@ def ukassa_site_attempt_recurring_payment():
     return run_ukassa_site_recurring(TaskRunLogger(channel="SITE"))
 
 
+
+@shared_task
+def cloudpayments_bot_attempt_recurring_payment():
+    """Периодическая задача — логика в apps.admindashboardx.cloudpayments_recurring."""
+    from apps.admindashboardx.task_run_logging import TaskRunLogger
+    from apps.admindashboardx.cloudpayments_recurring import run_cloudpayments_bot_recurring
+
+    return run_cloudpayments_bot_recurring(TaskRunLogger(channel="BOT"))
+
+
+@shared_task
+def cloudpayments_site_attempt_recurring_payment():
+    """Периодическая задача — логика в apps.admindashboardx.cloudpayments_recurring."""
+    from apps.admindashboardx.task_run_logging import TaskRunLogger
+    from apps.admindashboardx.cloudpayments_recurring import run_cloudpayments_site_recurring
+
+    return run_cloudpayments_site_recurring(TaskRunLogger(channel="SITE"))
+
+
 def _fetch_payment_from_yookassa(payment_id: str, shop_id: str, secret_key: str, timeout: int = 10):
     """
     Получает данные платежа через HTTP API ЮKassa.
