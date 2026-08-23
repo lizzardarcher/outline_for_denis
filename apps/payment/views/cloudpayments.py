@@ -177,6 +177,7 @@ class CloudPaymentsSiteWidgetView(LoginRequiredMixin, View):
         return render(request, "payments/cloudpayments_widget.html", ctx)
 
 
+
 class CloudPaymentsBotWidgetView(View):
     """Страница виджета для оплаты из Telegram (signed token)."""
 
