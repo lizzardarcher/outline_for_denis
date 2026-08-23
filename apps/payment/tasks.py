@@ -1,5 +1,3 @@
-
-
 from __future__ import annotations
 
 import json
@@ -13,7 +11,11 @@ from django.conf import settings
 from django.db import transaction as db_transaction
 from django.utils import timezone
 from yookassa import Payment, Configuration
-
+from apps.admindashboardx.task_run_logging import TaskRunLogger
+from apps.admindashboardx.cloudpayments_recurring import run_cloudpayments_site_recurring
+from apps.admindashboardx.cloudpayments_recurring import run_cloudpayments_bot_recurring
+from apps.admindashboardx.ukassa_recurring import run_ukassa_site_recurring
+from apps.admindashboardx.ukassa_recurring import run_ukassa_bot_recurring
 
 from apps.payment.robokassa_subscription import (
     RECURRING_CHARGE,
@@ -39,8 +41,6 @@ YOOKASSA_API_BASE = "https://api.yookassa.ru/v3/payments"
 @shared_task
 def ukassa_bot_attempt_recurring_payment():
     """Периодическая задача — логика в apps.admindashboardx.ukassa_recurring."""
-    from apps.admindashboardx.task_run_logging import TaskRunLogger
-    from apps.admindashboardx.ukassa_recurring import run_ukassa_bot_recurring
 
     return run_ukassa_bot_recurring(TaskRunLogger(channel="BOT"))
 
@@ -48,18 +48,13 @@ def ukassa_bot_attempt_recurring_payment():
 @shared_task
 def ukassa_site_attempt_recurring_payment():
     """Периодическая задача — логика в apps.admindashboardx.ukassa_recurring."""
-    from apps.admindashboardx.task_run_logging import TaskRunLogger
-    from apps.admindashboardx.ukassa_recurring import run_ukassa_site_recurring
 
     return run_ukassa_site_recurring(TaskRunLogger(channel="SITE"))
-
 
 
 @shared_task
 def cloudpayments_bot_attempt_recurring_payment():
     """Периодическая задача — логика в apps.admindashboardx.cloudpayments_recurring."""
-    from apps.admindashboardx.task_run_logging import TaskRunLogger
-    from apps.admindashboardx.cloudpayments_recurring import run_cloudpayments_bot_recurring
 
     return run_cloudpayments_bot_recurring(TaskRunLogger(channel="BOT"))
 
@@ -67,8 +62,6 @@ def cloudpayments_bot_attempt_recurring_payment():
 @shared_task
 def cloudpayments_site_attempt_recurring_payment():
     """Периодическая задача — логика в apps.admindashboardx.cloudpayments_recurring."""
-    from apps.admindashboardx.task_run_logging import TaskRunLogger
-    from apps.admindashboardx.cloudpayments_recurring import run_cloudpayments_site_recurring
 
     return run_cloudpayments_site_recurring(TaskRunLogger(channel="SITE"))
 
@@ -246,7 +239,8 @@ def _process_payment_data(payment_data: dict, transaction: Transaction, telegram
                                    message=f'[{source_label}] [Неизвестный статус при опросе] [status={event_status}] [payment_id={transaction.payment_id}]',
                                    datetime=timezone.now())
     except Exception:
-        Logging.objects.create(category="payment", log_level="DANGER", message=f'{traceback.format_exc()}', datetime=timezone.now())
+        Logging.objects.create(category="payment", log_level="DANGER", message=f'{traceback.format_exc()}',
+                               datetime=timezone.now())
 
 
 @shared_task(bind=True)
@@ -258,7 +252,8 @@ def ukassa_check_pending_bot(self):
     shop_id = getattr(settings, "YOOKASSA_SHOP_ID_BOT", None)
     secret = getattr(settings, "YOOKASSA_SECRET_BOT", None)
     if not shop_id or not secret:
-        Logging.objects.create(category="payment", log_level="DANGER", message='[BOT] YOOKASSA credentials not configured',
+        Logging.objects.create(category="payment", log_level="DANGER",
+                               message='[BOT] YOOKASSA credentials not configured',
                                datetime=timezone.now())
         return
 
@@ -293,7 +288,8 @@ def ukassa_check_pending_site(self):
     shop_id = getattr(settings, "YOOKASSA_SHOP_ID_SITE", None)
     secret = getattr(settings, "YOOKASSA_SECRET_SITE", None)
     if not shop_id or not secret:
-        Logging.objects.create(category="payment", log_level="DANGER", message='[WEB] YOOKASSA credentials not configured',
+        Logging.objects.create(category="payment", log_level="DANGER",
+                               message='[WEB] YOOKASSA credentials not configured',
                                datetime=timezone.now())
         return
 
@@ -493,14 +489,13 @@ def _apply_robokassa_success(transaction: Transaction, amount_value: Decimal, so
     )
 
 
-
 def _reconcile_robokassa_pending_transaction(
-    transaction: Transaction,
-    *,
-    merchant_login: str,
-    password_2: str,
-    source_label: str,
-    log_missing: bool = True,
+        transaction: Transaction,
+        *,
+        merchant_login: str,
+        password_2: str,
+        source_label: str,
+        log_missing: bool = True,
 ) -> str:
     """
     Сверяет pending-транзакцию с OpState.
@@ -536,38 +531,38 @@ def _reconcile_robokassa_pending_transaction(
         transaction.status = 'canceled'
         transaction.paid = False
         transaction.save(update_fields=['status', 'paid'])
-        Logging.objects.create(
-            category="payment",
-            log_level="WARNING",
-            message=(
-                f'[{source_label}] [pending-check] Отменён InvId={inv_id} '
-                f'State={state} ResultCode={result_code}'
-            ),
-            datetime=timezone.now(),
-            user=transaction.user,
-        )
-    elif kind == 'error' and log_missing:
-        Logging.objects.create(
-            category="payment",
-            log_level="WARNING",
-            message=(
-                f'[{source_label}] [pending-check] Ошибка OpState InvId={inv_id} '
-                f'ResultCode={result_code} State={state}'
-            ),
-            datetime=timezone.now(),
-            user=transaction.user,
-        )
-    elif kind == 'unknown':
-        Logging.objects.create(
-            category="payment",
-            log_level="WARNING",
-            message=(
-                f'[{source_label}] [pending-check] Неизвестный State={state} '
-                f'InvId={inv_id} ResultCode={result_code}'
-            ),
-            datetime=timezone.now(),
-            user=transaction.user,
-        )
+        # Logging.objects.create(
+        #     category="payment",
+        #     log_level="WARNING",
+        #     message=(
+        #         f'[{source_label}] [pending-check] Отменён InvId={inv_id} '
+        #         f'State={state} ResultCode={result_code}'
+        #     ),
+        #     datetime=timezone.now(),
+        #     user=transaction.user,
+        # )
+    # elif kind == 'error' and log_missing:
+        # Logging.objects.create(
+        #     category="payment",
+        #     log_level="WARNING",
+        #     message=(
+        #         f'[{source_label}] [pending-check] Ошибка OpState InvId={inv_id} '
+        #         f'ResultCode={result_code} State={state}'
+        #     ),
+        #     datetime=timezone.now(),
+        #     user=transaction.user,
+        # )
+    # elif kind == 'unknown':
+    #     Logging.objects.create(
+    #         category="payment",
+    #         log_level="WARNING",
+    #         message=(
+    #             f'[{source_label}] [pending-check] Неизвестный State={state} '
+    #             f'InvId={inv_id} ResultCode={result_code}'
+    #         ),
+    #         datetime=timezone.now(),
+    #         user=transaction.user,
+    #     )
     return kind
 
 
@@ -583,8 +578,8 @@ def _check_robokassa_pending_transactions(*, payment_system: str, merchant_login
     ).filter(
         Q(timestamp__gte=lookback)
         | (
-            Q(robokassa_recurring_previous_inv_id__isnull=False)
-            & ~Q(robokassa_recurring_previous_inv_id='')
+                Q(robokassa_recurring_previous_inv_id__isnull=False)
+                & ~Q(robokassa_recurring_previous_inv_id='')
         )
     ).select_related('user')
 
@@ -597,14 +592,14 @@ def _check_robokassa_pending_transactions(*, payment_system: str, merchant_login
                 password_2=password_2,
                 source_label=source_label,
             )
-        except Exception:
-            Logging.objects.create(
-                category="payment",
-                log_level="DANGER",
-                message=f'[{source_label}] [pending-check] Ошибка InvId={inv_id}\n{traceback.format_exc()}',
-                datetime=timezone.now(),
-                user=transaction.user if getattr(transaction, "user", None) else None,
-            )
+        except Exception:...
+            # Logging.objects.create(
+            #     category="payment",
+            #     log_level="DANGER",
+            #     message=f'[{source_label}] [pending-check] Ошибка InvId={inv_id}\n{traceback.format_exc()}',
+            #     datetime=timezone.now(),
+            #     user=transaction.user if getattr(transaction, "user", None) else None,
+            # )
 
 
 @shared_task(bind=True)
@@ -650,15 +645,15 @@ def robokassa_check_pending_site(self):
 
 
 def _run_robokassa_recurring(
-    *,
-    channel: str,
-    payment_system: str,
-    merchant_login: str,
-    password_1: str,
-    password_2: str,
-    is_test: bool,
-    recurring_description: str,
-    success_log_message: str,
+        *,
+        channel: str,
+        payment_system: str,
+        merchant_login: str,
+        password_1: str,
+        password_2: str,
+        is_test: bool,
+        recurring_description: str,
+        success_log_message: str,
 ):
     """
     Рекуррент RoboKassa: сначала commit pending-транзакции, затем POST /Merchant/Recurring.

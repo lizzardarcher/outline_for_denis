@@ -33,14 +33,14 @@ class TelegramUser(models.Model):
         blank=True,
         default='',
         verbose_name='CloudPayments Token',
-        help_text='Токен карты для tokens/charge (не путать с payment_method_id ЮKassa).',
+        help_text='Токен карты для tokens/charge (не payment_method_id ЮKassa).',
     )
     cloudpayments_account_id = models.CharField(
         max_length=255,
         blank=True,
         default='',
         verbose_name='CloudPayments AccountId',
-        help_text='Стабильный AccountId в CP, обычно tg:{user_id}.',
+        help_text='Стабильный AccountId в CP, tg:{user_id}.',
     )
     cloudpayments_channel = models.CharField(
         max_length=16,

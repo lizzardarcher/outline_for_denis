@@ -145,6 +145,7 @@ def _run_channel(channel: str, logger: TaskRunLogger, *, dry_run=False, api_time
     )
 
     amount_to_charge = Decimal(Prices.objects.get(pk=1).price_1)
+    # amount_to_charge = Decimal(1)
     currency = "RUB"
     success = failed = skipped = canceled = 0
 

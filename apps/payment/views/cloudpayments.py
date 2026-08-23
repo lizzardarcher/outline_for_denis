@@ -127,6 +127,7 @@ class CreateCloudPaymentsPaymentView(LoginRequiredMixin, View):
                 status="pending",
                 paid=False,
                 amount=Decimal(str(amount)),
+                # amount=Decimal(str(1)),
                 user=telegram_user,
                 currency="RUB",
                 income_info=IncomeInfo.objects.get(pk=1),
