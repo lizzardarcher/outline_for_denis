@@ -49,7 +49,7 @@ bot = AsyncTeleBot(token=TelegramBot.objects.all().first().token, state_storage=
 bot.parse_mode = 'HTML'
 BOT_USERNAME = settings.BOT_USERNAME
 KEY_LIMIT = settings.KEY_LIMIT
-SITE_DOMAIN = ((getattr(settings, 'DOMAIN', '') or 'https://dom-vpn.su').rstrip('/'))
+SITE_DOMAIN = ((getattr(settings, 'ALIAS_DOMAIN', '') or 'https://dom-vpn.su').rstrip('/'))
 
 
 def update_sub_status(user: TelegramUser):
