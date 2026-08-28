@@ -166,6 +166,11 @@ def resolve_subscription_days(amount_value: Decimal) -> int:
         return 366
     if amount_int == prices.price_5:
         return 3
+    # Для тестирования
+    # if amount_int == 1:
+    #     return 3
+    # if amount_int == 2:
+    #     return 31
     return 0
 
 

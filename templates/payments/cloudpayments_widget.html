@@ -94,7 +94,7 @@
                     price: cfg.amount,
                     quantity: 1.00,
                     amount: cfg.amount,
-                    vat: null,
+                    vat: 0,
                     method: 0,
                     object: 4
                 }],
@@ -109,6 +109,7 @@
             successRedirectUrl: cfg.successUrl,
             failRedirectUrl: cfg.failUrl
         };
+
 
         widget.start(intentParams).then(function (result) {
             if (result && result.status === "success") {

@@ -127,6 +127,7 @@ class CreateCloudPaymentsPaymentView(LoginRequiredMixin, View):
                 status="pending",
                 paid=False,
                 amount=Decimal(str(amount)),
+                # ИЗМЕНИТЬ ЦЕНУ ПОСЛЕ ТЕСТОВ
                 # amount=Decimal(str(1)),
                 user=telegram_user,
                 currency="RUB",
@@ -135,6 +136,7 @@ class CreateCloudPaymentsPaymentView(LoginRequiredMixin, View):
                 description=f"Приобретение подписки (CloudPayments SITE, {days} дн.)",
                 payment_system="CloudPaymentsSite",
             )
+
             if not (telegram_user.cloudpayments_account_id or "").strip():
                 telegram_user.cloudpayments_account_id = default_account_id(telegram_user)
                 telegram_user.save(update_fields=["cloudpayments_account_id"])

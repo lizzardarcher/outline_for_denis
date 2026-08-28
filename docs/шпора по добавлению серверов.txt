@@ -1,0 +1,3 @@
+openssl x509 -in /etc/hysteria/cert.pem -outform DER | sha256sum
+
+sudo bash -c "$(curl -sL https://github.com/Gozargah/Marzban-scripts/raw/master/marzban-node.sh)" @ install

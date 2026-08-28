@@ -76,11 +76,12 @@ def _charge_payload(user, amount, currency, invoice_id: int) -> dict:
                             "price": float(amount),
                             "quantity": 1.0,
                             "amount": float(amount),
-                            "vat": None,
+                            "vat": 0,
                             "method": 0,
                             "object": 4,
                         }
                     ],
+
                     "email": _user_email(user),
                     "amounts": {
                         "electronic": float(amount),
@@ -143,9 +144,9 @@ def _run_channel(channel: str, logger: TaskRunLogger, *, dry_run=False, api_time
         f"[{'DRY-RUN' if dry_run else 'CELERY'}] [{label}] [CloudPayments] [{mode}] "
         f"[кандидатов: {len(users)}]",
     )
-
+    # ИЗМЕНИТЬ ЦЕНУ ПОСЛЕ ТЕСТОВ
     amount_to_charge = Decimal(Prices.objects.get(pk=1).price_1)
-    # amount_to_charge = Decimal(1)
+    # amount_to_charge = Decimal(2)
     currency = "RUB"
     success = failed = skipped = canceled = 0
 

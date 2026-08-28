@@ -231,23 +231,23 @@
 {#                                            disabled>#}
 {#                                        Юкасса (СБП, Банковская карта)#}
 {#                                    </button>#}
+
+                                    {% if request.user.username|lower == 'megafoll' %}
+                                    <button type="button"
+                                            class="btn btn-primary btn-md choose-payment-system mb-2"
+                                            id="payCloudPaymentsButton"
+                                            data-payment-url="{% url 'create_payment_cloudpayments' %}"
+                                            disabled>
+                                        CloudPayments (СБП, Банковская карта)
+                                    </button>
+                                    {% endif %}
                                     <button type="button"
                                             class="btn btn-primary btn-md choose-payment-system"
                                             id="payRobokassaButton"
                                             data-payment-url="{% url 'create_payment_robokassa' %}"
                                             disabled>
-                                        Робокасса (Банковская карта)
+                                        Робокасса (СБП, Банковская карта)
                                     </button>
-
-                                    {% if request.user.username|lower == 'megafoll' %}
-                                    <button type="button"
-                                            class="btn btn-primary btn-md choose-payment-system mt-2"
-                                            id="payCloudPaymentsButton"
-                                            data-payment-url="{% url 'create_payment_cloudpayments' %}"
-                                            disabled>
-                                        CloudPayments (Банковская карта)
-                                    </button>
-                                    {% endif %}
                                 </div>
                             </div>
                         </div>
