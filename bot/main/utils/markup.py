@@ -170,8 +170,7 @@ def payment_menu(payment_type: str, user):
     markup = InlineKeyboardMarkup()
 
 
-    from apps.payment.cloudpayments_common import is_cloudpayments_allowed_telegram_user
-    # if is_cloudpayments_allowed_telegram_user(user):
+
     markup.add(
         InlineKeyboardButton(
             text='CloudPayments (СБП, Банковская карта)',

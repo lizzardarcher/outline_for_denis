@@ -20,14 +20,13 @@ from django.utils.decorators import method_decorator
 from django.views import View
 from django.views.decorators.csrf import csrf_exempt
 
+
 from apps.payment.cloudpayments_common import (
     apply_fail_side_effects,
     apply_successful_pay,
     credentials_for_channel,
     default_account_id,
     find_transaction_by_invoice,
-    is_cloudpayments_allowed_django_user,
-    is_cloudpayments_allowed_telegram_user,
     json_code,
     payment_system_for_channel,
     verify_cloudpayments_hmac,
@@ -104,8 +103,6 @@ class CreateCloudPaymentsPaymentView(LoginRequiredMixin, View):
     """Сайт: создаёт pending Transaction и редиректит на страницу виджета."""
 
     def post(self, request, *args, **kwargs):
-        if not is_cloudpayments_allowed_django_user(request.user):
-            return HttpResponseForbidden("CloudPayments временно недоступен")
         try:
             telegram_user = request.user.profile.telegram_user
             amount, days = _resolve_amount_days(request.POST.get("subscription"))
@@ -163,8 +160,6 @@ class CreateCloudPaymentsPaymentView(LoginRequiredMixin, View):
 
 class CloudPaymentsSiteWidgetView(LoginRequiredMixin, View):
     def get(self, request, *args, **kwargs):
-        if not is_cloudpayments_allowed_django_user(request.user):
-            return HttpResponseForbidden("CloudPayments временно недоступен")
         tx_id = request.GET.get("tx")
         telegram_user = request.user.profile.telegram_user
         transaction = get_object_or_404(
@@ -192,8 +187,6 @@ class CloudPaymentsBotWidgetView(View):
             return HttpResponseForbidden("invalid or expired token")
 
         telegram_user = get_object_or_404(TelegramUser, user_id=payload["uid"])
-        if not is_cloudpayments_allowed_telegram_user(telegram_user):
-            return HttpResponseForbidden("CloudPayments временно недоступен")
 
         transaction = get_object_or_404(
             Transaction,

@@ -47,21 +47,6 @@ REASON_KEEP_TOKEN = frozenset({
 })
 
 
-def cloudpayments_test_usernames():
-    return {u.lower() for u in getattr(settings, "CLOUDPAYMENTS_TEST_USERNAMES", ("megafoll",))}
-
-
-def is_cloudpayments_allowed_django_user(user) -> bool:
-    if not user or not getattr(user, "is_authenticated", False):
-        return False
-    return (user.username or "").lower() in cloudpayments_test_usernames()
-
-
-def is_cloudpayments_allowed_telegram_user(tg_user: Optional[TelegramUser]) -> bool:
-    if not tg_user:
-        return False
-    return (tg_user.username or "").lower() in cloudpayments_test_usernames()
-
 
 def default_account_id(telegram_user: TelegramUser) -> str:
     existing = (telegram_user.cloudpayments_account_id or "").strip()
