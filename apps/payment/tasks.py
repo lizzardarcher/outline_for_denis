@@ -14,6 +14,9 @@ from yookassa import Payment, Configuration
 from apps.admindashboardx.task_run_logging import TaskRunLogger
 from apps.admindashboardx.cloudpayments_recurring import run_cloudpayments_site_recurring
 from apps.admindashboardx.cloudpayments_recurring import run_cloudpayments_bot_recurring
+
+from apps.admindashboardx.cryptocloud_recurring import run_cryptocloud_site_recurring
+from apps.admindashboardx.cryptocloud_recurring import run_cryptocloud_bot_recurring
 from apps.admindashboardx.ukassa_recurring import run_ukassa_site_recurring
 from apps.admindashboardx.ukassa_recurring import run_ukassa_bot_recurring
 
@@ -64,6 +67,20 @@ def cloudpayments_site_attempt_recurring_payment():
     """Периодическая задача — логика в apps.admindashboardx.cloudpayments_recurring."""
 
     return run_cloudpayments_site_recurring(TaskRunLogger(channel="SITE"))
+
+
+@shared_task
+def cryptocloud_bot_attempt_recurring_payment():
+    """Периодическая задача — новый инвойс CryptoCloud + ссылка в Telegram (bot)."""
+
+    return run_cryptocloud_bot_recurring(TaskRunLogger(channel="BOT"))
+
+
+@shared_task
+def cryptocloud_site_attempt_recurring_payment():
+    """Периодическая задача — новый инвойс CryptoCloud + ссылка в Telegram (site)."""
+
+    return run_cryptocloud_site_recurring(TaskRunLogger(channel="SITE"))
 
 
 def _fetch_payment_from_yookassa(payment_id: str, shop_id: str, secret_key: str, timeout: int = 10):
@@ -312,6 +329,22 @@ def ukassa_check_pending_site(self):
             Logging.objects.create(category="payment", log_level="DANGER",
                                    message=f'[WEB] [Ошибка при опросе платежа {str(traceback.format_exc())}] [payment_id={getattr(transaction, "payment_id", None)}]',
                                    datetime=timezone.now())
+
+
+@shared_task(bind=True)
+def cloudpayments_check_pending_bot(self):
+    """Опрос зависших pending CloudPayments (бот): InvoiceId = tx.id, затем TransactionId."""
+    from apps.payment.cloudpayments_common import check_cloudpayments_pending_transactions
+
+    check_cloudpayments_pending_transactions(channel="bot", source_label="BOT/CP")
+
+
+@shared_task(bind=True)
+def cloudpayments_check_pending_site(self):
+    """Опрос зависших pending CloudPayments (сайт): InvoiceId = tx.id, затем TransactionId."""
+    from apps.payment.cloudpayments_common import check_cloudpayments_pending_transactions
+
+    check_cloudpayments_pending_transactions(channel="site", source_label="SITE/CP")
 
 
 ### RoboKassa

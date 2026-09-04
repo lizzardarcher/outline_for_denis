@@ -275,6 +275,9 @@ def _charge_step_prefix(index, total):
 def _bot_skip_reason(user, payment_system_by_pm_id=None):
     if (getattr(user, "robokassa_recurring_parent_inv_id", "") or "").strip():
         return "активна рекуррентная подписка RoboKassa"
+
+    if (getattr(user, "cryptocloud_channel", "") or "").strip():
+        return "активна подписка CryptoCloud"
     if not (len(user.payment_method_id) > 10 and "000" in user.payment_method_id):
         return "payment_method_id не подходит под YooKassa Bot"
     payment_system = _payment_system_for_user(user, payment_system_by_pm_id)
@@ -284,6 +287,8 @@ def _bot_skip_reason(user, payment_system_by_pm_id=None):
 
 
 def _site_skip_reason(user, payment_system_by_pm_id=None):
+    if (getattr(user, "cryptocloud_channel", "") or "").strip():
+        return "активна подписка CryptoCloud"
     if not user.payment_method_id:
         return "нет payment_method_id"
     payment_system = _payment_system_for_user(user, payment_system_by_pm_id)

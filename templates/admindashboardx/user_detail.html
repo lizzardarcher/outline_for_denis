@@ -75,6 +75,8 @@
                         <div class="col-md-3"><strong>Доход:</strong> {{ user_obj.income }}</div>
                         <div class="col-md-3"><strong>Payment method id:</strong> {{ user_obj.payment_method_id|default:"—" }}</div>
                         <div class="col-md-3"><strong>Robo parent InvId:</strong> {{ user_obj.robokassa_recurring_parent_inv_id|default:"—" }}</div>
+
+{#                        <div class="col-md-3"><strong>CryptoCloud канал:</strong> {{ user_obj.cryptocloud_channel|default:"—" }}</div>#}
                         <div class="col-md-12"><strong>Special offer:</strong>
                             {% if user_obj.special_offer %}
                                 L1={{ user_obj.special_offer.level_1_percentage }}%, L2={{ user_obj.special_offer.level_2_percentage }}%, L3={{ user_obj.special_offer.level_3_percentage }}%, L4={{ user_obj.special_offer.level_4_percentage }}%, L5={{ user_obj.special_offer.level_5_percentage }}%

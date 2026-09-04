@@ -8,6 +8,11 @@ from .cloudpayments_recurring import (
     run_cloudpayments_site_recurring,
 )
 
+from .cryptocloud_recurring import (
+    run_cryptocloud_bot_recurring,
+    run_cryptocloud_site_recurring,
+)
+
 _TASK_RUNNERS = {
     "ukassa_bot_attempt_recurring_payment": (
         lambda logger, dry_run: run_ukassa_bot_recurring(logger, dry_run=dry_run),
@@ -23,6 +28,14 @@ _TASK_RUNNERS = {
     ),
     "cloudpayments_site_attempt_recurring_payment": (
         lambda logger, dry_run: run_cloudpayments_site_recurring(logger, dry_run=dry_run),
+        "SITE",
+    ),
+    "cryptocloud_bot_attempt_recurring_payment": (
+        lambda logger, dry_run: run_cryptocloud_bot_recurring(logger, dry_run=dry_run),
+        "BOT",
+    ),
+    "cryptocloud_site_attempt_recurring_payment": (
+        lambda logger, dry_run: run_cryptocloud_site_recurring(logger, dry_run=dry_run),
         "SITE",
     ),
 }

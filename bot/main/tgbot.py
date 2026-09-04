@@ -1132,6 +1132,110 @@ async def callback_query_handlers(call):
                                     reply_markup=markup.start(user=user),
                                 )
 
+
+                        elif 'cryptocloud' in data:
+                            from apps.payment.cryptocloud_common import (
+                                create_invoice,
+                                credentials_for_channel,
+                                is_cryptocloud_allowed_for_user,
+                            )
+
+                            if not is_cryptocloud_allowed_for_user(user):
+                                await edit_screen(
+                                    call,
+                                    "Оплата через CryptoCloud пока недоступна.",
+                                    reply_markup=markup.payment_menu(data[-1], user),
+                                )
+                            else:
+                                price = None
+                                days = None
+                                prices = Prices.objects.get(pk=1)
+
+                                if data[-1] == '1':
+                                    price = prices.price_1
+                                    days = 31
+                                elif data[-1] == '2':
+                                    price = prices.price_2
+                                    days = 93
+                                elif data[-1] == '3':
+                                    price = prices.price_3
+                                    days = 186
+                                elif data[-1] == '4':
+                                    price = prices.price_4
+                                    days = 366
+                                elif data[-1] == '3_days_trial':
+                                    price = prices.price_5
+                                    days = 3
+
+                                try:
+                                    api_key, shop_id, _secret = credentials_for_channel("bot")
+                                    if not api_key or not shop_id:
+                                        raise RuntimeError("CryptoCloud bot: нет API key / shop_id")
+
+                                    amount_decimal = Decimal(str(price))
+                                    transaction = Transaction.objects.create(
+                                        status='pending',
+                                        paid=False,
+                                        amount=amount_decimal,
+                                        user=user,
+                                        currency=getattr(settings, "CRYPTOCLOUD_CURRENCY", "RUB") or "RUB",
+                                        income_info=IncomeInfo.objects.get(pk=1),
+                                        side='Приход средств',
+                                        description=f'Приобретение подписки (CryptoCloud BOT, {days} дн.)',
+                                        payment_system='CryptoCloudBot',
+                                    )
+                                    invoice = create_invoice(
+                                        channel="bot",
+                                        amount=amount_decimal,
+                                        order_id=transaction.id,
+                                    )
+                                    uuid = invoice.get("uuid")
+                                    pay_url = invoice.get("link")
+                                    if uuid:
+                                        transaction.payment_id = str(uuid)
+                                        transaction.save(update_fields=['payment_id'])
+                                    if not pay_url:
+                                        raise RuntimeError("CryptoCloud: нет link в ответе")
+
+                                    Logging.objects.create(
+                                        category="payment",
+                                        log_level="INFO",
+                                        message=f'[BOT] [CryptoCloud] [Платёж tx={transaction.id} uuid={uuid} на {amount_decimal}]',
+                                        datetime=datetime.now(),
+                                        user=user,
+                                    )
+
+                                    payment_markup = InlineKeyboardMarkup()
+                                    payment_markup.add(
+                                        InlineKeyboardButton(
+                                            text=f'💳 Оплатить подписку {str(days)} дн. за {str(price)}р.',
+                                            url=pay_url,
+                                        )
+                                    )
+                                    payment_markup.add(
+                                        InlineKeyboardButton(
+                                            text='Договор оферты',
+                                            url=f'{SITE_DOMAIN}/oferta/',
+                                        )
+                                    )
+                                    payment_markup.add(
+                                        InlineKeyboardButton(text='🔙 Назад', callback_data='back')
+                                    )
+                                    await edit_screen(
+                                        call,
+                                        f"Для оплаты подписки на {days} дн. нажмите Оплатить "
+                                        f"(откроется страница CryptoCloud):",
+                                        reply_markup=payment_markup,
+                                    )
+                                    _schedule_payment_followup(call, user)
+                                except Exception as e:
+                                    await edit_screen(
+                                        call,
+                                        f"Произошла ошибка при оформлении подписки через CryptoCloud. "
+                                        f"Попробуйте позже. {e}",
+                                        reply_markup=markup.start(user=user),
+                                    )
+
                         elif 'cryptobot' in data:
                             # Создание платежа через CryptoBot (бот-магазин)
                             price = None
@@ -1258,6 +1362,7 @@ async def callback_query_handlers(call):
                         user.robokassa_recurring_parent_inv_id = ''
                         user.cloudpayments_token = ''
                         user.cloudpayments_channel = ''
+                        user.cryptocloud_channel = ''
                         user.permission_revoked = True
                         user.save()
                         revoke_all_user_keys(user, reason="manual_cancel_bot")
@@ -1361,6 +1466,7 @@ async def callback_query_handlers(call):
                         user.payment_method_id
                         or (user.robokassa_recurring_parent_inv_id or '').strip()
                         or (user.cloudpayments_token or '').strip()
+                        or (user.cryptocloud_channel or '').strip()
                     ) else ''
 
                     await edit_screen(

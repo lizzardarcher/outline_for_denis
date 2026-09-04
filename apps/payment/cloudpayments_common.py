@@ -1,20 +1,25 @@
 
 """
-Общая логика CloudPayments: HMAC webhooks, AccountId, применение успешного Pay.
+Общая логика CloudPayments: HMAC webhooks, AccountId, применение успешного Pay,
+опрос зависших pending-транзакций.
 """
+
 
 from __future__ import annotations
 
 import base64
 import hashlib
 import hmac
-from datetime import datetime
+import traceback
+from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Optional
 
+import requests
 from django.conf import settings
 from django.db import transaction as db_transaction
 from django.http import JsonResponse
+from django.utils import timezone
 
 from apps.payment.robokassa_subscription import (
     extend_telegram_user_subscription,
@@ -45,6 +50,12 @@ REASON_KEEP_TOKEN = frozenset({
     5051,  # InsufficientFunds
     5006,  # Decline by issuer temporary
 })
+
+CLOUDPAYMENTS_PENDING_LOOKBACK_DAYS = 1
+CLOUDPAYMENTS_PENDING_API_TIMEOUT = 15
+_PAID_STATUSES = frozenset({"Completed"})
+_CANCELED_STATUSES = frozenset({"Declined", "Cancelled", "Canceled"})
+_PENDING_STATUSES = frozenset({"AwaitingAuthentication", "Authorized"})
 
 
 
@@ -240,3 +251,208 @@ def find_transaction_by_invoice(invoice_id: str) -> Optional[Transaction]:
         return Transaction.objects.filter(pk=int(invoice_id)).first()
     except (TypeError, ValueError):
         return Transaction.objects.filter(payment_id=str(invoice_id)).first()
+
+
+def classify_cloudpayments_status(status: str) -> str:
+    """paid | canceled | pending | unknown"""
+    value = (status or "").strip()
+    if value in _PAID_STATUSES:
+        return "paid"
+    if value in _CANCELED_STATUSES:
+        return "canceled"
+    if value in _PENDING_STATUSES:
+        return "pending"
+    return "unknown"
+
+
+def has_pending_cloudpayments_charge(user: TelegramUser, payment_system: str) -> bool:
+    """Свежий pending (виджет или рекуррент) блокирует новое списание."""
+    lookback = timezone.now() - timedelta(days=CLOUDPAYMENTS_PENDING_LOOKBACK_DAYS)
+    return Transaction.objects.filter(
+        user=user,
+        payment_system=payment_system,
+        status="pending",
+        paid=False,
+        timestamp__gte=lookback,
+    ).exists()
+
+
+def _model_from_cp_response(data: Optional[dict]) -> Optional[dict]:
+    if not isinstance(data, dict):
+        return None
+    model = data.get("Model")
+    if isinstance(model, dict) and (model.get("Status") or model.get("TransactionId")):
+        return model
+    return None
+
+
+def _cp_api_post(
+    path: str,
+    payload: dict,
+    public_id: str,
+    api_secret: str,
+    *,
+    timeout: int = CLOUDPAYMENTS_PENDING_API_TIMEOUT,
+) -> Optional[dict]:
+    base = getattr(settings, "CLOUDPAYMENTS_API_BASE", "https://api.cloudpayments.ru").rstrip("/")
+    url = f"{base}{path}"
+    try:
+        response = requests.post(
+            url,
+            json=payload,
+            auth=(public_id, api_secret),
+            headers={"Content-Type": "application/json"},
+            timeout=timeout,
+        )
+        return response.json()
+    except Exception:
+        return None
+
+
+def fetch_cloudpayments_payment(
+    transaction: Transaction,
+    public_id: str,
+    api_secret: str,
+    *,
+    timeout: int = CLOUDPAYMENTS_PENDING_API_TIMEOUT,
+) -> Optional[dict]:
+    """
+    Ищет платёж в CP: сначала /payments/find по InvoiceId=tx.id,
+    затем /payments/get по TransactionId, если payment_id уже известен.
+    """
+    data = _cp_api_post(
+        "/payments/find",
+        {"InvoiceId": str(transaction.id)},
+        public_id,
+        api_secret,
+        timeout=timeout,
+    )
+    model = _model_from_cp_response(data)
+    if model:
+        return model
+
+    payment_id = str(transaction.payment_id or "").strip()
+    if payment_id.isdigit():
+        data = _cp_api_post(
+            "/payments/get",
+            {"TransactionId": int(payment_id)},
+            public_id,
+            api_secret,
+            timeout=timeout,
+        )
+        return _model_from_cp_response(data)
+    return None
+
+
+def reconcile_cloudpayments_pending_transaction(
+    transaction: Transaction,
+    *,
+    public_id: str,
+    api_secret: str,
+    channel: str,
+    source_label: str,
+) -> str:
+    """
+    Сверяет pending-транзакцию с CloudPayments.
+    Возвращает: paid | canceled | pending | error | unknown
+    """
+    model = fetch_cloudpayments_payment(transaction, public_id, api_secret)
+    if not model:
+        return "error"
+
+    kind = classify_cloudpayments_status(model.get("Status") or "")
+    telegram_user = transaction.user
+    log_prefix = f"[{source_label}] [pending-check]"
+    cp_tx_id = model.get("TransactionId")
+
+    if kind == "paid":
+        if not telegram_user:
+            return "error"
+        amount_raw = model.get("Amount") or model.get("PaymentAmount") or transaction.amount
+        try:
+            amount_value = Decimal(str(amount_raw))
+        except Exception:
+            amount_value = Decimal(transaction.amount)
+        apply_successful_pay(
+            transaction=transaction,
+            telegram_user=telegram_user,
+            amount_value=amount_value,
+            payment_id=str(cp_tx_id or transaction.payment_id or transaction.id),
+            token=str(model.get("Token") or ""),
+            channel=channel,
+            log_prefix=log_prefix,
+        )
+        return kind
+
+    if kind == "canceled":
+        if cp_tx_id and not transaction.payment_id:
+            transaction.payment_id = str(cp_tx_id)
+            transaction.save(update_fields=["payment_id"])
+        reason_code = model.get("ReasonCode")
+        if telegram_user:
+            apply_fail_side_effects(
+                telegram_user=telegram_user,
+                reason_code=reason_code,
+                transaction=transaction,
+                log_prefix=log_prefix,
+            )
+        elif transaction.status != "succeeded":
+            transaction.status = "canceled"
+            transaction.paid = False
+            transaction.save(update_fields=["status", "paid"])
+        return kind
+
+    if kind == "unknown":
+        Logging.objects.create(
+            category="payment",
+            log_level="WARNING",
+            message=(
+                f"{log_prefix} Неизвестный Status={model.get('Status')} "
+                f"tx={transaction.id} cp={cp_tx_id}"
+            ),
+            datetime=timezone.now(),
+            user=telegram_user,
+        )
+    return kind
+
+
+def check_cloudpayments_pending_transactions(*, channel: str, source_label: str) -> None:
+    public_id, api_secret = credentials_for_channel(channel)
+    if not public_id or not api_secret:
+        Logging.objects.create(
+            category="payment",
+            log_level="DANGER",
+            message=f"[{source_label}] [pending-check] Не заданы CloudPayments Public ID / API Secret",
+            datetime=timezone.now(),
+        )
+        return
+
+    payment_system = payment_system_for_channel(channel)
+    lookback = timezone.now() - timedelta(days=CLOUDPAYMENTS_PENDING_LOOKBACK_DAYS)
+    pending_qs = Transaction.objects.filter(
+        status="pending",
+        paid=False,
+        payment_system=payment_system,
+        timestamp__gte=lookback,
+    ).select_related("user")
+
+    for transaction in pending_qs:
+        try:
+            reconcile_cloudpayments_pending_transaction(
+                transaction,
+                public_id=public_id,
+                api_secret=api_secret,
+                channel=channel,
+                source_label=source_label,
+            )
+        except Exception:
+            Logging.objects.create(
+                category="payment",
+                log_level="DANGER",
+                message=(
+                    f"[{source_label}] [pending-check] Ошибка tx={transaction.id} "
+                    f"payment_id={transaction.payment_id}\n{traceback.format_exc()}"
+                ),
+                datetime=timezone.now(),
+                user=transaction.user if getattr(transaction, "user", None) else None,
+            )

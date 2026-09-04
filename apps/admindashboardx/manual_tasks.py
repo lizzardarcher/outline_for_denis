@@ -41,5 +41,26 @@ MANUAL_TASKS = {
         "celery_task_name": "apps.admindashboardx.tasks.manual_cloudpayments_site_attempt_recurring_payment",
         "supports_dry_run": True,
     },
+
+    "cryptocloud_bot_attempt_recurring_payment": {
+        "title": "CryptoCloud Bot — рекуррентный инвойс",
+        "description": (
+            "Новый инвойс CryptoCloud (канал bot) и ссылка на оплату в Telegram "
+            "для пользователей с неактивной подпиской."
+        ),
+        "icon": "bi-currency-bitcoin",
+        "celery_task_name": "apps.admindashboardx.tasks.manual_cryptocloud_bot_attempt_recurring_payment",
+        "supports_dry_run": True,
+    },
+    "cryptocloud_site_attempt_recurring_payment": {
+        "title": "CryptoCloud Site — рекуррентный инвойс",
+        "description": (
+            "Новый инвойс CryptoCloud (канал site) и ссылка на оплату в Telegram "
+            "для пользователей с неактивной подпиской."
+        ),
+        "icon": "bi-currency-exchange",
+        "celery_task_name": "apps.admindashboardx.tasks.manual_cryptocloud_site_attempt_recurring_payment",
+        "supports_dry_run": True,
+    },
 }
 

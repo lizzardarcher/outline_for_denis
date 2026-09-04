@@ -49,6 +49,13 @@ class TelegramUser(models.Model):
         verbose_name='CloudPayments канал',
         help_text='bot или site — какой терминал/секрет использовать для рекуррента.',
     )
+    cryptocloud_channel = models.CharField(
+        max_length=16,
+        blank=True,
+        default='',
+        verbose_name='CryptoCloud канал',
+        help_text='bot или site — какой магазин использовать для рекуррентных инвойсов.',
+    )
     permission_revoked = models.BooleanField(default=False, verbose_name='Самостоятельно отменил автоплатёж')
     next_payment_date = models.DateField(default=None, blank=True, null=True, verbose_name='Следующее списание')
     special_offer = models.ForeignKey('ReferralSpecialOffer', default=None, null=True, blank=True, db_index=True, on_delete=models.SET_NULL, related_name='special_offers', verbose_name='Специальные проценты')
@@ -195,6 +202,8 @@ PAYMENT_SYSTEM = (
     ('CryptoBotSite', 'Криптобот Сайт'),
     ('CloudPaymentsBot', 'CloudPayments Бот'),
     ('CloudPaymentsSite', 'CloudPayments Сайт'),
+    ('CryptoCloudBot', 'CryptoCloud Бот'),
+    ('CryptoCloudSite', 'CryptoCloud Сайт'),
 )
 
 
@@ -478,6 +487,7 @@ LOG_CATEGORY = (
     ('admin', 'Админка / служебное'),
     ('other', 'Прочее'),
 )
+
 
 
 class Logging(models.Model):

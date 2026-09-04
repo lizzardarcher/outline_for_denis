@@ -240,6 +240,16 @@
                                             disabled>
                                         CloudPayments (СБП, Банковская карта)
                                     </button>
+
+{#                                    {% if show_cryptocloud_payment %}#}
+{#                                    <button type="button"#}
+{#                                            class="btn btn-primary btn-md choose-payment-system mb-2"#}
+{#                                            id="payCryptoCloudButton"#}
+{#                                            data-payment-url="{% url 'create_payment_cryptocloud' %}"#}
+{#                                            disabled>#}
+{#                                        CryptoCloud (криптовалюта)#}
+{#                                    </button>#}
+                                    {% endif %}
 {#                                    <button type="button"#}
 {#                                            class="btn btn-primary btn-md choose-payment-system"#}
 {#                                            id="payRobokassaButton"#}

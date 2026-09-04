@@ -1,5 +1,6 @@
 from django.urls import path
-from .views import ukassa, robokassa, cryptobot, report, cloudpayments
+
+from .views import ukassa, robokassa, cryptobot, report, cloudpayments, cryptocloud
 
 
 
@@ -71,6 +72,33 @@ urlpatterns = [
         'bot/cloudpayments/fail/',
         cloudpayments.CloudPaymentsBotFailView.as_view(),
         name='cloudpayments_fail_bot',
+    ),
+
+    # CRYPTOCLOUD
+    path(
+        'create-payment-cryptocloud/',
+        cryptocloud.CreateCryptoCloudPaymentView.as_view(),
+        name='create_payment_cryptocloud',
+    ),
+    path(
+        'site/cryptocloud/webhook/',
+        cryptocloud.CryptoCloudSiteWebhookView.as_view(),
+        name='cryptocloud_site_webhook',
+    ),
+    path(
+        'bot/cryptocloud/webhook/',
+        cryptocloud.CryptoCloudBotWebhookView.as_view(),
+        name='cryptocloud_bot_webhook',
+    ),
+    path(
+        'site/cryptocloud/success/',
+        cryptocloud.CryptoCloudSuccessView.as_view(),
+        name='cryptocloud_success',
+    ),
+    path(
+        'site/cryptocloud/fail/',
+        cryptocloud.CryptoCloudFailView.as_view(),
+        name='cryptocloud_fail',
     ),
 
     # RESULT EXCEL

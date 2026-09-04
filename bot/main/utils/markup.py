@@ -8,6 +8,8 @@ from telebot.types import ShippingOption
 import django_orm
 from bot.models import Prices, Country, TelegramUser, Server
 
+from apps.payment.cryptocloud_common import is_cryptocloud_allowed_for_user
+
 btn_back = InlineKeyboardButton(text=f'🔙 Назад', callback_data=f'back')
 DOMAIN = settings.DOMAIN
 ALIAS_DOMAIN = settings.ALIAS_DOMAIN
@@ -184,6 +186,13 @@ def payment_menu(payment_type: str, user):
             callback_data=f'account:payment:ukassa:{payment_type}'
         )
     )
+    if is_cryptocloud_allowed_for_user(user):
+        markup.add(
+            InlineKeyboardButton(
+                text='CryptoCloud (криптовалюта)',
+                callback_data=f'account:payment:cryptocloud:{payment_type}'
+            )
+        )
     # Для тестирования
     # if user.user_id == 5566146968 or user.user_id == 443210329:
     # markup.add(

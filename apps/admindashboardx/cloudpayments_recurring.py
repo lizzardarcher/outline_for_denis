@@ -11,6 +11,7 @@ import uuid
 from decimal import Decimal
 from typing import Optional
 
+
 import requests
 from django.conf import settings
 
@@ -19,6 +20,7 @@ from apps.payment.cloudpayments_common import (
     apply_successful_pay,
     credentials_for_channel,
     default_account_id,
+    has_pending_cloudpayments_charge,
     payment_system_for_channel,
 )
 from bot.models import IncomeInfo, Prices, TelegramUser, Transaction
@@ -44,6 +46,8 @@ def _skip_reason(user: TelegramUser, expected_channel: str) -> Optional[str]:
         return "активна рекуррентная подписка RoboKassa"
     if (user.payment_method_id or "").strip():
         return "активен payment_method_id ЮKassa"
+    if (getattr(user, "cryptocloud_channel", "") or "").strip():
+        return "активна подписка CryptoCloud"
     channel = (user.cloudpayments_channel or "").strip().lower()
     if channel and channel != expected_channel:
         return f"канал «{channel}» (нужен {expected_channel})"
@@ -52,6 +56,8 @@ def _skip_reason(user: TelegramUser, expected_channel: str) -> Optional[str]:
         # site задача берёт пустой как site, bot — только явный bot.
         if expected_channel == "bot":
             return "канал не bot (пустой → site)"
+    if has_pending_cloudpayments_charge(user, payment_system_for_channel(expected_channel)):
+        return "есть pending CloudPayments"
     return None
 
 

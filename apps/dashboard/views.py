@@ -16,6 +16,8 @@ from django.views.generic import TemplateView
 
 from apps.authentication.forms import DashboardPasswordChangeForm
 from apps.mtproxy.services import can_use_mtproxy, get_active_key, issue_or_get_key, reissue_key, revoke_all_user_keys
+
+from apps.payment.cryptocloud_common import is_cryptocloud_allowed_for_user
 from bot.main.vpn_key_issue import issue_vpn_key_for_user, logging_context_for_protocol
 from bot.main.vpn_key_lock import acquire_vpn_key_create_lock, release_vpn_key_create_lock
 from bot.models import VpnKey, Server, TelegramUser, Country, Prices, UserProfile, ReferralSettings, TelegramReferral, \
@@ -94,6 +96,7 @@ class ProfileView(LoginRequiredMixin, SuccessMessageMixin, TemplateView):
         context['show_mtproxy'] = can_use_mtproxy(tg_user)
         if context['show_mtproxy']:
             context['mtproxy_key'] = get_active_key(tg_user)
+        context['show_cryptocloud_payment'] = is_cryptocloud_allowed_for_user(tg_user)
         return context
 
 
@@ -155,6 +158,7 @@ class CancelSubscriptionView(LoginRequiredMixin, TemplateView):
         user.robokassa_recurring_parent_inv_id = ''
         user.cloudpayments_token = ''
         user.cloudpayments_channel = ''
+        user.cryptocloud_channel = ''
         user.permission_revoked = True
         user.save()
         revoke_all_user_keys(user, reason="manual_cancel_site")

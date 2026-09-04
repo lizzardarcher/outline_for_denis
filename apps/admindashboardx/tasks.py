@@ -151,3 +151,18 @@ def manual_cloudpayments_site_attempt_recurring_payment(self, run_id: int):
     from .manual_task_runner import execute_manual_task_run
 
     return execute_manual_task_run(run_id, celery_task_id=self.request.id or "")
+
+
+
+@shared_task(bind=True, name="apps.admindashboardx.tasks.manual_cryptocloud_bot_attempt_recurring_payment")
+def manual_cryptocloud_bot_attempt_recurring_payment(self, run_id: int):
+    from .manual_task_runner import execute_manual_task_run
+
+    return execute_manual_task_run(run_id, celery_task_id=self.request.id or "")
+
+
+@shared_task(bind=True, name="apps.admindashboardx.tasks.manual_cryptocloud_site_attempt_recurring_payment")
+def manual_cryptocloud_site_attempt_recurring_payment(self, run_id: int):
+    from .manual_task_runner import execute_manual_task_run
+
+    return execute_manual_task_run(run_id, celery_task_id=self.request.id or "")
