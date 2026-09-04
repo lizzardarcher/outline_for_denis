@@ -880,7 +880,8 @@ class ParseRobokassaOpStateTest(TestCase):
             <Result><Code>3</Code></Result>
             </OperationStateResponse>'''
         )
-        self.assertEqual(classify_robokassa_opstate(not_found), 'error')
+        self.assertEqual(classify_robokassa_opstate(not_found), 'not_found')
+
 
     def test_utf8_bom_bytes(self):
         payload = b'\xef\xbb\xbf' + OPSTATE_PAID_XML.encode('utf-8')
@@ -1000,6 +1001,45 @@ class RobokassaPendingCheckTest(TestCase):
         self.transaction.refresh_from_db()
         self.assertEqual(self.transaction.status, 'canceled')
         self.assertFalse(self.transaction.paid)
+
+    @patch('apps.payment.tasks.fetch_robokassa_opstate')
+    def test_fresh_not_found_keeps_pending(self, mock_fetch):
+        mock_fetch.return_value = {'ResultCode': '3'}
+        self._run_pending_check()
+        self.transaction.refresh_from_db()
+        self.assertEqual(self.transaction.status, 'pending')
+        self.assertFalse(self.transaction.paid)
+
+    @patch('apps.payment.tasks.fetch_robokassa_opstate')
+    def test_old_not_found_marks_canceled(self, mock_fetch):
+        mock_fetch.return_value = {'ResultCode': '3'}
+        Transaction.objects.filter(pk=self.transaction.pk).update(
+            timestamp=timezone.now() - timedelta(hours=25),
+        )
+        self._run_pending_check()
+        self.transaction.refresh_from_db()
+        self.assertEqual(self.transaction.status, 'canceled')
+        self.assertFalse(self.transaction.paid)
+
+    @patch('apps.payment.tasks.fetch_robokassa_opstate')
+    def test_old_state_5_stays_pending(self, mock_fetch):
+        mock_fetch.return_value = {'ResultCode': '0', 'State': '5'}
+        Transaction.objects.filter(pk=self.transaction.pk).update(
+            timestamp=timezone.now() - timedelta(hours=25),
+        )
+        self._run_pending_check()
+        self.transaction.refresh_from_db()
+        self.assertEqual(self.transaction.status, 'pending')
+
+    @patch('apps.payment.tasks.fetch_robokassa_opstate')
+    def test_old_opstate_unavailable_stays_pending(self, mock_fetch):
+        mock_fetch.return_value = None
+        Transaction.objects.filter(pk=self.transaction.pk).update(
+            timestamp=timezone.now() - timedelta(hours=25),
+        )
+        self._run_pending_check()
+        self.transaction.refresh_from_db()
+        self.assertEqual(self.transaction.status, 'pending')
 
 
 class RobokassaRecurringChargeGuardTest(TestCase):

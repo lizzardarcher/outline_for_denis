@@ -19,10 +19,14 @@ from bot.models import Prices, TelegramUser, Transaction
 ROBOKASSA_OPSTATE_EXT_URL = 'https://auth.robokassa.ru/Merchant/WebService/Service.asmx/OpStateExt'
 ROBOKASSA_OPSTATE_URL = 'https://auth.robokassa.ru/Merchant/WebService/Service.asmx/OpState'
 
+
 # https://docs.robokassa.ru/ru/xml-interfaces — State.Code
 ROBOKASSA_PAID_STATE_CODES = frozenset({'50', '100'})
 ROBOKASSA_CANCELED_STATE_CODES = frozenset({'10', '60'})
 ROBOKASSA_PENDING_STATE_CODES = frozenset({'5', '20', '80'})
+# https://docs.robokassa.ru/xml-interfaces — Result.Code 3: операция не найдена
+ROBOKASSA_NOT_FOUND_RESULT_CODES = frozenset({'3'})
+ROBOKASSA_ABANDON_AFTER = timedelta(hours=24)
 
 ROBOKASSA_RECURRING_COOLDOWN_DAYS = getattr(settings, 'ROBOKASSA_RECURRING_COOLDOWN_DAYS', 3)
 
@@ -110,11 +114,25 @@ def parse_robokassa_opstate_xml(xml_text) -> dict:
     return parsed
 
 
+def is_pending_old_enough_to_abandon(transaction: Transaction, after: timedelta) -> bool:
+    ts = getattr(transaction, 'timestamp', None)
+    if ts is None:
+        return False
+    now = timezone.now()
+    if timezone.is_naive(ts):
+        ts = timezone.make_aware(ts, timezone.get_current_timezone())
+    if timezone.is_naive(now):
+        now = timezone.make_aware(now, timezone.get_current_timezone())
+    return (now - ts) >= after
+
+
 def classify_robokassa_opstate(parsed: Optional[dict]) -> str:
-    """paid | canceled | pending | error | unknown"""
+    """paid | canceled | pending | not_found | error | unknown"""
     if not parsed:
         return 'error'
     result_code = str(parsed.get('ResultCode') or '').strip()
+    if result_code in ROBOKASSA_NOT_FOUND_RESULT_CODES:
+        return 'not_found'
     if result_code and result_code != '0':
         return 'error'
     state = str(parsed.get('State') or '').strip()

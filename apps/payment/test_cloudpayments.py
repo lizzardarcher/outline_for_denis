@@ -136,6 +136,31 @@ class CloudPaymentsPendingCheckTest(TestCase):
         self.assertEqual(self.transaction.status, "pending")
         self.assertFalse(self.transaction.paid)
 
+
+    @patch("apps.payment.cloudpayments_common.requests.post")
+    def test_old_not_found_marks_canceled_keeps_token(self, mock_post):
+        mock_post.return_value = _json_response({"Success": False, "Message": "Not found"})
+        Transaction.objects.filter(pk=self.transaction.pk).update(
+            timestamp=timezone.now() - timedelta(hours=25),
+        )
+        self._run_pending_check()
+        self.transaction.refresh_from_db()
+        self.telegram_user.refresh_from_db()
+        self.assertEqual(self.transaction.status, "canceled")
+        self.assertFalse(self.transaction.paid)
+        self.assertEqual(self.telegram_user.cloudpayments_token, "tok_saved")
+        self.assertFalse(self.telegram_user.subscription_status)
+
+    @patch("apps.payment.cloudpayments_common.requests.post")
+    def test_old_api_error_keeps_pending(self, mock_post):
+        mock_post.side_effect = Exception("timeout")
+        Transaction.objects.filter(pk=self.transaction.pk).update(
+            timestamp=timezone.now() - timedelta(hours=25),
+        )
+        self._run_pending_check()
+        self.transaction.refresh_from_db()
+        self.assertEqual(self.transaction.status, "pending")
+
     @patch("apps.payment.cloudpayments_common.requests.post")
     def test_pending_check_falls_back_to_get_by_payment_id(self, mock_post):
         self.transaction.payment_id = "555001"
@@ -227,7 +252,7 @@ class CloudPaymentsRecurringPendingSkipTest(TestCase):
             payment_system="CloudPaymentsBot",
         )
         Transaction.objects.filter(pk=pending.pk).update(
-            timestamp=timezone.now() - timedelta(days=2),
+            timestamp=timezone.now() - timedelta(days=8),
         )
         self.assertIsNone(_skip_reason(self.user, "bot"))
         self.assertFalse(has_pending_cloudpayments_charge(self.user, "CloudPaymentsBot"))

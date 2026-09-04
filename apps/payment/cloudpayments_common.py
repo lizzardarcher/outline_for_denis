@@ -15,6 +15,7 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Optional
 
+
 import requests
 from django.conf import settings
 from django.db import transaction as db_transaction
@@ -23,6 +24,7 @@ from django.utils import timezone
 
 from apps.payment.robokassa_subscription import (
     extend_telegram_user_subscription,
+    is_pending_old_enough_to_abandon,
     resolve_subscription_days,
 )
 from bot.models import (
@@ -51,7 +53,8 @@ REASON_KEEP_TOKEN = frozenset({
     5006,  # Decline by issuer temporary
 })
 
-CLOUDPAYMENTS_PENDING_LOOKBACK_DAYS = 1
+CLOUDPAYMENTS_PENDING_LOOKBACK_DAYS = 7
+CLOUDPAYMENTS_ABANDON_AFTER = timedelta(hours=24)
 CLOUDPAYMENTS_PENDING_API_TIMEOUT = 15
 _PAID_STATUSES = frozenset({"Completed"})
 _CANCELED_STATUSES = frozenset({"Declined", "Cancelled", "Canceled"})
@@ -309,16 +312,42 @@ def _cp_api_post(
         return None
 
 
+def _is_cp_not_found(data: Optional[dict]) -> bool:
+    if not isinstance(data, dict):
+        return False
+    if _model_from_cp_response(data):
+        return False
+    message = str(data.get("Message") or "").strip().lower()
+    return (not data.get("Success")) and ("not found" in message)
+
+
+def _mark_abandoned_pending(transaction: Transaction, log_prefix: str) -> None:
+    """Брошенный инвойс: canceled без сброса токена карты."""
+    if transaction.status == "succeeded":
+        return
+    transaction.status = "canceled"
+    transaction.paid = False
+    transaction.save(update_fields=["status", "paid"])
+    Logging.objects.create(
+        category="payment",
+        log_level="INFO",
+        message=f"{log_prefix} Нет платежа в CloudPayments, отменён как брошенный tx={transaction.id}",
+        datetime=timezone.now(),
+        user=transaction.user if getattr(transaction, "user", None) else None,
+    )
+
+
 def fetch_cloudpayments_payment(
     transaction: Transaction,
     public_id: str,
     api_secret: str,
     *,
     timeout: int = CLOUDPAYMENTS_PENDING_API_TIMEOUT,
-) -> Optional[dict]:
+) -> tuple[Optional[dict], str]:
     """
     Ищет платёж в CP: сначала /payments/find по InvoiceId=tx.id,
     затем /payments/get по TransactionId, если payment_id уже известен.
+    Возвращает (model, kind): found | not_found | error.
     """
     data = _cp_api_post(
         "/payments/find",
@@ -327,21 +356,33 @@ def fetch_cloudpayments_payment(
         api_secret,
         timeout=timeout,
     )
+    if data is None:
+        return None, "error"
     model = _model_from_cp_response(data)
     if model:
-        return model
+        return model, "found"
 
     payment_id = str(transaction.payment_id or "").strip()
     if payment_id.isdigit():
-        data = _cp_api_post(
+        data_get = _cp_api_post(
             "/payments/get",
             {"TransactionId": int(payment_id)},
             public_id,
             api_secret,
             timeout=timeout,
         )
-        return _model_from_cp_response(data)
-    return None
+        if data_get is None:
+            return None, "error"
+        model = _model_from_cp_response(data_get)
+        if model:
+            return model, "found"
+        if _is_cp_not_found(data_get) or _is_cp_not_found(data):
+            return None, "not_found"
+        return None, "error"
+
+    if _is_cp_not_found(data):
+        return None, "not_found"
+    return None, "error"
 
 
 def reconcile_cloudpayments_pending_transaction(
@@ -356,13 +397,18 @@ def reconcile_cloudpayments_pending_transaction(
     Сверяет pending-транзакцию с CloudPayments.
     Возвращает: paid | canceled | pending | error | unknown
     """
-    model = fetch_cloudpayments_payment(transaction, public_id, api_secret)
-    if not model:
+    log_prefix = f"[{source_label}] [pending-check]"
+    model, fetch_kind = fetch_cloudpayments_payment(transaction, public_id, api_secret)
+    if fetch_kind == "not_found":
+        if is_pending_old_enough_to_abandon(transaction, CLOUDPAYMENTS_ABANDON_AFTER):
+            _mark_abandoned_pending(transaction, log_prefix)
+            return "canceled"
+        return "pending"
+    if fetch_kind != "found" or not model:
         return "error"
 
     kind = classify_cloudpayments_status(model.get("Status") or "")
     telegram_user = transaction.user
-    log_prefix = f"[{source_label}] [pending-check]"
     cp_tx_id = model.get("TransactionId")
 
     if kind == "paid":

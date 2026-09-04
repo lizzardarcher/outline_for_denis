@@ -20,14 +20,17 @@ from apps.admindashboardx.cryptocloud_recurring import run_cryptocloud_bot_recur
 from apps.admindashboardx.ukassa_recurring import run_ukassa_site_recurring
 from apps.admindashboardx.ukassa_recurring import run_ukassa_bot_recurring
 
+
 from apps.payment.robokassa_subscription import (
     RECURRING_CHARGE,
     RECURRING_REPAIR_AND_SKIP,
     RECURRING_SKIP,
+    ROBOKASSA_ABANDON_AFTER,
     classify_robokassa_opstate,
     evaluate_robokassa_recurring_charge,
     extend_telegram_user_subscription,
     fetch_robokassa_opstate,
+    is_pending_old_enough_to_abandon,
     repair_subscription_from_transaction,
     resolve_subscription_days,
     robokassa_md5,
@@ -548,8 +551,6 @@ def _reconcile_robokassa_pending_transaction(
         return 'error'
 
     kind = classify_robokassa_opstate(payment_info)
-    state = payment_info.get('State') or ''
-    result_code = payment_info.get('ResultCode') or ''
 
     if kind == 'paid':
         _apply_robokassa_success(
@@ -564,38 +565,23 @@ def _reconcile_robokassa_pending_transaction(
         transaction.status = 'canceled'
         transaction.paid = False
         transaction.save(update_fields=['status', 'paid'])
-        # Logging.objects.create(
-        #     category="payment",
-        #     log_level="WARNING",
-        #     message=(
-        #         f'[{source_label}] [pending-check] Отменён InvId={inv_id} '
-        #         f'State={state} ResultCode={result_code}'
-        #     ),
-        #     datetime=timezone.now(),
-        #     user=transaction.user,
-        # )
-    # elif kind == 'error' and log_missing:
-        # Logging.objects.create(
-        #     category="payment",
-        #     log_level="WARNING",
-        #     message=(
-        #         f'[{source_label}] [pending-check] Ошибка OpState InvId={inv_id} '
-        #         f'ResultCode={result_code} State={state}'
-        #     ),
-        #     datetime=timezone.now(),
-        #     user=transaction.user,
-        # )
-    # elif kind == 'unknown':
-    #     Logging.objects.create(
-    #         category="payment",
-    #         log_level="WARNING",
-    #         message=(
-    #             f'[{source_label}] [pending-check] Неизвестный State={state} '
-    #             f'InvId={inv_id} ResultCode={result_code}'
-    #         ),
-    #         datetime=timezone.now(),
-    #         user=transaction.user,
-    #     )
+    elif kind == 'not_found':
+        if is_pending_old_enough_to_abandon(transaction, ROBOKASSA_ABANDON_AFTER):
+            transaction.status = 'canceled'
+            transaction.paid = False
+            transaction.save(update_fields=['status', 'paid'])
+            Logging.objects.create(
+                category="payment",
+                log_level="INFO",
+                message=(
+                    f'[{source_label}] [pending-check] Нет платежа в RoboKassa, '
+                    f'отменён как брошенный InvId={inv_id}'
+                ),
+                datetime=timezone.now(),
+                user=transaction.user,
+            )
+            return 'canceled'
+        return 'pending'
     return kind
 
 
