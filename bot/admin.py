@@ -13,7 +13,8 @@ from django.core.paginator import Paginator
 from django.db.models import Q, Sum
 from django.http import HttpResponse, HttpResponseForbidden
 from django.shortcuts import redirect, render
-from django.urls import path, reverse
+
+from django.urls import path
 from django.utils import timezone
 from django.utils.html import format_html
 from django_celery_beat.models import *
@@ -770,8 +771,6 @@ class ServerAdmin(BaseAdmin):
             return redirect("admin:bot_server_panel_health")
 
 
-        status = (request.GET.get("status") or "").strip()
-        is_active = (request.GET.get("is_active") or "").strip()
         snapshot = get_cached_snapshot()
         checked_at = None
         raw_checked_at = (snapshot or {}).get("checked_at") or ""
@@ -782,15 +781,6 @@ class ServerAdmin(BaseAdmin):
                 checked_at = None
 
         rows = list((snapshot or {}).get("rows") or [])
-        if status in ("ok", "down", "unknown", "idle"):
-            rows = [row for row in rows if row.get("status") == status]
-        if is_active in ("true", "false"):
-            want_active = is_active == "true"
-            rows = [row for row in rows if bool(row.get("is_active")) == want_active]
-
-        page_qs_params = request.GET.copy()
-        page_qs_params.pop("page", None)
-        page_qs = page_qs_params.urlencode()
         paginator = Paginator(rows, 50)
         rows_page = paginator.get_page(request.GET.get("page", 1))
 
@@ -802,10 +792,6 @@ class ServerAdmin(BaseAdmin):
             "checked_at": checked_at,
             "summary": (snapshot or {}).get("summary") or {},
             "rows_page": rows_page,
-            "status": status,
-            "is_active": is_active,
-            "page_qs": page_qs,
-            "reset_url": reverse("admin:bot_server_panel_health"),
         }
         return render(request, "admin/bot/server/panel_health.html", context)
 

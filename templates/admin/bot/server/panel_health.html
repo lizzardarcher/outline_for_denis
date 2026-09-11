@@ -102,32 +102,6 @@
             </div>
         </div>
 
-        <div class="card">
-            <div class="card-body">
-                <form method="get" class="form-inline flex-wrap">
-                    <div class="form-group mr-3 mb-2">
-                        <label class="mr-2">Статус</label>
-                        <select name="status" class="form-control">
-                            <option value="">Все</option>
-                            <option value="ok" {% if status == "ok" %}selected{% endif %}>Доступен</option>
-                            <option value="down" {% if status == "down" %}selected{% endif %}>Недоступен</option>
-                            <option value="unknown" {% if status == "unknown" %}selected{% endif %}>Нет ответа</option>
-                            <option value="idle" {% if status == "idle" %}selected{% endif %}>Не в панелях</option>
-                        </select>
-                    </div>
-                    <div class="form-group mr-3 mb-2">
-                        <label class="mr-2">Активность</label>
-                        <select name="is_active" class="form-control">
-                            <option value="">Все</option>
-                            <option value="true" {% if is_active == "true" %}selected{% endif %}>Активен</option>
-                            <option value="false" {% if is_active == "false" %}selected{% endif %}>Неактивен</option>
-                        </select>
-                    </div>
-                    <button class="btn btn-primary mb-2 mr-2" type="submit">Применить</button>
-                    <a class="btn btn-outline-secondary mb-2" href="{{ reset_url }}">Сбросить</a>
-                </form>
-            </div>
-        </div>
 
         <div class="card">
             <div class="card-body p-0">
@@ -181,10 +155,10 @@
                     <small class="text-muted">Страница {{ rows_page.number }} / {{ rows_page.paginator.num_pages }}</small>
                     <div>
                         {% if rows_page.has_previous %}
-                            <a class="btn btn-sm btn-outline-secondary" href="?{{ page_qs }}{% if page_qs %}&{% endif %}page={{ rows_page.previous_page_number }}">Назад</a>
+                            <a class="btn btn-sm btn-outline-secondary" href="?page={{ rows_page.previous_page_number }}">Назад</a>
                         {% endif %}
                         {% if rows_page.has_next %}
-                            <a class="btn btn-sm btn-outline-secondary" href="?{{ page_qs }}{% if page_qs %}&{% endif %}page={{ rows_page.next_page_number }}">Вперед</a>
+                            <a class="btn btn-sm btn-outline-secondary" href="?page={{ rows_page.next_page_number }}">Вперед</a>
                         {% endif %}
                     </div>
                 </div>
