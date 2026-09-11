@@ -11,8 +11,8 @@ ALIAS_DOMAIN = 'https://dom-vpn.su'
 PROXY_DOMAIN = 'https://tm3949.craftum.io'
 
 
-# DEBUG = True
-DEBUG = False
+DEBUG = True
+# DEBUG = False
 
 ALLOWED_HOSTS = os.getenv('DJANGO_ALLOWED_HOSTS').split(',')
 CSRF_TRUSTED_ORIGINS = os.getenv('CSRF_TRUSTED_ORIGINS').split(',')
@@ -160,10 +160,28 @@ JAZZMIN_SETTINGS = {
     "topmenu_links": [
 
         {"model": "bot.Server"},
+
+        {
+            "name": "Доступность",
+            "url": "admin:bot_server_panel_health",
+            "icon": "fas fa-heartbeat",
+            "permissions": ["bot.view_server"],
+        },
         {"model": "bot.TelegramMessage"},
         {"model": "bot.Logging"},
 
     ],
+
+    "custom_links": {
+        "bot": [
+            {
+                "name": "Доступность серверов",
+                "url": "admin:bot_server_panel_health",
+                "icon": "fas fa-heartbeat",
+                "permissions": ["bot.view_server"],
+            }
+        ]
+    },
 
     "show_sidebar": True,
 

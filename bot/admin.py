@@ -1,22 +1,28 @@
 import os
 
+from datetime import datetime
+from functools import update_wrapper
+
 from django.conf import settings
-from django.contrib import admin
+from django.contrib import admin, messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth.admin import UserAdmin as DjangoUserAdmin
 from django.contrib.auth.models import Group
 from django.contrib.admin.sites import NotRegistered
+from django.core.paginator import Paginator
 from django.db.models import Q, Sum
+from django.http import HttpResponse, HttpResponseForbidden
+from django.shortcuts import redirect, render
+from django.urls import path, reverse
 from django.utils import timezone
 from django.utils.html import format_html
 from django_celery_beat.models import *
 from django_admin_inline_paginator.admin import TabularInlinePaginated
 
 from apps.admindashboardx.models import ManualTaskRun
+from apps.admindashboardx.panel_health import collect_and_store, get_cached_snapshot
 from bot.models import *
 
-
-from django.http import HttpResponse
 from openpyxl import Workbook
 
 User = get_user_model()
@@ -727,6 +733,91 @@ class ServerAdmin(BaseAdmin):
     )
     readonly_fields = ('max_keys', 'created_at', 'panels_active', 'hysteria_cert_synced_at')
     ordering = ('country', 'ip_address')
+
+    def get_urls(self):
+        urls = super().get_urls()
+        info = self.opts.app_label, self.opts.model_name
+
+        def wrap(view):
+            def wrapper(*args, **kwargs):
+                return self.admin_site.admin_view(view)(*args, **kwargs)
+
+            wrapper.model_admin = self
+            return update_wrapper(wrapper, view)
+
+        extra = [
+            path(
+                "panel-health/",
+                wrap(self.panel_health_view),
+                name="%s_%s_panel_health" % info,
+            ),
+        ]
+        return extra + urls
+
+    def panel_health_view(self, request):
+        if (
+            request.user.username == getattr(settings, "SUPPORT_ACCOUNT", "")
+            or not self.has_view_permission(request)
+        ):
+            return HttpResponseForbidden("Недостаточно прав")
+
+        if request.method == "POST":
+            try:
+                collect_and_store()
+                self.message_user(request, "Проверка панелей завершена.", level=messages.SUCCESS)
+            except Exception:
+                self.message_user(request, "Не удалось выполнить проверку.", level=messages.ERROR)
+            return redirect("admin:bot_server_panel_health")
+
+        query = (request.GET.get("q") or "").strip()
+        status = (request.GET.get("status") or "").strip()
+        is_active = (request.GET.get("is_active") or "").strip()
+        snapshot = get_cached_snapshot()
+        checked_at = None
+        raw_checked_at = (snapshot or {}).get("checked_at") or ""
+        if raw_checked_at:
+            try:
+                checked_at = datetime.fromisoformat(raw_checked_at)
+            except ValueError:
+                checked_at = None
+
+        rows = list((snapshot or {}).get("rows") or [])
+        if query:
+            needle = query.lower()
+            rows = [
+                row
+                for row in rows
+                if needle in (row.get("hosting") or "").lower()
+                or needle in (row.get("ip_address") or "").lower()
+                or needle in (row.get("country") or "").lower()
+            ]
+        if status in ("ok", "down", "unknown", "idle"):
+            rows = [row for row in rows if row.get("status") == status]
+        if is_active in ("true", "false"):
+            want_active = is_active == "true"
+            rows = [row for row in rows if bool(row.get("is_active")) == want_active]
+
+        page_qs_params = request.GET.copy()
+        page_qs_params.pop("page", None)
+        page_qs = page_qs_params.urlencode()
+        paginator = Paginator(rows, 50)
+        rows_page = paginator.get_page(request.GET.get("page", 1))
+
+        context = {
+            **self.admin_site.each_context(request),
+            "title": "Доступность серверов",
+            "opts": self.model._meta,
+            "snapshot": snapshot,
+            "checked_at": checked_at,
+            "summary": (snapshot or {}).get("summary") or {},
+            "rows_page": rows_page,
+            "q": query,
+            "status": status,
+            "is_active": is_active,
+            "page_qs": page_qs,
+            "reset_url": reverse("admin:bot_server_panel_health"),
+        }
+        return render(request, "admin/bot/server/panel_health.html", context)
 
 
 @admin.register(Country)

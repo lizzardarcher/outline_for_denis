@@ -52,6 +52,8 @@ from .manual_task_log_cleanup import (
 )
 from .models import ManualTaskRun, ManualTaskLog
 
+from .panel_health import collect_and_store, get_cached_snapshot
+
 class ServerForm(forms.ModelForm):
     class Meta:
         model = Server
@@ -1713,6 +1715,72 @@ class ServerInitActionView(DashboardBaseView, View):
         server = get_object_or_404(Server, id=kwargs.get("server_id"))
         initialize_server_task.delay(server.id)
         return redirect(reverse("admindashboardx:server_detail", kwargs={"server_id": server.id}) + "?ops=init_started")
+
+
+class ServerPanelHealthView(DashboardBaseView):
+    template_name = "admindashboardx/server_panel_health.html"
+    page_title = "AdminDashboardX · Доступность серверов"
+    page_key = "server_panel_health"
+
+    def dispatch(self, request, *args, **kwargs):
+        if self._is_support():
+            return self._forbidden_response()
+        return super().dispatch(request, *args, **kwargs)
+
+    def post(self, request, *args, **kwargs):
+        try:
+            collect_and_store()
+        except Exception:
+            return redirect(reverse("admindashboardx:server_panel_health") + "?ops=error")
+        return redirect(reverse("admindashboardx:server_panel_health") + "?ops=checked")
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        query = (self.request.GET.get("q") or "").strip()
+        status = (self.request.GET.get("status") or "").strip()
+        is_active = (self.request.GET.get("is_active") or "").strip()
+        ops = (self.request.GET.get("ops") or "").strip()
+        snapshot = get_cached_snapshot()
+        checked_at = None
+        raw_checked_at = (snapshot or {}).get("checked_at") or ""
+        if raw_checked_at:
+            try:
+                checked_at = datetime.fromisoformat(raw_checked_at)
+            except ValueError:
+                checked_at = None
+        rows = list((snapshot or {}).get("rows") or [])
+
+        if query:
+            needle = query.lower()
+            rows = [
+                row
+                for row in rows
+                if needle in (row.get("hosting") or "").lower()
+                or needle in (row.get("ip_address") or "").lower()
+                or needle in (row.get("country") or "").lower()
+            ]
+        if status in ("ok", "down", "unknown", "idle"):
+            rows = [row for row in rows if row.get("status") == status]
+        if is_active in ("true", "false"):
+            want_active = is_active == "true"
+            rows = [row for row in rows if bool(row.get("is_active")) == want_active]
+
+        context.update(
+            {
+                **self._base_context(),
+                "snapshot": snapshot,
+                "checked_at": checked_at,
+                "summary": (snapshot or {}).get("summary") or {},
+                "rows_page": self._paginate(rows, per_page=50),
+                "q": query,
+                "status": status,
+                "is_active": is_active,
+                "ops": ops,
+                "page_qs": self._page_qs(),
+                "reset_url": reverse("admindashboardx:server_panel_health"),
+            }
+        )
+        return context
 
 
 class KeysListView(DashboardBaseView):

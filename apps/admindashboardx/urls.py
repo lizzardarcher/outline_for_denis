@@ -34,6 +34,8 @@ from .views import (
     ServersListView,
     ServerDetailView,
     ServerInitActionView,
+
+    ServerPanelHealthView,
     ServerUpdateView,
     ReferralSettingsCreateView,
     ReferralSettingsDeleteView,
@@ -107,6 +109,7 @@ urlpatterns = [
     path("transactions/<int:tx_id>/", TransactionDetailView.as_view(), name="transaction_detail"),
     path("logs/", LogsListView.as_view(), name="logs"),
     path("servers/", ServersListView.as_view(), name="servers"),
+    path("servers/health/", ServerPanelHealthView.as_view(), name="server_panel_health"),
     path("servers/create/", ServerCreateView.as_view(), name="server_create"),
     path("servers/<int:server_id>/", ServerDetailView.as_view(), name="server_detail"),
     path("servers/<int:server_id>/edit/", ServerUpdateView.as_view(), name="server_update"),

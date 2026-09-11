@@ -437,10 +437,19 @@ async def start(message):
                                                reply_markup=markup.get_app_or_start())
                         return
 
-                    # Проверяем, чтобы несколько поделившихся реферальной ссылкой не были рефералами для вновь вступившего пользователя
-                    duplicate = TelegramReferral.objects.filter(referred=referred_user.user_id, level=1)
+
+                    # Один пользователь может иметь только одного реферера 1 уровня.
+                    # referred — FK на TelegramUser.id, не на telegram user_id.
+                    duplicate = TelegramReferral.objects.filter(referred=referred_user, level=1)
                     if duplicate.exists():
+                        lg.objects.create(
+                            log_level='INFO',
+                            message='[BOT] [Реферальная связь 1 уровня уже существует, повторная ссылка проигнорирована.]',
+                            datetime=datetime.now(),
+                            user=referred_user,
+                        )
                         return
+
 
                     try:
                         referral_level_1, created_level_1 = TelegramReferral.objects.get_or_create(
