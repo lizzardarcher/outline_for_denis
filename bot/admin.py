@@ -769,7 +769,7 @@ class ServerAdmin(BaseAdmin):
                 self.message_user(request, "Не удалось выполнить проверку.", level=messages.ERROR)
             return redirect("admin:bot_server_panel_health")
 
-        query = (request.GET.get("q") or "").strip()
+
         status = (request.GET.get("status") or "").strip()
         is_active = (request.GET.get("is_active") or "").strip()
         snapshot = get_cached_snapshot()
@@ -782,15 +782,6 @@ class ServerAdmin(BaseAdmin):
                 checked_at = None
 
         rows = list((snapshot or {}).get("rows") or [])
-        if query:
-            needle = query.lower()
-            rows = [
-                row
-                for row in rows
-                if needle in (row.get("hosting") or "").lower()
-                or needle in (row.get("ip_address") or "").lower()
-                or needle in (row.get("country") or "").lower()
-            ]
         if status in ("ok", "down", "unknown", "idle"):
             rows = [row for row in rows if row.get("status") == status]
         if is_active in ("true", "false"):
@@ -811,7 +802,6 @@ class ServerAdmin(BaseAdmin):
             "checked_at": checked_at,
             "summary": (snapshot or {}).get("summary") or {},
             "rows_page": rows_page,
-            "q": query,
             "status": status,
             "is_active": is_active,
             "page_qs": page_qs,

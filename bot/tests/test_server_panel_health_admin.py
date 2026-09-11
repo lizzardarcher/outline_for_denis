@@ -34,7 +34,9 @@ class ServerPanelHealthAdminTests(TestCase):
         response = self.client.get(reverse("admin:bot_server_panel_health"))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Проверить сейчас")
-        self.assertContains(response, "Проверка ещё не запускалась")
+        self.assertContains(response, "Последняя проверка")
+        self.assertNotContains(response, "hosting, ip, country")
+
 
     def test_post_stores_snapshot_and_redirects(self):
         snapshot = {

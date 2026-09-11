@@ -1,6 +1,29 @@
-
 {% extends "admin/base_site.html" %}
 {% load i18n admin_urls %}
+
+
+{% block extrastyle %}
+    {{ block.super }}
+    <style>
+        .small-box.panel-health-box {
+            background: #2b2f36 !important;
+            color: #cfd3da;
+            box-shadow: none;
+        }
+        .small-box.panel-health-box .inner p {
+            color: #cfd3da;
+        }
+        .small-box.panel-health-box .inner h3 {
+            font-size: 1.6rem;
+            word-break: break-word;
+        }
+        .small-box.panel-health-box .inner h3.text-success { color: #28a745 !important; }
+        .small-box.panel-health-box .inner h3.text-danger { color: #dc3545 !important; }
+        .small-box.panel-health-box .inner h3.text-warning { color: #ffc107 !important; }
+        .small-box.panel-health-box .inner h3.text-info { color: #17a2b8 !important; }
+        .small-box.panel-health-box .inner h3.text-light { color: #f8f9fa !important; }
+    </style>
+{% endblock %}
 
 {% block content_title %}Доступность серверов{% endblock %}
 
@@ -24,48 +47,55 @@
 
 {% block content %}
     <div class="col-12">
-        <p class="text-muted">
-            {% if snapshot %}
-                Последняя проверка:
-                {% if checked_at %}{{ checked_at|date:"d.m.Y H:i" }}{% else %}{{ snapshot.checked_at }}{% endif %}
-            {% else %}
-                Проверка ещё не запускалась.
-            {% endif %}
-        </p>
-
         {% if snapshot and not snapshot.panels_ok %}
             <div class="alert alert-warning">Не удалось полностью опросить панели. Результат может быть неполным.</div>
         {% endif %}
 
         <div class="row">
-            <div class="col-6 col-lg-3">
-                <div class="small-box bg-success">
+            <div class="col-12 col-md-6 col-xl">
+                <div class="small-box panel-health-box">
                     <div class="inner">
-                        <h3>{{ summary.ok|default:0 }}</h3>
+                        <h3 class="text-light">
+                            {% if checked_at %}
+                                {{ checked_at|date:"d.m.Y H:i" }}
+                            {% elif snapshot.checked_at %}
+                                {{ snapshot.checked_at }}
+                            {% else %}
+                                —
+                            {% endif %}
+                        </h3>
+                        <p>Последняя проверка</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md-6 col-xl">
+                <div class="small-box panel-health-box">
+                    <div class="inner">
+                        <h3 class="text-success">{{ summary.ok|default:0 }}</h3>
                         <p>Доступны</p>
                     </div>
                 </div>
             </div>
-            <div class="col-6 col-lg-3">
-                <div class="small-box bg-danger">
+            <div class="col-6 col-md-6 col-xl">
+                <div class="small-box panel-health-box">
                     <div class="inner">
-                        <h3>{{ summary.down|default:0 }}</h3>
+                        <h3 class="text-danger">{{ summary.down|default:0 }}</h3>
                         <p>Недоступны</p>
                     </div>
                 </div>
             </div>
-            <div class="col-6 col-lg-3">
-                <div class="small-box bg-warning">
+            <div class="col-6 col-md-6 col-xl">
+                <div class="small-box panel-health-box">
                     <div class="inner">
-                        <h3>{{ summary.unknown|default:0 }}</h3>
+                        <h3 class="text-warning">{{ summary.unknown|default:0 }}</h3>
                         <p>Нет ответа</p>
                     </div>
                 </div>
             </div>
-            <div class="col-6 col-lg-3">
-                <div class="small-box bg-info">
+            <div class="col-6 col-md-6 col-xl">
+                <div class="small-box panel-health-box">
                     <div class="inner">
-                        <h3>{{ summary.servers|default:0 }}</h3>
+                        <h3 class="text-info">{{ summary.servers|default:0 }}</h3>
                         <p>Всего серверов</p>
                     </div>
                 </div>
@@ -75,10 +105,6 @@
         <div class="card">
             <div class="card-body">
                 <form method="get" class="form-inline flex-wrap">
-                    <div class="form-group mr-3 mb-2">
-                        <label class="mr-2">Поиск</label>
-                        <input type="text" name="q" class="form-control" value="{{ q }}" placeholder="hosting, ip, country">
-                    </div>
                     <div class="form-group mr-3 mb-2">
                         <label class="mr-2">Статус</label>
                         <select name="status" class="form-control">
