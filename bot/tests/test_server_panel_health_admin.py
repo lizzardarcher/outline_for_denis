@@ -64,7 +64,8 @@ class ServerPanelHealthAdminTests(TestCase):
         self.assertNotContains(response, "Celerity")
         self.assertIsNotNone(cache.get(CACHE_KEY))
 
-    def test_support_account_forbidden(self):
+
+    def test_support_account_can_open_page(self):
         User.objects.create_user(
             "support-health",
             password="secret123!",
@@ -73,7 +74,8 @@ class ServerPanelHealthAdminTests(TestCase):
         )
         self.client.login(username="support-health", password="secret123!")
         response = self.client.get(reverse("admin:bot_server_panel_health"))
-        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Проверить сейчас")
 
     def test_server_changelist_has_health_link(self):
         response = self.client.get(reverse("admin:bot_server_changelist"))

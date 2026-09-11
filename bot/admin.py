@@ -11,7 +11,8 @@ from django.contrib.auth.models import Group
 from django.contrib.admin.sites import NotRegistered
 from django.core.paginator import Paginator
 from django.db.models import Q, Sum
-from django.http import HttpResponse, HttpResponseForbidden
+
+from django.http import HttpResponse
 from django.shortcuts import redirect, render
 
 from django.urls import path
@@ -756,12 +757,6 @@ class ServerAdmin(BaseAdmin):
         return extra + urls
 
     def panel_health_view(self, request):
-        if (
-            request.user.username == getattr(settings, "SUPPORT_ACCOUNT", "")
-            or not self.has_view_permission(request)
-        ):
-            return HttpResponseForbidden("Недостаточно прав")
-
         if request.method == "POST":
             try:
                 collect_and_store()

@@ -165,7 +165,7 @@ JAZZMIN_SETTINGS = {
             "name": "Доступность",
             "url": "admin:bot_server_panel_health",
             "icon": "fas fa-heartbeat",
-            "permissions": ["bot.view_server"],
+
         },
         {"model": "bot.TelegramMessage"},
         {"model": "bot.Logging"},
@@ -178,7 +178,6 @@ JAZZMIN_SETTINGS = {
                 "name": "Доступность серверов",
                 "url": "admin:bot_server_panel_health",
                 "icon": "fas fa-heartbeat",
-                "permissions": ["bot.view_server"],
             }
         ]
     },
