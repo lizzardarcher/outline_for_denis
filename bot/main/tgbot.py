@@ -1347,8 +1347,9 @@ async def callback_query_handlers(call):
                                     reply_markup=markup.start(user=user),
                                 )
 
+
                     elif 'cancel_subscription' in data:
-                        if user.subscription_status:
+                        if user.has_saved_autopay():
                             await edit_screen(
                                 call,
                                 msg.cancel_subscription,

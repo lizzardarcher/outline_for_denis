@@ -60,6 +60,19 @@ class TelegramUser(models.Model):
     next_payment_date = models.DateField(default=None, blank=True, null=True, verbose_name='Следующее списание')
     special_offer = models.ForeignKey('ReferralSpecialOffer', default=None, null=True, blank=True, db_index=True, on_delete=models.SET_NULL, related_name='special_offers', verbose_name='Специальные проценты')
 
+
+    def has_saved_autopay(self) -> bool:
+        """Есть сохранённый рекуррентный метод, даже если подписка уже истекла."""
+        if (self.payment_method_id or '').strip():
+            return True
+        if (self.robokassa_recurring_parent_inv_id or '').strip():
+            return True
+        if (self.cloudpayments_token or '').strip():
+            return True
+        if (self.cryptocloud_channel or '').strip():
+            return True
+        return False
+
     def __str__(self):
         if not self.last_name:
             last_name = ''

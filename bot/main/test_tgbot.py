@@ -889,10 +889,9 @@ async def callback_query_handlers(call):
                                     f"Произошла ошибка при оформлении подписки через CryptoBot. Попробуйте позже. {e}",
                                 )
 
-
                     elif 'cancel_subscription' in data:
                         # Отмена подписки
-                        if user.subscription_status:
+                        if user.has_saved_autopay():
                             await bot.send_message(call.message.chat.id, text=msg.cancel_subscription,
                                                    reply_markup=markup.cancel_subscription())
                         else:
