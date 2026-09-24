@@ -14,16 +14,17 @@
     </ol>
 {% endblock %}
 
+
 {% block content %}
     <div class="col-12">
         <div class="mb-3">
             <div><strong>{{ server.hosting|default:"—" }}</strong></div>
             <div class="text-muted">{{ server.ip_address|default:"—" }}{% if server.country %} · {{ server.country.name_for_app|default:server.country.name }}{% endif %}</div>
             {% if panel_state %}
-                <div class="mt-2">Панели: {{ panel_state.detail|default:panel_state.status }}{% if panel_state.duration_label %} ({{ panel_state.duration_label }}){% endif %}</div>
+                <div class="mt-2">Панели: {% include "admin/bot/server/panel_health_status.html" with status=panel_state.status detail=panel_state.detail duration=panel_state.duration_label %}</div>
             {% endif %}
             {% if ping_state %}
-                <div>Сеть: {{ ping_state.detail|default:ping_state.status }}{% if ping_state.duration_label %} ({{ ping_state.duration_label }}){% endif %}</div>
+                <div>Сеть: {% include "admin/bot/server/panel_health_status.html" with status=ping_state.status detail=ping_state.detail duration=ping_state.duration_label %}</div>
             {% endif %}
         </div>
 
@@ -43,8 +44,8 @@
                     {% for sample in samples_page %}
                         <tr>
                             <td>{{ sample.checked_at|date:"d.m.Y H:i" }}</td>
-                            <td>{{ sample.panel_detail|default:sample.panel_status }}</td>
-                            <td>{{ sample.ping_detail|default:sample.ping_status }}</td>
+                            <td>{% include "admin/bot/server/panel_health_status.html" with status=sample.panel_status detail=sample.panel_detail %}</td>
+                            <td>{% include "admin/bot/server/panel_health_status.html" with status=sample.ping_status detail=sample.ping_detail %}</td>
                             <td>{% if sample.ping_ms is not None %}{{ sample.ping_ms }}{% else %}—{% endif %}</td>
                         </tr>
                     {% empty %}

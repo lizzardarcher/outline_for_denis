@@ -154,6 +154,7 @@ class ServerPanelHealthViewTests(TestCase):
         mocked.assert_called_once()
         self.assertIn("ops=checked", response.url)
 
+
     def test_get_shows_cached_combined_status(self):
         collect_and_store(
             servers=[_server()],
@@ -162,7 +163,7 @@ class ServerPanelHealthViewTests(TestCase):
         )
         response = self.client.get(reverse("admindashboardx:server_panel_health"))
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "недоступен")
+        self.assertContains(response, "❌")
         self.assertNotContains(response, "Marzban")
         self.assertNotContains(response, "Celerity")
         self.assertContains(response, "Сеть")

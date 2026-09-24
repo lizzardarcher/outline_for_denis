@@ -65,10 +65,11 @@ class ServerPanelHealthAdminTests(TestCase):
         )
         response = self.client.get(reverse("admin:bot_server_panel_health"))
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "недоступен")
+        self.assertContains(response, "❌")
         self.assertNotContains(response, "Marzban")
         self.assertNotContains(response, "Celerity")
         self.assertIsNotNone(cache.get(CACHE_KEY))
+
 
 
     def test_support_account_can_open_page(self):
@@ -113,5 +114,5 @@ class ServerPanelHealthAdminTests(TestCase):
         log_response = self.client.get(log_url)
         self.assertEqual(log_response.status_code, 200)
         self.assertContains(log_response, "Zomro DE1")
-        self.assertContains(log_response, "доступен")
+        self.assertContains(log_response, "✅")
         self.assertContains(log_response, "15")
