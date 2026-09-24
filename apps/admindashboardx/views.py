@@ -52,7 +52,8 @@ from .manual_task_log_cleanup import (
 )
 from .models import ManualTaskRun, ManualTaskLog
 
-from .panel_health import collect_and_store, get_cached_snapshot
+
+from .panel_health import attach_duration_labels, collect_and_store, get_cached_snapshot
 
 class ServerForm(forms.ModelForm):
     class Meta:
@@ -1749,6 +1750,7 @@ class ServerPanelHealthView(DashboardBaseView):
             except ValueError:
                 checked_at = None
         rows = list((snapshot or {}).get("rows") or [])
+        attach_duration_labels(rows)
 
         if query:
             needle = query.lower()

@@ -11,6 +11,23 @@ from bot.main.pasarguard_node_bootstrap import bootstrap_pasarguard_for_server
 from bot.models import GlobalSettings, Logging, Server
 from django.conf import settings
 
+
+@shared_task(name="admindashboardx.check_server_health")
+def check_server_health():
+    from apps.admindashboardx.panel_health import collect_and_store
+
+    payload = collect_and_store()
+    summary = payload.get("summary") or {}
+    return {
+        "checked_at": payload.get("checked_at"),
+        "servers": summary.get("servers", 0),
+        "ok": summary.get("ok", 0),
+        "down": summary.get("down", 0),
+        "ping_ok": summary.get("ping_ok", 0),
+        "ping_down": summary.get("ping_down", 0),
+    }
+
+
 @shared_task(name="admindashboardx.initialize_server_task")
 def initialize_server_task(server_id: int):
     cloud_init = """#!/bin/bash

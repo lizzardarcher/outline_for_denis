@@ -11,8 +11,9 @@ ALIAS_DOMAIN = 'https://dom-vpn.su'
 PROXY_DOMAIN = 'https://tm3949.craftum.io'
 
 
-DEBUG = True
-# DEBUG = False
+
+# DEBUG = True
+DEBUG = False
 
 ALLOWED_HOSTS = os.getenv('DJANGO_ALLOWED_HOSTS').split(',')
 CSRF_TRUSTED_ORIGINS = os.getenv('CSRF_TRUSTED_ORIGINS').split(',')

@@ -13,7 +13,8 @@ from django.core.paginator import Paginator
 from django.db.models import Q, Sum
 
 from django.http import HttpResponse
-from django.shortcuts import redirect, render
+
+from django.shortcuts import get_object_or_404, redirect, render
 
 from django.urls import path
 from django.utils import timezone
@@ -22,7 +23,7 @@ from django_celery_beat.models import *
 from django_admin_inline_paginator.admin import TabularInlinePaginated
 
 from apps.admindashboardx.models import ManualTaskRun
-from apps.admindashboardx.panel_health import collect_and_store, get_cached_snapshot
+from apps.admindashboardx.panel_health import attach_duration_labels, collect_and_store, format_streak, get_cached_snapshot
 from bot.models import *
 
 from openpyxl import Workbook
@@ -753,6 +754,11 @@ class ServerAdmin(BaseAdmin):
                 wrap(self.panel_health_view),
                 name="%s_%s_panel_health" % info,
             ),
+            path(
+                "panel-health/<int:server_id>/log/",
+                wrap(self.panel_health_log_view),
+                name="%s_%s_panel_health_log" % info,
+            ),
         ]
         return extra + urls
 
@@ -776,6 +782,7 @@ class ServerAdmin(BaseAdmin):
                 checked_at = None
 
         rows = list((snapshot or {}).get("rows") or [])
+        attach_duration_labels(rows)
         paginator = Paginator(rows, 50)
         rows_page = paginator.get_page(request.GET.get("page", 1))
 
@@ -789,6 +796,26 @@ class ServerAdmin(BaseAdmin):
             "rows_page": rows_page,
         }
         return render(request, "admin/bot/server/panel_health.html", context)
+
+    def panel_health_log_view(self, request, server_id):
+        server = get_object_or_404(Server, pk=server_id)
+        samples = server.health_samples.all()
+        paginator = Paginator(samples, 50)
+        samples_page = paginator.get_page(request.GET.get("page", 1))
+        now = timezone.now()
+        states = {item.channel: item for item in server.health_states.all()}
+        for item in states.values():
+            item.duration_label = format_streak(item.streak_started_at, now)
+        context = {
+            **self.admin_site.each_context(request),
+            "title": f"Лог доступности · {server.hosting or server.ip_address or server.pk}",
+            "opts": self.model._meta,
+            "server": server,
+            "panel_state": states.get("panel"),
+            "ping_state": states.get("ping"),
+            "samples_page": samples_page,
+        }
+        return render(request, "admin/bot/server/panel_health_log.html", context)
 
 
 @admin.register(Country)

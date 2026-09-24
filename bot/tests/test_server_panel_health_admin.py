@@ -5,8 +5,11 @@ from django.urls import reverse
 from django.utils import timezone
 from unittest.mock import patch
 
+
+from apps.admindashboardx.models import ServerHealthSample
 from apps.admindashboardx.panel_health import CACHE_KEY, collect_and_store
 from apps.admindashboardx.tests.test_panel_health import _celerity_api, _marzban_api, _server
+from bot.models import Server
 
 
 
@@ -22,6 +25,9 @@ User = get_user_model()
 class ServerPanelHealthAdminTests(TestCase):
     def setUp(self):
         cache.clear()
+        patcher = patch("apps.admindashboardx.panel_health._ping_servers", return_value={})
+        patcher.start()
+        self.addCleanup(patcher.stop)
         self.admin_user = User.objects.create_user(
             "admin-health",
             password="secret123!",
@@ -81,3 +87,31 @@ class ServerPanelHealthAdminTests(TestCase):
         response = self.client.get(reverse("admin:bot_server_changelist"))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, reverse("admin:bot_server_panel_health"))
+
+    def test_health_page_links_to_server_log(self):
+        server = Server.objects.create(hosting="Zomro DE1", ip_address="10.1.1.1", is_active=True)
+        ServerHealthSample.objects.create(
+            server=server,
+            checked_at=timezone.now(),
+            panel_status="ok",
+            panel_detail="доступен",
+            ping_status="ok",
+            ping_detail="доступен",
+            ping_ms=15,
+        )
+        collect_and_store(
+            servers=[server],
+            marzban_api=_marzban_api([{"id": 1, "address": "10.1.1.1", "status": "connected"}]),
+            celerity_api=_celerity_api([{"_id": "n1", "ip": "10.1.1.1", "status": "online"}]),
+            ping_hosts={"10.1.1.1": {"status": "ok", "detail": "доступен", "ping_ms": 15}},
+        )
+        response = self.client.get(reverse("admin:bot_server_panel_health"))
+        log_url = reverse("admin:bot_server_panel_health_log", args=[server.pk])
+        self.assertContains(response, log_url)
+        self.assertContains(response, "Сеть")
+
+        log_response = self.client.get(log_url)
+        self.assertEqual(log_response.status_code, 200)
+        self.assertContains(log_response, "Zomro DE1")
+        self.assertContains(log_response, "доступен")
+        self.assertContains(log_response, "15")

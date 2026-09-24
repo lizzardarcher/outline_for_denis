@@ -1,5 +1,6 @@
 $ sudo apt-get install sshpass
 sshpass -p your_password ssh -o "StrictHostKeyChecking no" user@hostname
 
-sudo bash -c "$(wget -qO- https://raw.githubusercontent.com/Jigsaw-Code/outline-server/master/src/server_manager/install_scripts/install_server.sh)"
+sudo bash -c "$(curl -sL https://github.com/Gozargah/Marzban-scripts/raw/master/marzban-node.sh)" @ install
 
+openssl x509 -in /etc/hysteria/cert.pem -outform DER | sha256sum
