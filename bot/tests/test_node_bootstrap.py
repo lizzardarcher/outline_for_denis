@@ -6,6 +6,7 @@ from django.test import SimpleTestCase, override_settings
 from bot.main.celerity_node_bootstrap import (
     bootstrap_celerity_for_server,
     build_celerity_node_payload,
+    pin_sha256_from_setup_logs,
     resolve_celerity_node_sni,
 )
 from bot.main.marzban_node_bootstrap import build_marzban_node_install_script
@@ -15,7 +16,6 @@ _PEM = """-----BEGIN CERTIFICATE-----
 MIIB
 -----END CERTIFICATE-----
 """
-
 
 class _Country:
     name_for_app = "NL"
@@ -41,6 +41,7 @@ class MarzbanInstallScriptTests(SimpleTestCase):
         self.assertIn('XRAY_API_PORT: "62051"', script)
         self.assertIn('SERVICE_PROTOCOL: "rest"', script)
         self.assertIn("echo \"MARZBAN_NODE_UP\"", script)
+        self.assertIn("HYSTERIA_PIN_SHA256=", script)
         self.assertIn("{{.State.Running}}", script)
 
 
@@ -57,19 +58,24 @@ class CeleritySniTests(SimpleTestCase):
 
 
 class _Api:
-    def __init__(self):
+    def __init__(self, setups=None):
         self.updated = None
+        self.updates = []
         self.setup_called = False
+        self.setups = list(setups or [])
 
     def find_node_id_by_ip(self, ip, node_type):
         return True, "node-1"
 
     def update_node(self, node_id, data):
         self.updated = (node_id, data)
-        return True, {"sni": data["sni"]}
+        self.updates.append(data)
+        return True, data
 
-    def setup_node(self, node_id, request_timeout=300):
+    def setup_node(self, node_id, data=None, request_timeout=300):
         self.setup_called = True
+        if self.setups:
+            return self.setups.pop(0)
         return True, {"ok": True}
 
 
@@ -101,3 +107,36 @@ class CelerityActivationTests(SimpleTestCase):
         sync.assert_called_once()
         self.assertEqual(sync.call_args.kwargs["sni_override"], "bing.com")
         mark.assert_called_once()
+
+
+class PanelSshInstallTests(SimpleTestCase):
+    def test_pin_line_from_setup_logs(self):
+        pin = "3E0CAA6110D55DC28123208EB5495C8D8C881DB3D8371C1E2F87AD0CEECDDB6E"
+        found = pin_sha256_from_setup_logs(
+            {"logs": ["docker pull", f"HYSTERIA_PIN_SHA256={pin.lower()}"]}
+        )
+        self.assertEqual(found, pin)
+
+    @patch("bot.main.celerity_node_bootstrap._celerity_group_id", return_value="g1")
+    @patch("bot.main.celerity_node_bootstrap.mark_server_c3_activated")
+    @patch("bot.main.celerity_node_bootstrap.save_hysteria_tls_meta_to_server")
+    @patch("bot.main.celerity_node_bootstrap.try_sync_hysteria_tls_meta_after_setup")
+    def test_pin_comes_from_panel_setup_not_local_ssh(self, sync, save, mark, _group):
+        pin = "AB" * 32
+        api = _Api(setups=[
+            (True, {"logs": ["MARZBAN_NODE_UP"]}),
+            (True, {"logs": [f"HYSTERIA_PIN_SHA256={pin}"]}),
+        ])
+        ok, detail = bootstrap_celerity_for_server(
+            _Server(),
+            api=api,
+            init_script="echo MARZBAN_NODE_UP",
+        )
+        self.assertTrue(ok)
+        self.assertIn("MARZBAN_NODE_UP", detail)
+        sync.assert_not_called()
+        save.assert_called_once()
+        self.assertEqual(save.call_args.kwargs["pin"], pin)
+        self.assertEqual(save.call_args.kwargs["sni"], "bing.com")
+        mark.assert_called_once()
+        self.assertEqual(api.updates[0]["initScript"], "echo MARZBAN_NODE_UP")

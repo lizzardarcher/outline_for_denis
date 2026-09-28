@@ -4,20 +4,31 @@ Celerity (C³): создание ноды в панели (POST /nodes при н
 """
 from __future__ import annotations
 
-
 import json
+import re
 from typing import Any, Callable, Optional, Tuple
 
 from django.conf import settings
 
 from bot.main.CelerityAPI import CelerityAPI
 from bot.main.celerity_key_issue import _celerity_group_id
-from bot.main.hysteria_tls_meta import try_sync_hysteria_tls_meta_after_setup
+from bot.main.hysteria_tls_meta import (
+    save_hysteria_tls_meta_to_server,
+    try_sync_hysteria_tls_meta_after_setup,
+)
 from bot.models import Server
 
 
 _SERVER_PASSWORD_PLACEHOLDERS = frozenset(("", "<PASSWORD>"))
 _DEFAULT_HYSTERIA_SNI = "bing.com"
+_PIN_LINE = re.compile(r"HYSTERIA_PIN_SHA256=([0-9A-Fa-f]{64})")
+# Короткий скрипт для второго setup: cert уже создан, SSH идёт с панели Celerity.
+HYSTERIA_PIN_INIT_SCRIPT = r"""
+set -e
+test -f /etc/hysteria/cert.pem
+pin="$(openssl x509 -in /etc/hysteria/cert.pem -outform DER | sha256sum | awk '{print $1}')"
+echo "HYSTERIA_PIN_SHA256=${pin}"
+"""
 
 
 def _flag_from_country_name_for_app(name: Optional[str]) -> str:
@@ -133,6 +144,21 @@ def create_celerity_node_or_find(
 
     return False, "", res_c
 
+def flatten_setup_logs(data: Any) -> str:
+    if isinstance(data, dict):
+        logs = data.get("logs")
+        if isinstance(logs, list):
+            return "\n".join(str(item) for item in logs)
+        if isinstance(logs, str):
+            return logs
+    return "" if data is None else str(data)
+
+
+def pin_sha256_from_setup_logs(data: Any) -> str:
+    match = _PIN_LINE.search(flatten_setup_logs(data))
+    return match.group(1).upper() if match else ""
+
+
 def ensure_celerity_node_sni(api: CelerityAPI, node_id: str, sni: str) -> Tuple[bool, Any]:
     """PUT только sni: панель не затирает ssh и остальные поля."""
     return api.update_node(node_id, {"sni": sni})
@@ -143,6 +169,44 @@ def mark_server_c3_activated(server: Server) -> None:
     server.save(update_fields=["is_c3celeryty_activated"])
 
 
+def _save_pin_from_logs(server: Server, data: Any, sni: str) -> str:
+    pin = pin_sha256_from_setup_logs(data)
+    if not pin:
+        return ""
+    save_hysteria_tls_meta_to_server(server, pin=pin, sni=sni)
+    return pin
+
+
+def _pull_pin_via_panel_setup(
+    api: CelerityAPI,
+    node_id: str,
+    server: Server,
+    sni: str,
+    emit: Callable[[str, str], None],
+) -> str:
+    """Второй setup без переустановки Hysteria: initScript печатает pin, SSH делает панель."""
+    ok_put, err_put = api.update_node(node_id, {"initScript": HYSTERIA_PIN_INIT_SCRIPT})
+    if not ok_put:
+        emit("WARNING", f"PUT pin script: {err_put!r}")
+        return ""
+    emit("DEBUG", "POST setup для pinSHA256 (без переустановки Hysteria)")
+    ok_pin, data_pin = api.setup_node(
+        node_id,
+        data={
+            "installHysteria": False,
+            "setupPortHopping": False,
+            "restartService": False,
+        },
+        request_timeout=180,
+    )
+    if not ok_pin:
+        emit("WARNING", f"setup pin: {data_pin!r}")
+        return ""
+    pin = _save_pin_from_logs(server, data_pin, sni)
+    api.update_node(node_id, {"initScript": ""})
+    return pin
+
+
 def bootstrap_celerity_for_server(
     server: Server,
     *,
@@ -150,6 +214,7 @@ def bootstrap_celerity_for_server(
     node_type: str = "hysteria",
     setup_timeout: int = 300,
     log_fn: Optional[Callable[[str, str], None]] = None,
+    init_script: Optional[str] = None,
 ) -> Tuple[bool, str]:
     """
     provision + setup для одного Server. При успехе — is_c3celeryty_activated=True.
@@ -191,7 +256,11 @@ def bootstrap_celerity_for_server(
         _emit("DEBUG", f"нода уже в панели node_id={node_id!r}")
 
     sni = resolve_celerity_node_sni()
-    ok_sni, err_sni = ensure_celerity_node_sni(api, node_id, sni)
+    node_update: dict = {"sni": sni}
+    if init_script:
+        node_update["initScript"] = init_script
+        _emit("DEBUG", "initScript: marzban-node ставится по SSH панели Celerity, до Hysteria")
+    ok_sni, err_sni = api.update_node(node_id, node_update)
     if not ok_sni:
         _emit("ERROR", f"PUT sni={sni}: {err_sni!r}")
         return False, f"PUT sni={sni}: {err_sni!r}"
@@ -199,21 +268,38 @@ def bootstrap_celerity_for_server(
 
     _emit("DEBUG", f"POST setup node_id={node_id!r} (timeout {setup_timeout}s)")
     ok_setup, data = api.setup_node(node_id, request_timeout=setup_timeout)
+    logs_text = flatten_setup_logs(data)
+    marzban_up = "MARZBAN_NODE_UP" in logs_text
     if not ok_setup:
         _emit("ERROR", f"setup_node: {data!r}")
-        return False, f"setup_node: {data!r}"
+        failed = f"setup_node: {data!r}"
+        if marzban_up:
+            failed = "MARZBAN_NODE_UP " + failed
+        return False, failed
 
-    synced = try_sync_hysteria_tls_meta_after_setup(
-        server,
-        log_fn=_emit,
-        sni_override=sni,
-    )
-    if not synced:
-        return False, "setup прошёл, но pinSHA256 не снят с /etc/hysteria/cert.pem"
+    pin = _save_pin_from_logs(server, data, sni)
+    if pin:
+        _emit("INFO", f"hysteria TLS meta: pin={pin[:8]}… sni={sni}")
+    elif init_script:
+        pin = _pull_pin_via_panel_setup(api, node_id, server, sni, _emit)
+        if pin:
+            _emit("INFO", f"hysteria TLS meta: pin={pin[:8]}… sni={sni}")
+    if not pin:
+        synced = try_sync_hysteria_tls_meta_after_setup(
+            server,
+            log_fn=_emit,
+            sni_override=sni,
+            attempts=1 if init_script else 4,
+        )
+        if not synced:
+            failed = "setup прошёл, но pinSHA256 не снят с /etc/hysteria/cert.pem"
+            if marzban_up:
+                failed = "MARZBAN_NODE_UP " + failed
+            return False, failed
 
     mark_server_c3_activated(server)
-    detail = ""
+    detail = "MARZBAN_NODE_UP " if marzban_up else ""
     if isinstance(data, dict) and data.get("logs"):
-        detail = json.dumps(data, ensure_ascii=False, default=str)[:2000]
+        detail += json.dumps(data, ensure_ascii=False, default=str)[:1500]
     _emit("INFO", "setup OK, pinSHA256 сохранён, is_c3celeryty_activated=True")
     return True, detail or "OK"

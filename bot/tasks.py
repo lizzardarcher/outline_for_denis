@@ -249,25 +249,14 @@ def init_all_panel_servers():
                 server,
                 log_fn=lambda level, msg: _log("PasarGuard", level, msg),
             )
-            server.refresh_from_db(
-                fields=["is_pasarguard_activated", "is_activated_vless", "is_c3celeryty_activated"],
+
+        if getattr(settings, "VPN_MARZBAN_ENABLED", True):
+            provision_marzban_then_celerity(server)
+        elif not server.is_c3celeryty_activated:
+            bootstrap_celerity_for_server(
+                server,
+                log_fn=lambda level, msg: _log("hysteria", level, msg),
             )
-
-        marzban_on = getattr(settings, "VPN_MARZBAN_ENABLED", True)
-        if marzban_on and not server.is_activated_vless:
-            _init_marzban_single_server(server)
-            server.refresh_from_db(
-                fields=["is_pasarguard_activated", "is_activated_vless", "is_c3celeryty_activated"],
-            )
-
-        if (marzban_on and not server.is_activated_vless) or server.is_c3celeryty_activated:
-            continue
-
-        bootstrap_celerity_for_server(
-            server,
-            log_fn=lambda level, msg: _log("hysteria", level, msg),
-        )
-
 
 @shared_task
 def init_marzban_and_celerity_servers():

@@ -172,8 +172,11 @@ if [ "$running" != "true" ]; then
   exit 1
 fi
 echo "MARZBAN_NODE_UP"
+if [ -f /etc/hysteria/cert.pem ]; then
+  pin="$(openssl x509 -in /etc/hysteria/cert.pem -outform DER | sha256sum | awk '{{print $1}}')"
+  echo "HYSTERIA_PIN_SHA256=${{pin}}"
+fi
 """
-
 
 def _node_display_name(server: Server) -> str:
     country_label = ""
