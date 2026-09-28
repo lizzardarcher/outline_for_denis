@@ -58,6 +58,8 @@ PASARGUARD_API = os.getenv('PASARGUARD_API')
 PASARGUARD_ADMIN_USERNAME = os.getenv('PASARGUARD_ADMIN_USERNAME')
 PASARGUARD_ADMIN_PASSWORD = os.getenv('PASARGUARD_ADMIN_PASSWORD')
 PASARGUARD_NODE_CERT_FILE = os.getenv('PASARGUARD_NODE_CERT_FILE')
+
+MARZBAN_NODE_CERT_FILE = os.getenv('MARZBAN_NODE_CERT_FILE')
 VPN_PASARGUARD_DUAL_WRITE = os.getenv('VPN_PASARGUARD_DUAL_WRITE', 'True').lower() in ('1', 'true', 'yes')
 VPN_VLESS_LINK_SOURCE = (os.getenv('VPN_VLESS_LINK_SOURCE') or 'pasarguard').strip().lower()
 VPN_MARZBAN_ENABLED = os.getenv('VPN_MARZBAN_ENABLED', 'True').lower() in ('1', 'true', 'yes')
@@ -66,6 +68,8 @@ C3CELERYTY_API_KEY= os.getenv('C3CELERYTY_API_KEY')
 # Группа серверов в панели Celerity для POST /users (как в bot/main/celerity_deploy.py).
 CELERITY_SERVER_GROUP_NAME = os.getenv('CELERITY_SERVER_GROUP_NAME', 'Марвел')
 CELERITY_SERVER_GROUP_ID = os.getenv('CELERITY_SERVER_GROUP_ID') or None
+# SNI маскировки Hysteria2. Пустое значение в коде тоже становится bing.com.
+CELERITY_NODE_SNI = os.getenv('CELERITY_NODE_SNI', 'bing.com')
 
 
 YOOKASSA_SHOP_ID = os.getenv('YOOKASSA_SHOP_ID_LIVE')

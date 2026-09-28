@@ -15,7 +15,9 @@ from bot.main.celerity_key_issue import _celerity_group_id
 from bot.main.hysteria_tls_meta import try_sync_hysteria_tls_meta_after_setup
 from bot.models import Server
 
+
 _SERVER_PASSWORD_PLACEHOLDERS = frozenset(("", "<PASSWORD>"))
+_DEFAULT_HYSTERIA_SNI = "bing.com"
 
 
 def _flag_from_country_name_for_app(name: Optional[str]) -> str:
@@ -38,6 +40,13 @@ def _flag_emoji_for_server(server: Server) -> str:
     return _flag_from_country_name_for_app(
         getattr(country, "name_for_app", None) or ""
     )
+
+
+def resolve_celerity_node_sni() -> str:
+    """SNI маскировки Hysteria. Пустая настройка — bing.com."""
+    raw = getattr(settings, "CELERITY_NODE_SNI", None)
+    sni = str(raw).strip() if raw else ""
+    return sni or _DEFAULT_HYSTERIA_SNI
 
 
 def django_ssh_looks_weak(server: Server) -> bool:
@@ -83,12 +92,11 @@ def build_celerity_node_payload(server: Server, group_id: str, node_type: str) -
     }
     if flag:
         body["flag"] = flag
-    dom = getattr(settings, "CELERITY_NODE_DOMAIN", None)
+    # domain включает ACME в панели и сертификат перестаёт быть self-signed CN=bing.com.
+    dom = (getattr(settings, "CELERITY_NODE_DOMAIN", None) or "").strip()
     if dom:
         body["domain"] = dom
-    sni = getattr(settings, "CELERITY_NODE_SNI", None)
-    if sni:
-        body["sni"] = sni
+    body["sni"] = resolve_celerity_node_sni()
     return body
 
 
@@ -124,6 +132,11 @@ def create_celerity_node_or_find(
             return False, "", f"duplicate but find failed: {nid2!r}"
 
     return False, "", res_c
+
+def ensure_celerity_node_sni(api: CelerityAPI, node_id: str, sni: str) -> Tuple[bool, Any]:
+    """PUT только sni: панель не затирает ssh и остальные поля."""
+    return api.update_node(node_id, {"sni": sni})
+
 
 def mark_server_c3_activated(server: Server) -> None:
     server.is_c3celeryty_activated = True
@@ -177,16 +190,30 @@ def bootstrap_celerity_for_server(
     else:
         _emit("DEBUG", f"нода уже в панели node_id={node_id!r}")
 
+    sni = resolve_celerity_node_sni()
+    ok_sni, err_sni = ensure_celerity_node_sni(api, node_id, sni)
+    if not ok_sni:
+        _emit("ERROR", f"PUT sni={sni}: {err_sni!r}")
+        return False, f"PUT sni={sni}: {err_sni!r}"
+    _emit("DEBUG", f"Hysteria TLS SNI={sni}")
+
     _emit("DEBUG", f"POST setup node_id={node_id!r} (timeout {setup_timeout}s)")
     ok_setup, data = api.setup_node(node_id, request_timeout=setup_timeout)
     if not ok_setup:
         _emit("ERROR", f"setup_node: {data!r}")
         return False, f"setup_node: {data!r}"
 
-    try_sync_hysteria_tls_meta_after_setup(server, log_fn=_emit)
+    synced = try_sync_hysteria_tls_meta_after_setup(
+        server,
+        log_fn=_emit,
+        sni_override=sni,
+    )
+    if not synced:
+        return False, "setup прошёл, но pinSHA256 не снят с /etc/hysteria/cert.pem"
+
     mark_server_c3_activated(server)
     detail = ""
     if isinstance(data, dict) and data.get("logs"):
         detail = json.dumps(data, ensure_ascii=False, default=str)[:2000]
-    _emit("INFO", "setup OK, is_c3celeryty_activated=True")
+    _emit("INFO", "setup OK, pinSHA256 сохранён, is_c3celeryty_activated=True")
     return True, detail or "OK"

@@ -30,8 +30,9 @@ def _load_node_cert_pem() -> Optional[str]:
     return raw
 
 
+
 def build_marzban_node_cloud_init(cert_pem: str) -> str:
-    """Bash-скрипт: установка marzban-node + запись cert (как bot/tasks.py CLOUD_INIT_MARZBAN)."""
+    """Bash-скрипт: установка marzban-node + запись cert PasarGuard."""
     cert_escaped = cert_pem.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
     return f"""#!/bin/bash
 

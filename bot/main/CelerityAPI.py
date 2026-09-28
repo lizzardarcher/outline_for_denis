@@ -196,6 +196,16 @@ class CelerityAPI:
         nid = quote(str(node_id), safe="")
         return self._make_request("DELETE", f"/nodes/{nid}")
 
+
+    def update_node(self, node_id: str, data: dict):
+        """
+        PUT /nodes/:id — частичное обновление (панель применяет только переданные поля).
+
+        Для SNI достаточно {"sni": "bing.com"}: ssh и остальные поля не затираются.
+        """
+        nid = quote(str(node_id), safe="")
+        return self._make_request("PUT", f"/nodes/{nid}", data=data)
+
     def create_node(self, data: dict):
         """
         POST /nodes — создание ноды (type, name, ip, port, groups, …).

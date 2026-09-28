@@ -4,6 +4,7 @@ from bot.main.celerity_key_issue import sanitize_hysteria2_uri_for_happ
 from bot.main.hysteria_tls_meta import (
     parse_hysteria_cert_ssh_output,
     parse_pin_sha256_from_fingerprint_line,
+    parse_pin_sha256_from_sha256sum_line,
     parse_sni_from_subject_line,
 )
 
@@ -15,12 +16,31 @@ class HysteriaTlsMetaParseTests(SimpleTestCase):
             "3E0CAA6110D55DC28123208EB5495C8D8C881DB3D8371C1E2F87AD0CEECDDB6E",
         )
 
+
     def test_parse_sni_from_subject(self):
         self.assertEqual(parse_sni_from_subject_line("subject=CN = bing.com"), "bing.com")
         self.assertEqual(
             parse_sni_from_subject_line("subject=C=US, CN=example.com, O=Test"),
             "example.com",
         )
+
+    def test_parse_sha256sum_line(self):
+        self.assertEqual(
+            parse_pin_sha256_from_sha256sum_line(
+                "3e0caa6110d55dc28123208eb5495c8d8c881db3d8371c1e2f87ad0ceecddb6e  -"
+            ),
+            "3E0CAA6110D55DC28123208EB5495C8D8C881DB3D8371C1E2F87AD0CEECDDB6E",
+        )
+
+    def test_parse_ssh_output_prefers_sha256sum(self):
+        stdout = (
+            "3E0CAA6110D55DC28123208EB5495C8D8C881DB3D8371C1E2F87AD0CEECDDB6E  -\n"
+            "sha256 Fingerprint=AA:AA:AA:61:10:D5:5D:C2:81:23:20:8E:B5:49:5C:8D:8C:88:1D:B3:D8:37:1C:1E:2F:87:AD:0C:EE:CD:DB:6E\n"
+            "subject=CN = bing.com\n"
+        )
+        pin, sni = parse_hysteria_cert_ssh_output(stdout)
+        self.assertEqual(sni, "bing.com")
+        self.assertTrue(pin.startswith("3E0CAA61"))
 
     def test_parse_ssh_output(self):
         stdout = (

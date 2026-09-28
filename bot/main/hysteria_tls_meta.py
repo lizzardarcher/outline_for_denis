@@ -5,9 +5,9 @@ Pin берётся из /etc/hysteria/cert.pem на сервере (QUIC cert), 
 """
 from __future__ import annotations
 
-
 import re
-from typing import Any, Callable, Optional, Tuple
+import time
+from typing import Callable, Optional, Tuple
 
 import paramiko
 from django.conf import settings
@@ -23,6 +23,7 @@ _FETCH_CMD_TEMPLATE = r"""
 set -e
 CERT="{cert_path}"
 test -f "$CERT"
+openssl x509 -in "$CERT" -outform DER | sha256sum
 openssl x509 -in "$CERT" -noout -fingerprint -sha256
 openssl x509 -in "$CERT" -noout -subject
 """
@@ -56,14 +57,38 @@ def parse_sni_from_subject_line(line: str) -> str:
     return match.group(1).strip()
 
 
+def parse_pin_sha256_from_sha256sum_line(line: str) -> str:
+    """
+    ``openssl ... | sha256sum`` → ``3E0CAA...  -``.
+    """
+    raw = (line or "").strip().split()
+    if not raw:
+        return ""
+    token = raw[0].replace(":", "").upper()
+    if len(token) == 64 and all(c in "0123456789ABCDEF" for c in token):
+        return token
+    return ""
+
+
 def parse_hysteria_cert_ssh_output(stdout: str) -> Tuple[str, str]:
     """
     Returns (pin_sha256_hex, sni). Raises ValueError on invalid output.
+
+    Pin берётся из sha256sum DER (та же команда, что вручную в админке),
+    иначе из openssl fingerprint.
     """
     lines = [ln.strip() for ln in (stdout or "").splitlines() if ln.strip()]
+    pin = ""
+    for line in lines:
+        if "fingerprint" in line.lower() or line.lower().startswith("subject="):
+            continue
+        pin = parse_pin_sha256_from_sha256sum_line(line)
+        if pin:
+            break
     fp_line = next((ln for ln in lines if "fingerprint" in ln.lower()), "")
+    if not pin:
+        pin = parse_pin_sha256_from_fingerprint_line(fp_line)
     subj_line = next((ln for ln in lines if ln.lower().startswith("subject=")), "")
-    pin = parse_pin_sha256_from_fingerprint_line(fp_line)
     sni = parse_sni_from_subject_line(subj_line)
     if len(pin) != 64 or not all(c in "0123456789ABCDEF" for c in pin):
         raise ValueError(f"некорректный pin SHA-256: {fp_line!r}")
@@ -89,7 +114,9 @@ def _ssh_connect(server: Server) -> paramiko.SSHClient:
     connect_kw = {
         "hostname": ip,
         "username": user,
-        "timeout": 20,
+        "timeout": 40,
+        "banner_timeout": 40,
+        "auth_timeout": 40,
         "allow_agent": False,
         "look_for_keys": False,
     }
@@ -147,27 +174,54 @@ def save_hysteria_tls_meta_to_server(server: Server, *, pin: str, sni: str) -> N
     )
 
 
-def sync_hysteria_tls_meta_for_server(server: Server) -> Tuple[bool, str]:
+def sync_hysteria_tls_meta_for_server(
+    server: Server,
+    *,
+    sni_override: Optional[str] = None,
+    attempts: int = 4,
+) -> Tuple[bool, str]:
     """
-    Снимает pin/SNI по SSH и сохраняет в Server.
+    Снимает pin по SSH и сохраняет в Server.
+
+    sni_override (обычно bing.com) пишется в hysteria_tls_sni даже если CN сертификата другой.
+    Несколько попыток: сразу после setup SSH и cert.pem ещё могут быть недоступны.
 
     Returns:
         (True, "OK") или (False, сообщение об ошибке)
     """
-    try:
-        pin, sni = fetch_hysteria_tls_meta_via_ssh(server)
-        save_hysteria_tls_meta_to_server(server, pin=pin, sni=sni)
-        return True, f"pin={pin[:8]}… sni={sni}"
-    except Exception as e:
-        return False, str(e)
+    forced_sni = (sni_override or "").strip()
+    last_error = "нет попыток"
+    tries = max(1, int(attempts))
+    for attempt in range(1, tries + 1):
+        try:
+            pin, cert_sni = fetch_hysteria_tls_meta_via_ssh(server)
+            sni = forced_sni or cert_sni
+            save_hysteria_tls_meta_to_server(server, pin=pin, sni=sni)
+            detail = f"pin={pin[:8]}… sni={sni}"
+            if cert_sni and forced_sni and cert_sni != forced_sni:
+                detail += f" (CN={cert_sni})"
+            return True, detail
+        except Exception as exc:
+            last_error = str(exc)
+            if attempt < tries:
+                time.sleep(8)
+    return False, last_error
 
 
 def try_sync_hysteria_tls_meta_after_setup(
     server: Server,
     log_fn: Optional[Callable[[str, str], None]] = None,
-) -> None:
-    """После Celerity setup: best-effort sync pin/SNI (не блокирует активацию ноды)."""
-    ok, detail = sync_hysteria_tls_meta_for_server(server)
+    *,
+    sni_override: Optional[str] = None,
+    attempts: int = 4,
+) -> bool:
+    """После Celerity setup. False — pin не сохранён, ноду активировать нельзя."""
+    ok, detail = sync_hysteria_tls_meta_for_server(
+        server,
+        sni_override=sni_override,
+        attempts=attempts,
+    )
     if log_fn:
         level = "INFO" if ok else "WARNING"
         log_fn(level, f"hysteria TLS meta: {detail}")
+    return ok
