@@ -3,9 +3,11 @@ from unittest.mock import patch
 
 from django.test import SimpleTestCase, override_settings
 
+
 from bot.main.celerity_node_bootstrap import (
     bootstrap_celerity_for_server,
     build_celerity_node_payload,
+    hysteria_restart_looks_failed,
     pin_sha256_from_setup_logs,
     resolve_celerity_node_sni,
 )
@@ -91,7 +93,7 @@ class CelerityActivationTests(SimpleTestCase):
         ok, detail = bootstrap_celerity_for_server(_Server(), api=api)
         self.assertFalse(ok)
         self.assertIn("pinSHA256", detail)
-        self.assertEqual(api.updated[1]["sni"], "bing.com")
+        self.assertEqual(api.updates[0]["sni"], "bing.com")
         self.assertTrue(api.setup_called)
         mark.assert_not_called()
 
@@ -110,6 +112,17 @@ class CelerityActivationTests(SimpleTestCase):
 
 
 class PanelSshInstallTests(SimpleTestCase):
+    def test_old_journal_permission_denied_is_not_a_failure_when_service_is_up(self):
+        text = (
+            "Active: active (running) since Wed 2026-09-30 08:04:00 UTC\n"
+            "FATAL failed to load server config tls.key: open /etc/hysteria/key.pem: permission denied\n"
+        )
+        self.assertFalse(hysteria_restart_looks_failed(text))
+
+    def test_permission_denied_without_running_service_is_a_failure(self):
+        text = "FATAL tls.key: open /etc/hysteria/key.pem: permission denied"
+        self.assertTrue(hysteria_restart_looks_failed(text))
+
     def test_pin_line_from_setup_logs(self):
         pin = "3E0CAA6110D55DC28123208EB5495C8D8C881DB3D8371C1E2F87AD0CEECDDB6E"
         found = pin_sha256_from_setup_logs(

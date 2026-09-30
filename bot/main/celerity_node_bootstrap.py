@@ -18,13 +18,37 @@ from bot.main.hysteria_tls_meta import (
 )
 from bot.models import Server
 
-
 _SERVER_PASSWORD_PLACEHOLDERS = frozenset(("", "<PASSWORD>"))
 _DEFAULT_HYSTERIA_SNI = "bing.com"
 _PIN_LINE = re.compile(r"HYSTERIA_PIN_SHA256=([0-9A-Fa-f]{64})")
-# Короткий скрипт для второго setup: cert уже создан, SSH идёт с панели Celerity.
+# Второй setup: cert уже есть. Сервис идёт от User=hysteria, а каталог после
+# install -D часто остаётся 700 root — отсюда tls.key permission denied.
+# Права чиним до перезапуска, который делает сама панель (restartService).
 HYSTERIA_PIN_INIT_SCRIPT = r"""
 set -e
+mkdir -p /etc/hysteria
+chmod 755 /etc/hysteria
+svc_user="$(sed -n 's/^User=//p' /etc/systemd/system/hysteria-server.service 2>/dev/null | tail -1)"
+if [ -z "$svc_user" ] || [ "$svc_user" = "root" ]; then
+  svc_user="hysteria"
+fi
+if [ -f /etc/hysteria/key.pem ] && id "$svc_user" >/dev/null 2>&1; then
+  chown "$svc_user:$svc_user" /etc/hysteria/key.pem /etc/hysteria/cert.pem
+fi
+if [ -f /etc/hysteria/key.pem ]; then
+  chmod 600 /etc/hysteria/key.pem
+fi
+if [ -f /etc/hysteria/cert.pem ]; then
+  chmod 644 /etc/hysteria/cert.pem
+fi
+if id "$svc_user" >/dev/null 2>&1 && [ -f /etc/hysteria/key.pem ] && command -v su >/dev/null 2>&1; then
+  if su -s /bin/sh "$svc_user" -c 'test -r /etc/hysteria/key.pem'; then
+    echo "HYSTERIA_KEY_READABLE"
+  else
+    echo "HYSTERIA_KEY_NOT_READABLE"
+    ls -la /etc/hysteria >&2 || true
+  fi
+fi
 test -f /etc/hysteria/cert.pem
 pin="$(openssl x509 -in /etc/hysteria/cert.pem -outform DER | sha256sum | awk '{print $1}')"
 echo "HYSTERIA_PIN_SHA256=${pin}"
@@ -177,34 +201,56 @@ def _save_pin_from_logs(server: Server, data: Any, sni: str) -> str:
     return pin
 
 
+def hysteria_restart_looks_failed(logs_text: str) -> bool:
+    """
+    systemctl status после restart. Старый FATAL в journalctl не считается,
+    если текущее состояние — active (running).
+    """
+    text = logs_text or ""
+    if "Active: active (running)" in text or "server up and running" in text:
+        return False
+    if "Active:" in text or "permission denied" in text.lower():
+        return True
+    return False
+
+
 def _pull_pin_via_panel_setup(
     api: CelerityAPI,
     node_id: str,
     server: Server,
     sni: str,
     emit: Callable[[str, str], None],
-) -> str:
-    """Второй setup без переустановки Hysteria: initScript печатает pin, SSH делает панель."""
+) -> Tuple[str, bool]:
+    """
+    Короткий setup: права на key.pem, pinSHA256, затем панель перезапускает hysteria-server.
+    Returns (pin, restart_failed).
+    """
     ok_put, err_put = api.update_node(node_id, {"initScript": HYSTERIA_PIN_INIT_SCRIPT})
     if not ok_put:
         emit("WARNING", f"PUT pin script: {err_put!r}")
-        return ""
-    emit("DEBUG", "POST setup для pinSHA256 (без переустановки Hysteria)")
+        return "", False
+    emit("DEBUG", "права на /etc/hysteria/key.pem и перезапуск hysteria-server")
     ok_pin, data_pin = api.setup_node(
         node_id,
         data={
             "installHysteria": False,
             "setupPortHopping": False,
-            "restartService": False,
+            "restartService": True,
         },
         request_timeout=180,
     )
+    logs_text = flatten_setup_logs(data_pin)
+    api.update_node(node_id, {"initScript": ""})
     if not ok_pin:
         emit("WARNING", f"setup pin: {data_pin!r}")
-        return ""
+        return "", hysteria_restart_looks_failed(logs_text)
     pin = _save_pin_from_logs(server, data_pin, sni)
-    api.update_node(node_id, {"initScript": ""})
-    return pin
+    if "HYSTERIA_KEY_NOT_READABLE" in logs_text or hysteria_restart_looks_failed(logs_text):
+        emit("ERROR", "hysteria не читает /etc/hysteria/key.pem после chown/chmod")
+        return pin, True
+    if "HYSTERIA_KEY_READABLE" in logs_text or "active (running)" in logs_text:
+        emit("INFO", "hysteria-server запущен, key.pem доступен пользователю сервиса")
+    return pin, False
 
 
 def bootstrap_celerity_for_server(
@@ -278,12 +324,16 @@ def bootstrap_celerity_for_server(
         return False, failed
 
     pin = _save_pin_from_logs(server, data, sni)
+    fixed_pin, restart_failed = _pull_pin_via_panel_setup(api, node_id, server, sni, _emit)
+    if fixed_pin:
+        pin = fixed_pin
     if pin:
         _emit("INFO", f"hysteria TLS meta: pin={pin[:8]}… sni={sni}")
-    elif init_script:
-        pin = _pull_pin_via_panel_setup(api, node_id, server, sni, _emit)
-        if pin:
-            _emit("INFO", f"hysteria TLS meta: pin={pin[:8]}… sni={sni}")
+    if restart_failed:
+        failed = "hysteria-server не online: нет прав на /etc/hysteria/key.pem"
+        if marzban_up:
+            failed = "MARZBAN_NODE_UP " + failed
+        return False, failed
     if not pin:
         synced = try_sync_hysteria_tls_meta_after_setup(
             server,
