@@ -57,6 +57,14 @@ class TelegramUser(models.Model):
         help_text='bot или site — какой магазин использовать для рекуррентных инвойсов.',
     )
     permission_revoked = models.BooleanField(default=False, verbose_name='Самостоятельно отменил автоплатёж')
+
+    last_special_month_offer_at = models.DateTimeField(
+        blank=True,
+        null=True,
+        default=None,
+        verbose_name='Последнее спецпредложение 1 месяц',
+        help_text='Когда пользователь в последний раз оплатил (1 месяц special).',
+    )
     next_payment_date = models.DateField(default=None, blank=True, null=True, verbose_name='Следующее списание')
     special_offer = models.ForeignKey('ReferralSpecialOffer', default=None, null=True, blank=True, db_index=True, on_delete=models.SET_NULL, related_name='special_offers', verbose_name='Специальные проценты')
 
@@ -529,9 +537,14 @@ class Prices(models.Model):
     price_3 = models.PositiveIntegerField(null=True, blank=True, verbose_name='price for 6 month')
     price_4 = models.PositiveIntegerField(null=True, blank=True, verbose_name='price for 12 month')
     price_5 = models.PositiveIntegerField(null=True, blank=True, default=20, verbose_name='price for 3 days trial')
+    price_special = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        verbose_name='Price for 1 month special',
+    )
 
     def __str__(self):
-        return f'{self.price_1} / {self.price_2} / {self.price_3} / {self.price_4}'
+        return f'{self.price_1} / {self.price_2} / {self.price_3} / {self.price_4} / {self.price_5} / {self.price_special}'
 
     class Meta:
         verbose_name = 'Цена'

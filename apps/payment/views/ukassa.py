@@ -31,24 +31,13 @@ class CreatePaymentView(View):
         try:
             subscription = request.POST.get('subscription')
 
-            prices = Prices.objects.get(pk=1)
-            amount = 0
-            days = 0
-            if float(subscription) == float(prices.price_1):
-                amount = float(prices.price_1)
-                days = 31
-            elif float(subscription) == float(prices.price_2):
-                amount = float(prices.price_2)
-                days = 93
-            elif float(subscription) == float(prices.price_3):
-                amount = float(prices.price_3)
-                days = 184
-            elif float(subscription) == float(prices.price_4):
-                amount = float(prices.price_4)
-                days = 366
-            elif float(subscription) == float(prices.price_5):
-                amount = float(prices.price_5)
-                days = 3
+
+            from apps.payment.retention_offer import resolve_purchase_for_user
+            amount, days = resolve_purchase_for_user(
+                subscription, request.user.profile.telegram_user
+            )
+            if amount <= 0 or days <= 0:
+                return redirect('profile')
 
             # Настройка ЮKassa
             Configuration.account_id = settings.YOOKASSA_SHOP_ID_SITE
@@ -157,17 +146,9 @@ class YookassaTGBOTWebhookView(View):
                     transaction.paid = True
                     transaction.save()
 
-                    days = 0
-                    if int(amount_value) == Prices.objects.get(id=1).price_1:
-                        days = 31
-                    elif int(amount_value) == Prices.objects.get(id=1).price_2:
-                        days = 93
-                    elif int(amount_value) == Prices.objects.get(id=1).price_3:
-                        days = 184
-                    elif int(amount_value) == Prices.objects.get(id=1).price_4:
-                        days = 366
-                    elif int(amount_value) == Prices.objects.get(id=1).price_5:
-                        days = 3
+                    from apps.payment.robokassa_subscription import resolve_subscription_days
+                    from apps.payment.retention_offer import mark_retention_offer_used_if_amount
+                    days = resolve_subscription_days(Decimal(str(amount_value)))
 
                     if telegram_user.subscription_status:
                         telegram_user.subscription_expiration = telegram_user.subscription_expiration + timedelta(
@@ -181,6 +162,7 @@ class YookassaTGBOTWebhookView(View):
                         telegram_user.payment_method_id = payment_method_id
                         telegram_user.permission_revoked = False
                         telegram_user.save()
+                    mark_retention_offer_used_if_amount(telegram_user, amount_value)
 
                     Logging.objects.create(category="payment", log_level="INFO",
                                            message=f'[BOT] [Обработка платежа] [{event_type}] [Сумма: {amount_value}] [Дни:{days}]',
@@ -295,17 +277,9 @@ class YookassaSiteWebhookView(View):
                     transaction.paid = True
                     transaction.save()
 
-                    days = 0
-                    if int(amount_value) == Prices.objects.get(id=1).price_1:
-                        days = 31
-                    elif int(amount_value) == Prices.objects.get(id=1).price_2:
-                        days = 93
-                    elif int(amount_value) == Prices.objects.get(id=1).price_3:
-                        days = 184
-                    elif int(amount_value) == Prices.objects.get(id=1).price_4:
-                        days = 366
-                    elif int(amount_value) == Prices.objects.get(id=1).price_5:
-                        days = 3
+                    from apps.payment.robokassa_subscription import resolve_subscription_days
+                    from apps.payment.retention_offer import mark_retention_offer_used_if_amount
+                    days = resolve_subscription_days(Decimal(str(amount_value)))
 
                     if telegram_user.subscription_status:
                         telegram_user.subscription_expiration = telegram_user.subscription_expiration + timedelta(
@@ -319,6 +293,7 @@ class YookassaSiteWebhookView(View):
                         telegram_user.permission_revoked = False
                         telegram_user.payment_method_id = payment_method_id
                         telegram_user.save()
+                    mark_retention_offer_used_if_amount(telegram_user, amount_value)
 
                     Logging.objects.create(category="payment", log_level="INFO",
                                            message=f'[WEB] [Обработка платежа] [{event_type}] [Сумма: {amount_value}] [Дни:{days}]',

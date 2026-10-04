@@ -171,28 +171,13 @@ def fetch_robokassa_opstate(
     return None
 
 
+
 def resolve_subscription_days(amount_value: Decimal) -> int:
-    prices = Prices.objects.get(pk=1)
-    amount_int = int(amount_value)
-    if amount_int == prices.price_1:
-        return 31
-    if amount_int == prices.price_2:
-        return 93
-    if amount_int == prices.price_3:
-        return 184
-    if amount_int == prices.price_4:
-        return 366
-    if amount_int == prices.price_5:
-        return 3
-    # Для тестирования
-    # if amount_int == 1:
-    #     return 3
-    # if amount_int == 2:
-    #     return 31
-    return 0
+    from apps.payment.retention_offer import days_for_amount
+    return days_for_amount(amount_value)
 
 
-def extend_telegram_user_subscription(telegram_user: TelegramUser, days: int) -> None:
+def extend_telegram_user_subscription(telegram_user: TelegramUser, days: int, amount=None) -> None:
     """Продлевает подписку; безопасен при subscription_expiration=None."""
     if days <= 0:
         return
@@ -204,6 +189,9 @@ def extend_telegram_user_subscription(telegram_user: TelegramUser, days: int) ->
         telegram_user.subscription_status = True
         telegram_user.subscription_expiration = today + timedelta(days=days)
     telegram_user.permission_revoked = False
+    if amount is not None:
+        from apps.payment.retention_offer import mark_retention_offer_used_if_amount
+        mark_retention_offer_used_if_amount(telegram_user, amount)
 
 
 def set_robokassa_recurring_parent_if_needed(telegram_user: TelegramUser, transaction: Transaction, inv_id) -> None:
@@ -263,6 +251,8 @@ def repair_subscription_from_transaction(transaction: Transaction) -> bool:
         transaction.robokassa_invoice_id or transaction.id,
     )
     telegram_user.save()
+    from apps.payment.retention_offer import mark_retention_offer_used_if_amount
+    mark_retention_offer_used_if_amount(telegram_user, transaction.amount)
     return True
 
 

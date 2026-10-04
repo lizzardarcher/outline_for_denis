@@ -462,8 +462,9 @@ def _apply_robokassa_success(transaction: Transaction, amount_value: Decimal, so
     else:
         payment_id = f"ROBOX_INV_{transaction.robokassa_invoice_id or transaction.id}"
 
+
     with db_transaction.atomic():
-        extend_telegram_user_subscription(telegram_user, days)
+        extend_telegram_user_subscription(telegram_user, days, amount=amount_value)
         set_robokassa_recurring_parent_if_needed(
             telegram_user,
             transaction,

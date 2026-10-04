@@ -250,7 +250,8 @@ def apply_successful_pay(
         if tx.status == "succeeded" and tx.paid:
             return True
 
-        extend_telegram_user_subscription(telegram_user, days)
+
+        extend_telegram_user_subscription(telegram_user, days, amount=amount_value)
         telegram_user.cryptocloud_channel = channel or telegram_user.cryptocloud_channel or "site"
         telegram_user.permission_revoked = False
         telegram_user.save()

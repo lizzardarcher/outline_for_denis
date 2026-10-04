@@ -136,8 +136,10 @@ def get_subscription():
 
 def cancel_subscription():
     markup = InlineKeyboardMarkup()
-    btn1 = InlineKeyboardButton(text=f'✅ Подтвердить отмену подписки', callback_data=f'account:cancelled_sbs')
+    btn1 = InlineKeyboardButton(text=f'✅ Один месяц по спец цене', callback_data=f'account:month_spec')
+    btn2 = InlineKeyboardButton(text=f'🛑 Подтвердить отмену подписки', callback_data=f'account:cancelled_sbs')
     markup.row(btn1)
+    markup.row(btn2)
     markup.row(btn_back)
     return markup
 
@@ -186,13 +188,13 @@ def payment_menu(payment_type: str, user):
             callback_data=f'account:payment:ukassa:{payment_type}'
         )
     )
-    if is_cryptocloud_allowed_for_user(user):
-        markup.add(
-            InlineKeyboardButton(
-                text='CryptoCloud (криптовалюта)',
-                callback_data=f'account:payment:cryptocloud:{payment_type}'
-            )
-        )
+    # if is_cryptocloud_allowed_for_user(user):
+    #     markup.add(
+    #         InlineKeyboardButton(
+    #             text='CryptoCloud (криптовалюта)',
+    #             callback_data=f'account:payment:cryptocloud:{payment_type}'
+    #         )
+    #     )
     # Для тестирования
     # if user.user_id == 5566146968 or user.user_id == 443210329:
     # markup.add(
@@ -227,6 +229,14 @@ def choose_subscription():
     markup.add(InlineKeyboardButton(text=f'🟢 6 месяцев ({price.price_3} р)', callback_data=f'account:sub:3'))
     markup.add(InlineKeyboardButton(text=f'🟢 1 год ({price.price_4} р)', callback_data=f'account:sub:4'))
 
+    markup.add(btn_back)
+    return markup
+
+
+def choose_special_price():
+    markup = InlineKeyboardMarkup()
+    price = Prices.objects.get(pk=1)
+    markup.add(InlineKeyboardButton(text=f'🟢 1 месяц ({price.price_special} р)', callback_data=f'account:sub:special'))
     markup.add(btn_back)
     return markup
 

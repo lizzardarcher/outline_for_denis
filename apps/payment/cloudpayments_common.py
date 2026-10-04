@@ -187,7 +187,8 @@ def apply_successful_pay(
         if tx.status == "succeeded" and tx.paid:
             return True
 
-        extend_telegram_user_subscription(telegram_user, days)
+
+        extend_telegram_user_subscription(telegram_user, days, amount=amount_value)
         if token:
             telegram_user.cloudpayments_token = token
         telegram_user.cloudpayments_account_id = default_account_id(telegram_user)

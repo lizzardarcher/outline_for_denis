@@ -91,6 +91,15 @@ ROBOKASSA_BOT_IS_TEST=False
 # Pending-рекуррент блокирует новое списание без TTL.
 ROBOKASSA_RECURRING_COOLDOWN_DAYS = 1
 
+
+# Retention-оффер при отмене: спеццена 1 месяца не чаще, чем раз в N календарных месяцев.
+try:
+    RETENTION_OFFER_COOLDOWN_MONTHS = int(os.getenv('RETENTION_OFFER_COOLDOWN_MONTHS', '3') or '3')
+except (TypeError, ValueError):
+    RETENTION_OFFER_COOLDOWN_MONTHS = 3
+if RETENTION_OFFER_COOLDOWN_MONTHS < 0:
+    RETENTION_OFFER_COOLDOWN_MONTHS = 3
+
 ROBOKASSA_MERCHANT_LOGIN_BOT = os.getenv('ROBOKASSA_MERCHANT_LOGIN_BOT')
 ROBOKASSA_PASSWORD_1_BOT = os.getenv('ROBOKASSA_PASSWORD_1_BOT')
 ROBOKASSA_PASSWORD_2_BOT = os.getenv('ROBOKASSA_PASSWORD_2_BOT')

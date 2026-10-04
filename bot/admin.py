@@ -339,7 +339,7 @@ class TelegramUserAdmin(admin.ModelAdmin):
     fieldsets = ([
         ('Основная информация', {'fields': ['join_date','first_name','last_name','username','user_id','photo_url', ],}),
         ('Подписка', {'fields': ['is_banned','subscription_expiration','subscription_status','payment_method_id','robokassa_recurring_parent_inv_id','cloudpayments_token','cloudpayments_account_id','cloudpayments_channel',
-                                 # 'cryptocloud_channel',
+                                 'last_special_month_offer_at',
                                  'permission_revoked',],}),
         ('Реферальная программа', {'fields':['income', 'special_offer']})
     ])

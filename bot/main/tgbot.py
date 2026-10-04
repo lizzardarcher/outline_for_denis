@@ -778,6 +778,9 @@ async def callback_query_handlers(call):
                         elif data[-1] == '3_days_trial':
                             sub = '3 Дня'
                             price = prices.price_5
+                        elif data[-1] == 'special':
+                            sub = '1 Месяц'
+                            price = prices.price_special
                         await edit_screen(
                             call,
                             msg.payment_menu.format(sub, price, recurrent_price),
@@ -806,7 +809,9 @@ async def callback_query_handlers(call):
                             elif data[-1] == '3_days_trial':
                                 price = prices.price_5
                                 days = 3
-
+                            elif data[-1] == 'special':
+                                price = prices.price_special
+                                days = 31
                             # await bot.send_message(
                             #     call.message.chat.id,
                             #     text='К сожалению, на данный момент мы не можем оказать услуги в связи с\n'
@@ -916,7 +921,9 @@ async def callback_query_handlers(call):
                             elif data[-1] == '3_days_trial':
                                 price = prices.price_5
                                 days = 3
-
+                            elif data[-1] == 'special':
+                                price = prices.price_special
+                                days = 31
                             try:
                                 amount_decimal = Decimal(str(price))
 
@@ -1081,7 +1088,9 @@ async def callback_query_handlers(call):
                             elif data[-1] == '3_days_trial':
                                 price = prices.price_5
                                 days = 3
-
+                            elif data[-1] == 'special':
+                                price = prices.price_special
+                                days = 31
                             try:
                                 amount_decimal = Decimal(str(price))
                                 if not (user.cloudpayments_account_id or '').strip():
@@ -1141,7 +1150,6 @@ async def callback_query_handlers(call):
                                     reply_markup=markup.start(user=user),
                                 )
 
-
                         elif 'cryptocloud' in data:
                             from apps.payment.cryptocloud_common import (
                                 create_invoice,
@@ -1175,7 +1183,9 @@ async def callback_query_handlers(call):
                                 elif data[-1] == '3_days_trial':
                                     price = prices.price_5
                                     days = 3
-
+                                elif data[-1] == 'special':
+                                    price = prices.price_special
+                                    days = 31
                                 try:
                                     api_key, shop_id, _secret = credentials_for_channel("bot")
                                     if not api_key or not shop_id:
@@ -1266,7 +1276,9 @@ async def callback_query_handlers(call):
                             elif data[-1] == '3_days_trial':
                                 price = prices.price_5
                                 days = 3
-
+                            elif data[-1] == 'special':
+                                price = prices.price_special
+                                days = 31
                             try:
                                 amount_decimal = Decimal(str(price))
 
@@ -1347,6 +1359,12 @@ async def callback_query_handlers(call):
                                     reply_markup=markup.start(user=user),
                                 )
 
+                    elif 'month_spec' in data:
+                        if user.last_special_month_offer_at:
+                            await edit_screen(call, msg.last_special_month_offer_at_fail.format(user.last_special_month_offer_at.strftime('%d.%m.%Y'),
+                                                                                                (user.last_special_month_offer_at + timedelta(days=92)).strftime('%d.%m.%Y')),  reply_markup=markup.choose_special_price())
+                        else:
+                            await edit_screen(call, msg.choose_special, reply_markup=markup.choose_special_price())
 
                     elif 'cancel_subscription' in data:
                         if user.has_saved_autopay():
@@ -1361,7 +1379,6 @@ async def callback_query_handlers(call):
                                 msg.cancel_subscription_error,
                                 reply_markup=markup.start(user=user),
                             )
-
 
                     elif 'cancelled_sbs' in data:
                         Logging.objects.create(category="payment",

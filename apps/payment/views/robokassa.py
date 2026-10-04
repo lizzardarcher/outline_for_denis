@@ -125,8 +125,9 @@ def _complete_robokassa_result_payment(
 
     days = resolve_subscription_days(amount_value)
 
+
     with db_transaction.atomic():
-        extend_telegram_user_subscription(telegram_user, days)
+        extend_telegram_user_subscription(telegram_user, days, amount=amount_value)
         set_robokassa_recurring_parent_if_needed(telegram_user, transaction, inv_id)
         telegram_user.save()
 
@@ -171,30 +172,13 @@ class CreateRobokassaPaymentView(LoginRequiredMixin, View):
         try:
             subscription = request.POST.get('subscription')
 
-            prices = Prices.objects.get(pk=1)
-            amount = 0
-            days = 0
-
-            if float(subscription) == float(prices.price_1):
-                amount = float(prices.price_1)
-                days = 31
-            elif float(subscription) == float(prices.price_2):
-                amount = float(prices.price_2)
-                days = 93
-            elif float(subscription) == float(prices.price_3):
-                amount = float(prices.price_3)
-                days = 184
-            elif float(subscription) == float(prices.price_4):
-                amount = float(prices.price_4)
-                days = 366
-            elif float(subscription) == float(prices.price_5):
-                amount = float(prices.price_5)
-                days = 3
+            from apps.payment.retention_offer import resolve_purchase_for_user
+            telegram_user = request.user.profile.telegram_user
+            amount, days = resolve_purchase_for_user(subscription, telegram_user)
+            if amount <= 0 or days <= 0:
+                return redirect('profile')
 
             amount_decimal = Decimal(str(amount))
-
-            # Пользователь из связанного Telegram-профиля
-            telegram_user = request.user.profile.telegram_user
 
             # 1) Создаём pending-транзакцию
             transaction = Transaction.objects.create(
