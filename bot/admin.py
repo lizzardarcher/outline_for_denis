@@ -327,7 +327,6 @@ class ReferralTransactionAdmin(BaseAdmin):
         return False
 
 
-
 @admin.register(TelegramUser)
 class TelegramUserAdmin(admin.ModelAdmin):
     list_display = (
@@ -353,6 +352,7 @@ class TelegramUserAdmin(admin.ModelAdmin):
         # WithdrawalRequestInline,
         LogInline
     ]
+
 
     def referral_link(self, obj):
         referral_url = f"https://t.me/xDomvpn_Bot?start={obj.user_id}"

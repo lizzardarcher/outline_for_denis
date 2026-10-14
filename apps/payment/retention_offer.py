@@ -106,6 +106,7 @@ def mark_retention_offer_used_if_amount(user: Optional[TelegramUser], amount: Am
     user.save(update_fields=["last_special_month_offer_at"])
 
 
+
 def days_for_amount(amount: AmountLike, prices: Optional[Prices] = None) -> int:
     prices = prices or get_prices()
     amount_int = _as_int_amount(amount)
