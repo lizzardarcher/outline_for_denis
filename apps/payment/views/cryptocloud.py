@@ -29,25 +29,8 @@ from apps.payment.cryptocloud_common import (
     payment_system_for_channel,
     verify_cryptocloud_jwt,
 )
-from bot.models import IncomeInfo, Logging, Prices, Transaction
 
-
-def _resolve_amount_days(subscription) -> tuple[float, int]:
-    prices = Prices.objects.get(pk=1)
-    amount = 0.0
-    days = 0
-    if float(subscription) == float(prices.price_1):
-        amount, days = float(prices.price_1), 31
-    elif float(subscription) == float(prices.price_2):
-        amount, days = float(prices.price_2), 93
-    elif float(subscription) == float(prices.price_3):
-        amount, days = float(prices.price_3), 184
-    elif float(subscription) == float(prices.price_4):
-        amount, days = float(prices.price_4), 366
-    elif float(subscription) == float(prices.price_5):
-        amount, days = float(prices.price_5), 3
-    return amount, days
-
+from bot.models import IncomeInfo, Logging, Transaction
 
 def _user_email(telegram_user) -> str:
     try:
@@ -65,7 +48,10 @@ class CreateCryptoCloudPaymentView(LoginRequiredMixin, View):
             if not is_cryptocloud_allowed_for_user(telegram_user):
                 return redirect("profile")
 
-            amount, days = _resolve_amount_days(request.POST.get("subscription"))
+            from apps.payment.retention_offer import resolve_purchase_for_user
+            amount, days = resolve_purchase_for_user(
+                request.POST.get("subscription"), telegram_user
+            )
             if amount <= 0 or days <= 0:
                 return redirect("profile")
 

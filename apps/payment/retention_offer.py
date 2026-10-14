@@ -77,17 +77,26 @@ def is_special_amount(amount: AmountLike, prices: Optional[Prices] = None) -> bo
     return amount_int == special
 
 
+
+def next_retention_offer_at(user: Optional[TelegramUser]) -> Optional[datetime]:
+    """Момент, когда акцию можно использовать снова. None, если пользователь её ещё не брал."""
+    if user is None or user.last_special_month_offer_at is None:
+        return None
+    last = user.last_special_month_offer_at
+    if timezone.is_naive(last):
+        last = timezone.make_aware(last, timezone.get_current_timezone())
+    return add_calendar_months(last, cooldown_months())
+
+
 def is_retention_offer_available(user: Optional[TelegramUser], prices: Optional[Prices] = None) -> bool:
     if user is None:
         return False
     if special_month_price(prices) is None:
         return False
-    last = user.last_special_month_offer_at
-    if last is None:
+    nxt = next_retention_offer_at(user)
+    if nxt is None:
         return True
-    if timezone.is_naive(last):
-        last = timezone.make_aware(last, timezone.get_current_timezone())
-    return timezone.now() >= add_calendar_months(last, cooldown_months())
+    return timezone.now() >= nxt
 
 
 def mark_retention_offer_used_if_amount(user: Optional[TelegramUser], amount: AmountLike) -> None:

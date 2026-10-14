@@ -64,6 +64,12 @@ class ProfileView(LoginRequiredMixin, SuccessMessageMixin, TemplateView):
         context['total_users'] = TelegramUser.objects.count()
         context['countries'] = Country.objects.filter(is_active=True)
         context['subscription'] = Prices.objects.get(id=1)
+
+        from apps.payment.retention_offer import is_retention_offer_available, special_month_price
+        context['retention_special_price'] = special_month_price(context['subscription'])
+        context['retention_offer_available'] = is_retention_offer_available(
+            tg_user, context['subscription']
+        )
         context['referral'] = ReferralSettings.objects.get(pk=1)
 
         context['inv_1_lvl'] = TelegramReferral.objects.filter(referrer=tg_user, level=1).__len__()
@@ -272,9 +278,11 @@ class UpdateSubscriptionView(LoginRequiredMixin, TemplateView):
                                    datetime=datetime.now(), user=self.request.user.profile.telegram_user)
             return redirect('profile')
 
+        user = get_object_or_404(TelegramUser, user_id=self.request.user.profile.telegram_user.user_id)
         prices = Prices.objects.get(pk=1)
         amount = 0
         days = 0
+        from apps.payment.retention_offer import is_retention_offer_available, mark_retention_offer_used_if_amount
         if float(subscription) == float(prices.price_1):
             amount = float(prices.price_1)
             days = 31
@@ -287,9 +295,12 @@ class UpdateSubscriptionView(LoginRequiredMixin, TemplateView):
         elif float(subscription) == float(prices.price_4):
             amount = float(prices.price_4)
             days = 366
+        elif prices.price_special and float(subscription) == float(prices.price_special):
+            if is_retention_offer_available(user, prices):
+                amount = float(prices.price_special)
+                days = 31
 
         if days and amount:
-            user = get_object_or_404(TelegramUser, user_id=self.request.user.profile.telegram_user.user_id)
             if float(user.balance) >= float(amount):
                 user.balance = float(user.balance) - float(amount)
                 if user.subscription_expiration < date.today():
@@ -297,6 +308,7 @@ class UpdateSubscriptionView(LoginRequiredMixin, TemplateView):
                 user.subscription_status = True
                 user.subscription_expiration = user.subscription_expiration + timedelta(days=days)
                 user.save()
+                mark_retention_offer_used_if_amount(user, amount)
                 messages.success(request,
                                  f'Поздравляем с приобретением подписки! Подписка действительна до {user.subscription_expiration}')
                 Logging.objects.create(category="web", log_level=" INFO", message=f'[WEB] [Приобретена подписка] [дни - {str(days)}]',

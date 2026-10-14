@@ -541,7 +541,9 @@ class Prices(models.Model):
         null=True,
         blank=True,
         verbose_name='Price for 1 month special',
+        help_text='Акция при отмене подписки: 1 месяц. Сумма должна отличаться от остальных цен.',
     )
+
 
     def __str__(self):
         return f'{self.price_1} / {self.price_2} / {self.price_3} / {self.price_4} / {self.price_5} / {self.price_special}'

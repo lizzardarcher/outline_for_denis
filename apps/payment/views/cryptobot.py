@@ -19,7 +19,6 @@ from bot.models import (
     Transaction,
     IncomeInfo,
     Logging,
-    Prices,
     TelegramReferral,
     ReferralSettings,
     ReferralTransaction,
@@ -84,18 +83,9 @@ def _apply_subscription_and_referrals(
     amount_value: Decimal,
 ) -> None:
     """Повторяет логику из Yookassa/Robokassa: продление подписки + реферальные начисления."""
-    prices = Prices.objects.get(pk=1)
-    days = 0
-    if int(amount_value) == prices.price_1:
-        days = 31
-    elif int(amount_value) == prices.price_2:
-        days = 93
-    elif int(amount_value) == prices.price_3:
-        days = 184
-    elif int(amount_value) == prices.price_4:
-        days = 366
-    elif int(amount_value) == prices.price_5:
-        days = 3
+    from apps.payment.retention_offer import mark_retention_offer_used_if_amount
+    from apps.payment.robokassa_subscription import resolve_subscription_days
+    days = resolve_subscription_days(amount_value)
 
     # Подписка
     if telegram_user.subscription_status:
@@ -107,6 +97,7 @@ def _apply_subscription_and_referrals(
         telegram_user.subscription_expiration = datetime.now() + timedelta(days=days)
         telegram_user.permission_revoked = False
         telegram_user.save()
+    mark_retention_offer_used_if_amount(telegram_user, amount_value)
 
     Logging.objects.create(
         category="payment",
@@ -186,30 +177,13 @@ class CreateCryptoBotPaymentView(LoginRequiredMixin, View):
     def post(self, request, *args, **kwargs):
         try:
             subscription = request.POST.get("subscription")
-
-            prices = Prices.objects.get(pk=1)
-            amount = 0
-            days = 0
-
-            if float(subscription) == float(prices.price_1):
-                amount = float(prices.price_1)
-                days = 31
-            elif float(subscription) == float(prices.price_2):
-                amount = float(prices.price_2)
-                days = 93
-            elif float(subscription) == float(prices.price_3):
-                amount = float(prices.price_3)
-                days = 184
-            elif float(subscription) == float(prices.price_4):
-                amount = float(prices.price_4)
-                days = 366
-            elif float(subscription) == float(prices.price_5):
-                amount = float(prices.price_5)
-                days = 3
+            telegram_user = request.user.profile.telegram_user
+            from apps.payment.retention_offer import resolve_purchase_for_user
+            amount, days = resolve_purchase_for_user(subscription, telegram_user)
+            if amount <= 0 or days <= 0:
+                return redirect("profile")
 
             amount_decimal = Decimal(str(amount))
-
-            telegram_user = request.user.profile.telegram_user
 
             transaction = Transaction.objects.create(
                 status="pending",

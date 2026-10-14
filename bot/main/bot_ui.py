@@ -82,6 +82,8 @@ def trail_for_callback(call_data: str, data: list) -> Tuple[str, ...]:
             return ("Главная", "Подписка", "Тариф")
         if len(data) > 1 and data[1] == "payment":
             return ("Главная", "Подписка", "Оплата")
+        if "month_spec" in call_data:
+            return ("Главная", "Профиль", "Отмена подписки", "Акция")
         if "cancel_subscription" in call_data:
             return ("Главная", "Профиль", "Отмена подписки")
         if "cancelled_sbs" in call_data:

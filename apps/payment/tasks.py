@@ -127,23 +127,11 @@ def _process_payment_data(payment_data: dict, transaction: Transaction, telegram
                 transaction.paid = True
                 transaction.save()
 
-                # Определяем дни подписки по сумме
-                days = 0
+
                 try:
-                    prices = Prices.objects.get(id=1)
-                    if int(amount_value) == int(prices.price_1):
-                        days = 31
-                    elif int(amount_value) == int(prices.price_2):
-                        days = 93
-                    elif int(amount_value) == int(prices.price_3):
-                        days = 184
-                    elif int(amount_value) == int(prices.price_4):
-                        days = 366
-                    elif int(amount_value) == int(prices.price_5):
-                        days = 3
+                    days = resolve_subscription_days(Decimal(str(amount_value)))
                 except Exception:
-                    # Если с Prices что-то не так — оставить days = 0
-                    pass
+                    days = 0
 
                 payment_method_id = None
                 try:
@@ -171,6 +159,8 @@ def _process_payment_data(payment_data: dict, transaction: Transaction, telegram
                             telegram_user.payment_method_id = payment_method_id
                         telegram_user.permission_revoked = False
                         telegram_user.save()
+                    from apps.payment.retention_offer import mark_retention_offer_used_if_amount
+                    mark_retention_offer_used_if_amount(telegram_user, amount_value)
 
                 Logging.objects.create(category="payment", log_level="INFO",
                                        message=f'[{source_label}] [Обработка платежа] [payment_id={transaction.payment_id}] [Сумма: {amount_value}] [Дни: {days}]',

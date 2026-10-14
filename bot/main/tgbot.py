@@ -138,7 +138,8 @@ def _callback_uses_edit(call_data: str, data: list) -> bool:
         return True
     if len(data) > 1 and data[1] == 'payment':
         return True
-    if 'cancel_subscription' in call_data or 'cancelled_sbs' in call_data:
+
+    if 'cancel_subscription' in call_data or 'cancelled_sbs' in call_data or 'month_spec' in call_data:
         return True
     if 'get_new_key' in call_data or 'swap_key' in call_data or 'swap_confirm' in call_data:
         return True
@@ -189,6 +190,20 @@ async def edit_screen(call, body: str, reply_markup=None, trail=None) -> None:
     data = call.data.split(':')
     parts = trail if trail is not None else trail_for_callback(call.data, data)
     await edit_callback_message(call, format_screen(body, parts), reply_markup=reply_markup)
+
+
+async def _show_special_offer_unavailable(call, user) -> None:
+    from apps.payment.retention_offer import next_retention_offer_at
+    nxt = next_retention_offer_at(user)
+    last = user.last_special_month_offer_at
+    if last and nxt:
+        text = msg.last_special_month_offer_at_fail.format(
+            last.strftime('%d.%m.%Y'),
+            nxt.strftime('%d.%m.%Y'),
+        )
+    else:
+        text = 'Специальная акция сейчас недоступна.'
+    await edit_screen(call, text, reply_markup=markup.back())
 
 
 def _schedule_payment_followup(call, user) -> None:
@@ -779,17 +794,25 @@ async def callback_query_handlers(call):
                             sub = '3 Дня'
                             price = prices.price_5
                         elif data[-1] == 'special':
-                            sub = '1 Месяц'
+                            sub = '1 месяц со скидкой'
                             price = prices.price_special
-                        await edit_screen(
-                            call,
-                            msg.payment_menu.format(sub, price, recurrent_price),
-                            reply_markup=markup.payment_menu(data[-1], user),
-                        )
+                        from apps.payment.retention_offer import is_retention_offer_available
+                        if data[-1] == 'special' and not is_retention_offer_available(user, prices):
+                            await _show_special_offer_unavailable(call, user)
+                        else:
+                            await edit_screen(
+                                call,
+                                msg.payment_menu.format(sub, price, recurrent_price),
+                                reply_markup=markup.payment_menu(data[-1], user),
+                            )
 
                     elif 'payment' in data:
-
-                        if 'ukassa' in data:
+                        from apps.payment.retention_offer import is_retention_offer_available, special_month_price
+                        if data[-1] == 'special' and (
+                            not special_month_price() or not is_retention_offer_available(user)
+                        ):
+                            await _show_special_offer_unavailable(call, user)
+                        elif 'ukassa' in data:
                             price = None
                             days = None
                             prices = Prices.objects.get(pk=1)
@@ -1360,19 +1383,33 @@ async def callback_query_handlers(call):
                                 )
 
                     elif 'month_spec' in data:
-                        if user.last_special_month_offer_at:
-                            await edit_screen(call, msg.last_special_month_offer_at_fail.format(user.last_special_month_offer_at.strftime('%d.%m.%Y'),
-                                                                                                (user.last_special_month_offer_at + timedelta(days=92)).strftime('%d.%m.%Y')),  reply_markup=markup.choose_special_price())
+                        from apps.payment.retention_offer import is_retention_offer_available, special_month_price
+                        offer_price = special_month_price()
+                        if offer_price and is_retention_offer_available(user):
+                            await edit_screen(
+                                call,
+                                msg.choose_special.format(offer_price),
+                                reply_markup=markup.choose_special_price(),
+                            )
                         else:
-                            await edit_screen(call, msg.choose_special, reply_markup=markup.choose_special_price())
+                            await _show_special_offer_unavailable(call, user)
 
                     elif 'cancel_subscription' in data:
                         if user.has_saved_autopay():
-                            await edit_screen(
-                                call,
-                                msg.cancel_subscription,
-                                reply_markup=markup.cancel_subscription(),
-                            )
+                            from apps.payment.retention_offer import is_retention_offer_available, special_month_price
+                            offer_price = special_month_price()
+                            if offer_price and is_retention_offer_available(user):
+                                await edit_screen(
+                                    call,
+                                    msg.cancel_subscription.format(offer_price),
+                                    reply_markup=markup.cancel_subscription(offer_price),
+                                )
+                            else:
+                                await edit_screen(
+                                    call,
+                                    msg.cancel_subscription_plain,
+                                    reply_markup=markup.cancel_subscription(),
+                                )
                         else:
                             await edit_screen(
                                 call,

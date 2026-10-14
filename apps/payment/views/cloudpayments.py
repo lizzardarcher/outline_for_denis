@@ -1,4 +1,3 @@
-
 """
 CloudPayments: создание платежа, страница виджета, webhooks Check/Pay/Fail.
 """
@@ -20,7 +19,6 @@ from django.utils.decorators import method_decorator
 from django.views import View
 from django.views.decorators.csrf import csrf_exempt
 
-
 from apps.payment.cloudpayments_common import (
     apply_fail_side_effects,
     apply_successful_pay,
@@ -31,27 +29,10 @@ from apps.payment.cloudpayments_common import (
     payment_system_for_channel,
     verify_cloudpayments_hmac,
 )
-from bot.models import IncomeInfo, Logging, Prices, TelegramUser, Transaction
+from bot.models import IncomeInfo, Logging, TelegramUser, Transaction
 
 WIDGET_SIGNER_SALT = "cloudpayments-widget"
 WIDGET_SIGNER_MAX_AGE = 60 * 60 * 6  # 6 часов
-
-
-def _resolve_amount_days(subscription) -> tuple[float, int]:
-    prices = Prices.objects.get(pk=1)
-    amount = 0.0
-    days = 0
-    if float(subscription) == float(prices.price_1):
-        amount, days = float(prices.price_1), 31
-    elif float(subscription) == float(prices.price_2):
-        amount, days = float(prices.price_2), 93
-    elif float(subscription) == float(prices.price_3):
-        amount, days = float(prices.price_3), 184
-    elif float(subscription) == float(prices.price_4):
-        amount, days = float(prices.price_4), 366
-    elif float(subscription) == float(prices.price_5):
-        amount, days = float(prices.price_5), 3
-    return amount, days
 
 
 def _widget_context(
@@ -105,7 +86,10 @@ class CreateCloudPaymentsPaymentView(LoginRequiredMixin, View):
     def post(self, request, *args, **kwargs):
         try:
             telegram_user = request.user.profile.telegram_user
-            amount, days = _resolve_amount_days(request.POST.get("subscription"))
+            from apps.payment.retention_offer import resolve_purchase_for_user
+            amount, days = resolve_purchase_for_user(
+                request.POST.get("subscription"), telegram_user
+            )
             if amount <= 0 or days <= 0:
                 return redirect("profile")
 

@@ -1,3 +1,87 @@
+<style>
+    #cancelSubscriptionModal .dv-modal-close {
+        width: 34px;
+        height: 34px;
+        margin: 0 0 0 12px;
+        padding: 0;
+        border: none;
+        border-radius: 50%;
+        background: #f3f4f8;
+        color: #6b7280;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex: 0 0 34px;
+        cursor: pointer;
+        box-shadow: none;
+        transition: background 0.15s ease, color 0.15s ease;
+    }
+    #cancelSubscriptionModal .dv-modal-close:hover {
+        background: #eceefe;
+        color: #13056e;
+    }
+    #cancelSubscriptionModal .dv-modal-close:focus {
+        outline: none;
+        box-shadow: 0 0 0 3px rgba(19, 5, 110, 0.16);
+    }
+    #cancelSubscriptionModal .dv-renew-form {
+        position: relative;
+        width: 100%;
+        margin: 0 0 0.65rem;
+        padding: 2px;
+        border-radius: 12px;
+        overflow: hidden;
+        isolation: isolate;
+    }
+    #cancelSubscriptionModal .dv-renew-form::before {
+        content: "";
+        position: absolute;
+        inset: -60%;
+        background: conic-gradient(
+            from 0deg,
+            rgba(255, 255, 255, 0) 0deg 250deg,
+            #ffffff 280deg,
+            #b8ffe0 310deg,
+            rgba(255, 255, 255, 0) 340deg
+        );
+        animation: dv-renew-edge 2.6s linear infinite;
+        z-index: 0;
+    }
+    #cancelSubscriptionModal .dv-renew-btn {
+        position: relative;
+        z-index: 1;
+        display: block;
+        width: 100%;
+        border: none;
+        border-radius: 10px;
+        padding: 0.78rem 1rem;
+        font-weight: 700;
+        font-size: 1rem;
+        letter-spacing: 0.01em;
+        color: #fff;
+        background: linear-gradient(180deg, #3ee08f 0%, #14b86a 55%, #0ea15c 100%);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45), 0 8px 18px rgba(14, 161, 92, 0.28);
+        cursor: pointer;
+    }
+    #cancelSubscriptionModal .dv-renew-btn:hover {
+        background: linear-gradient(180deg, #57e89e 0%, #18c473 55%, #12b368 100%);
+        color: #fff;
+    }
+
+    #cancelSubscriptionModal .dv-renew-btn:focus {
+        outline: none;
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45), 0 0 0 3px rgba(20, 184, 106, 0.28);
+    }
+    @keyframes dv-renew-edge {
+        to { transform: rotate(1turn); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+        #cancelSubscriptionModal .dv-renew-form::before {
+            animation: none;
+        }
+    }
+</style>
+
 <h2 class="h5 font-weight-bold mb-3 dv-panel-title" style="color: #13056e;">
     <i class="fa fa-user mr-2" aria-hidden="true"></i>Профиль
 </h2>
@@ -132,25 +216,47 @@
 
     <div class="modal fade" id="cancelSubscriptionModal" tabindex="-1" role="dialog"
          aria-labelledby="cancelSubscriptionModalLabel" aria-hidden="true">
-        <div class="modal-dialog" role="document">
-            <div class="modal-content" style="border-radius: 12px;">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="cancelSubscriptionModalLabel">Подтверждение отмены подписки</h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Закрыть">
-                        <span aria-hidden="true">&times;</span>
+        <div class="modal-dialog modal-dialog-centered" role="document">
+            <div class="modal-content dv-cancel-modal" style="border-radius: 12px;">
+                <div class="modal-header border-0 pb-0 align-items-center">
+                    <h5 class="modal-title mb-0" id="cancelSubscriptionModalLabel" style="color: #13056e;">Подтверждение отмены подписки</h5>
+                    <button type="button" class="dv-modal-close" data-dismiss="modal" aria-label="Закрыть">
+                        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false">
+                            <path d="M7 7l10 10M17 7L7 17" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+                        </svg>
                     </button>
                 </div>
                 <div class="modal-body">
+
                     <p class="small mb-0">
-                        Вы уверены, что хотите отказаться от подписки? Это действие необратимо.
-                        Отменив имеющуюся подписку вы можете продолжать пользоваться сервисом до момента окончания
-                        оплаченной подписки. Автоматическое списание средств при отказе от подписки не производится.
+                        Вы уверены, что хотите отказаться от подписки?
+                        Отменив подписку, вы можете пользоваться сервисом до конца уже оплаченного периода.
+                        Автоматическое списание после отмены не производится.
                     </p>
+                    {% if retention_offer_available and retention_special_price %}
+                        <p class="small mt-3 mb-0">
+                            Или продлите доступ на 1 месяц за <strong>{{ retention_special_price }} ₽</strong>.
+                            Следующие продления идут по обычной цене месяца
+                            {% if subscription.price_1 %}({{ subscription.price_1 }} ₽){% endif %}.
+                            Акция доступна не чаще одного раза за несколько месяцев.
+                            Оплачивая, вы соглашаетесь на регулярные списания и
+                            <a href="{% url 'oferta' %}" target="_blank" rel="noopener noreferrer">условия оферты</a>.
+                        </p>
+                    {% endif %}
                 </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary btn-sm" data-dismiss="modal">Отмена</button>
-                    <a class="btn btn-danger btn-sm"
-                       href="{% url 'cancel_subscription' request.user.profile.telegram_user.user_id %}">Подтвердить отмену</a>
+                <div class="modal-footer d-flex flex-column align-items-stretch">
+                    {% if retention_offer_available and retention_special_price %}
+                        <form method="post" action="{% url 'create_payment_cloudpayments' %}" class="dv-renew-form">
+                            {% csrf_token %}
+                            <input type="hidden" name="subscription" value="{{ retention_special_price }}">
+                            <button type="submit" class="dv-renew-btn">
+                                Продлить подписку за {{ retention_special_price }} ₽
+                            </button>
+                        </form>
+                    {% endif %}
+                    <a class="btn btn-danger btn-block mb-2"
+                       href="{% url 'cancel_subscription' request.user.profile.telegram_user.user_id %}">Отменить</a>
+                    <button type="button" class="btn btn-secondary btn-block" data-dismiss="modal">Закрыть</button>
                 </div>
             </div>
         </div>

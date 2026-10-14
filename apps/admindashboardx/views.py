@@ -103,7 +103,8 @@ class CountryForm(forms.ModelForm):
 class PricesForm(forms.ModelForm):
     class Meta:
         model = Prices
-        fields = ("price_1", "price_2", "price_3", "price_4", "price_5")
+        fields = ("price_1", "price_2", "price_3", "price_4", "price_5", "price_special")
+
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -1982,7 +1983,9 @@ class PricesListView(DashboardBaseView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         ops = (self.request.GET.get("ops") or "").strip()
-        items_qs = Prices.objects.only("id", "price_1", "price_2", "price_3", "price_4", "price_5").order_by("id")
+        items_qs = Prices.objects.only(
+            "id", "price_1", "price_2", "price_3", "price_4", "price_5", "price_special"
+        ).order_by("id")
         context.update(
             {
                 **self._base_context(),

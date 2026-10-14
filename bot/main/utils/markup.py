@@ -134,14 +134,17 @@ def get_subscription():
     return markup
 
 
-def cancel_subscription():
+def cancel_subscription(special_price=None):
     markup = InlineKeyboardMarkup()
-    btn1 = InlineKeyboardButton(text=f'✅ Один месяц по спец цене', callback_data=f'account:month_spec')
-    btn2 = InlineKeyboardButton(text=f'🛑 Подтвердить отмену подписки', callback_data=f'account:cancelled_sbs')
-    markup.row(btn1)
-    markup.row(btn2)
+    if special_price:
+        markup.row(InlineKeyboardButton(
+            text=f'🎁 Продлить со скидкой за {special_price}₽',
+            callback_data='account:month_spec',
+        ))
+    markup.row(InlineKeyboardButton(text='🛑 Отменить', callback_data='account:cancelled_sbs'))
     markup.row(btn_back)
     return markup
+
 
 
 def proceed_to_profile():
