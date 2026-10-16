@@ -14,6 +14,8 @@ import requests
 from django.conf import settings
 from django.utils import timezone
 
+
+from apps.payment.subscription_window import subscription_has_full_days_left
 from bot.models import Prices, TelegramUser, Transaction
 
 ROBOKASSA_OPSTATE_EXT_URL = 'https://auth.robokassa.ru/Merchant/WebService/Service.asmx/OpStateExt'
@@ -303,7 +305,9 @@ def evaluate_robokassa_recurring_charge(user: TelegramUser, payment_system: str)
     if user.permission_revoked:
         return RECURRING_SKIP, 'permission_revoked'
 
-    if subscription_covers_today(user):
+    # Последний день (expiration == сегодня) — уже окно списания, ключи ещё живы.
+    # Пропуск только если до окончания остались полные сутки.
+    if subscription_has_full_days_left(user):
         if not user.subscription_status:
             user.subscription_status = True
             user.save(update_fields=['subscription_status'])

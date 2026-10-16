@@ -9,6 +9,8 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.admin import UserAdmin as DjangoUserAdmin
 from django.contrib.auth.models import Group
 from django.contrib.admin.sites import NotRegistered
+
+from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
 from django.db.models import Q, Sum
 
@@ -25,6 +27,7 @@ from django_admin_inline_paginator.admin import TabularInlinePaginated
 from apps.admindashboardx.models import ManualTaskRun
 from apps.admindashboardx.panel_health import attach_duration_labels, collect_and_store, format_streak, get_cached_snapshot
 from bot.models import *
+from bot.referral_analytics import build_report, excel_response, parse_period, search_referrers
 
 from openpyxl import Workbook
 
@@ -533,10 +536,83 @@ class TelegramReferralAdmin(BaseAdmin):
     search_fields = ('referrer__username', 'referred__username', 'referrer__first_name', 'referred__first_name',
                      'referrer__last_name', 'referred__last_name', 'referrer__user_id', 'referred__user_id')
     list_select_related = ('referrer', 'referred')
+    change_list_template = 'admin/bot/telegramreferral/change_list.html'
 
     raw_id_fields = ('referrer', 'referred')
     inlines = [ReferralTransactionInline]
     list_filter = ['level']
+
+    def get_urls(self):
+        urls = super().get_urls()
+        info = self.opts.app_label, self.opts.model_name
+
+        def wrap(view):
+            def wrapper(*args, **kwargs):
+                return self.admin_site.admin_view(view)(*args, **kwargs)
+
+            wrapper.model_admin = self
+            return update_wrapper(wrapper, view)
+
+        extra = [
+            path(
+                'analytics/',
+                wrap(self.referral_analytics_view),
+                name='%s_%s_analytics' % info,
+            ),
+            path(
+                'analytics/export/',
+                wrap(self.referral_analytics_export_view),
+                name='%s_%s_analytics_export' % info,
+            ),
+        ]
+        return extra + urls
+
+    def _deny_support(self, request):
+        if _is_support_user(request):
+            raise PermissionDenied
+
+    def referral_analytics_view(self, request):
+        self._deny_support(request)
+        query = (request.GET.get('q') or '').strip()
+        referrer = None
+        referrer_id = (request.GET.get('referrer') or '').strip()
+        if referrer_id.isdigit():
+            referrer = TelegramUser.objects.filter(pk=int(referrer_id)).first()
+
+        date_from, date_to, period_error = parse_period(request.GET)
+        report = None
+        if referrer and not period_error:
+            report = build_report(referrer, date_from, date_to)
+
+        context = {
+            **self.admin_site.each_context(request),
+            'title': 'Расширенный анализ реферала',
+            'opts': self.model._meta,
+            'query': query,
+            'matches': search_referrers(query) if query else [],
+            'referrer': referrer,
+            'date_from': date_from,
+            'date_to': date_to,
+            'period_error': period_error,
+            'report': report,
+        }
+        return render(request, 'admin/bot/telegramreferral/analytics.html', context)
+
+    def referral_analytics_export_view(self, request):
+        self._deny_support(request)
+        referrer_id = (request.GET.get('referrer') or '').strip()
+        referrer = None
+        if referrer_id.isdigit():
+            referrer = TelegramUser.objects.filter(pk=int(referrer_id)).first()
+        date_from, date_to, period_error = parse_period(request.GET)
+        if not referrer or period_error:
+            self.message_user(
+                request,
+                period_error or 'Сначала выберите реферера и период.',
+                level=messages.ERROR,
+            )
+            return redirect('admin:bot_telegramreferral_analytics')
+        return excel_response(build_report(referrer, date_from, date_to))
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)

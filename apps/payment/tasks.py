@@ -21,6 +21,8 @@ from apps.admindashboardx.ukassa_recurring import run_ukassa_site_recurring
 from apps.admindashboardx.ukassa_recurring import run_ukassa_bot_recurring
 
 
+
+from apps.payment.subscription_window import renewal_due_q
 from apps.payment.robokassa_subscription import (
     RECURRING_CHARGE,
     RECURRING_REPAIR_AND_SKIP,
@@ -678,7 +680,7 @@ def _run_robokassa_recurring(
 
     user_ids = list(
         TelegramUser.objects.filter(
-            subscription_status=False,
+            renewal_due_q(),
             permission_revoked=False,
         )
         .exclude(robokassa_recurring_parent_inv_id='')

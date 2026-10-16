@@ -12,6 +12,8 @@ from telebot import TeleBot
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 from apps.mtproxy.tasks import revoke_mtproxy_keys_for_user_task
+
+from apps.payment.subscription_window import fresh_pending_recurring_user_ids
 from bot.main.celerity_key_issue import try_delete_celerity_user
 from bot.main.pasarguard_key_issue import try_delete_pasarguard_user
 from bot.main.utils import msg
@@ -89,10 +91,20 @@ def update_user_subscription_status():
     This function is now synchronous and suitable for Celery tasks.
     """
     bot = TeleBot(token=TelegramBot.objects.all().first().token)
+    grace_ids = fresh_pending_recurring_user_ids()
 
     users = TelegramUser.objects.filter(subscription_expiration__lt=timezone.now(), subscription_status=True)
     for user in users:
         try:
+            if user.pk in grace_ids:
+                Logging.objects.create(
+                    category='bot',
+                    log_level='INFO',
+                    message='[BOT] [Подписка на паузе: есть свежий pending-рекуррент, ключи не снимаем]',
+                    datetime=timezone.now(),
+                    user=user,
+                )
+                continue
             user.subscription_status = False
             user.save()
 
@@ -109,7 +121,7 @@ def update_user_subscription_status():
                                    message=f'[BOT] [Ошибка при автообновлении статуса подписки:\n{traceback.format_exc()}]',
                                    datetime=timezone.now())
 
-    vpn_keys = VpnKey.objects.filter(user__subscription_status=False)
+    vpn_keys = VpnKey.objects.filter(user__subscription_status=False).exclude(user_id__in=grace_ids)
     for key in vpn_keys:
         try:
             if getattr(settings, "VPN_MARZBAN_ENABLED", True):

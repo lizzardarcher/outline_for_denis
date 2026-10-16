@@ -15,6 +15,8 @@ from typing import Optional
 import requests
 from django.conf import settings
 
+
+from apps.payment.subscription_window import renewal_due_q
 from apps.payment.cloudpayments_common import (
     REASON_CLEAR_TOKEN,
     apply_successful_pay,
@@ -138,7 +140,7 @@ def _run_channel(channel: str, logger: TaskRunLogger, *, dry_run=False, api_time
     label = channel.upper()
     users = list(
         TelegramUser.objects.filter(
-            subscription_status=False,
+            renewal_due_q(),
             permission_revoked=False,
             cloudpayments_token__isnull=False,
         ).exclude(cloudpayments_token="")
@@ -231,8 +233,7 @@ def _run_channel(channel: str, logger: TaskRunLogger, *, dry_run=False, api_time
                     channel=expected,
                     log_prefix=f"{prefix}[CELERY] [{label}] [CloudPayments]",
                 )
-                # Рекуррент ЮKassa ставит +31 от now; apply_successful_pay продлевает от expiration —
-                # для expired subscription_status=False extend ставит today+days. OK.
+                # apply_successful_pay продлевает от текущей даты, пока подписка активна.
                 logger.log(
                     "SUCCESS",
                     f"{prefix}[CELERY] [{label}] Успех за {elapsed:.1f}s user={user.user_id} "

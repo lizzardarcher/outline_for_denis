@@ -11,6 +11,8 @@ from typing import Optional
 
 from django.conf import settings
 
+
+from apps.payment.subscription_window import renewal_due_q
 from apps.payment.cryptocloud_common import (
     create_invoice,
     credentials_for_channel,
@@ -58,12 +60,19 @@ def _send_pay_link(user: TelegramUser, pay_url: str, amount, logger: TaskRunLogg
     bot = TeleBot(token=token.token)
     markup = InlineKeyboardMarkup()
     markup.add(InlineKeyboardButton(text=f"💳 Оплатить {amount} ₽", url=pay_url))
-    bot.send_message(
-        chat_id=user.user_id,
-        text=(
+    if user.subscription_status:
+        text = (
+            "Подписка заканчивается. Оплатите продление через CryptoCloud — "
+            "после оплаты доступ продлится, текущие ключи сохранятся."
+        )
+    else:
+        text = (
             "Подписка истекла. Оплатите продление через CryptoCloud — "
             "после оплаты доступ восстановится автоматически."
-        ),
+        )
+    bot.send_message(
+        chat_id=user.user_id,
+        text=text,
         reply_markup=markup,
     )
 
@@ -73,7 +82,7 @@ def _run_channel(channel: str, logger: TaskRunLogger, *, dry_run=False):
     label = channel.upper()
     users = list(
         TelegramUser.objects.filter(
-            subscription_status=False,
+            renewal_due_q(),
             permission_revoked=False,
             cryptocloud_channel__isnull=False,
         ).exclude(cryptocloud_channel="")

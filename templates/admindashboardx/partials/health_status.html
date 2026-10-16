@@ -1,0 +1,12 @@
+
+{% if status == "ok" %}
+    <span class="badge text-bg-success">✅{% if duration %} ({{ duration }}){% endif %}</span>
+{% elif status == "down" %}
+    <span class="badge text-bg-danger">❌{% if duration %} ({{ duration }}){% endif %}</span>
+{% elif status == "unknown" %}
+    <span class="badge text-bg-warning">{{ detail|default:"нет ответа" }}{% if duration %} ({{ duration }}){% endif %}</span>
+{% elif status == "idle" %}
+    <span class="badge text-bg-secondary">{{ detail|default:"не в панелях" }}{% if duration %} ({{ duration }}){% endif %}</span>
+{% else %}
+    <span class="text-secondary">—</span>
+{% endif %}

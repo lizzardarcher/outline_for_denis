@@ -8,6 +8,9 @@ import requests
 from django.conf import settings
 from django.utils import timezone
 
+
+from apps.payment.robokassa_subscription import extend_telegram_user_subscription
+from apps.payment.subscription_window import renewal_due_q
 from bot.models import (
     IncomeInfo,
     Prices,
@@ -22,6 +25,8 @@ from .task_run_logging import TaskRunLogger
 
 YOOKASSA_API_BASE = "https://api.yookassa.ru/v3/payments"
 DEFAULT_YOOKASSA_API_TIMEOUT = 30
+YOOKASSA_RECURRING_DAYS = 31
+YOOKASSA_RECURRING_COOLDOWN_DAYS = 3
 
 
 class _YooKassaPaymentResponse:
@@ -272,6 +277,57 @@ def _charge_step_prefix(index, total):
     return f"[#{index:03d}/{total:03d}]"
 
 
+def _preview_expiration(user, days=YOOKASSA_RECURRING_DAYS):
+    today = timezone.localdate()
+    if user.subscription_status:
+        base = user.subscription_expiration or today
+        return base + timedelta(days=days)
+    return today + timedelta(days=days)
+
+
+def _apply_yookassa_recurring_success(user, amount_to_charge):
+    """Продлевает от текущей даты, пока подписка активна, и не трогает ключи."""
+    extend_telegram_user_subscription(user, YOOKASSA_RECURRING_DAYS, amount=amount_to_charge)
+    user.save()
+
+
+def _record_yookassa_pending(user, amount_to_charge, currency, payment_id, payment_system):
+    Transaction.objects.create(
+        user=user,
+        amount=amount_to_charge,
+        currency=currency,
+        side="Приход средств",
+        status="pending",
+        paid=False,
+        payment_id=payment_id or None,
+        income_info=IncomeInfo.objects.get(pk=1),
+        description="Рекуррентный платеж",
+        payment_system=payment_system,
+    )
+
+
+def _yookassa_charge_block_reason(user, payment_system):
+    """Не списывать повторно, если за 3 дня уже был успех или висит рекуррентный pending."""
+    cutoff = timezone.now() - timedelta(days=YOOKASSA_RECURRING_COOLDOWN_DAYS)
+    if Transaction.objects.filter(
+        user=user,
+        payment_system=payment_system,
+        status="succeeded",
+        paid=True,
+        timestamp__gte=cutoff,
+    ).exclude(side="Вывод средств").exists():
+        return "недавний успешный платёж"
+    if Transaction.objects.filter(
+        user=user,
+        payment_system=payment_system,
+        status="pending",
+        paid=False,
+        description__icontains="екуррент",
+    ).exists():
+        return "есть pending"
+    return None
+
+
 def _bot_skip_reason(user, payment_system_by_pm_id=None):
     if (getattr(user, "robokassa_recurring_parent_inv_id", "") or "").strip():
         return "активна рекуррентная подписка RoboKassa"
@@ -283,6 +339,9 @@ def _bot_skip_reason(user, payment_system_by_pm_id=None):
     payment_system = _payment_system_for_user(user, payment_system_by_pm_id)
     if payment_system in ("YooKassaSite", "RoboKassaBot", "RoboKassaSite"):
         return f"платёжная система «{payment_system}» (не Bot)"
+    blocked = _yookassa_charge_block_reason(user, "YooKassaBot")
+    if blocked:
+        return blocked
     return None
 
 
@@ -295,11 +354,14 @@ def _site_skip_reason(user, payment_system_by_pm_id=None):
     if payment_system != "YooKassaSite":
         ps = payment_system or "неизвестна"
         return f"платёжная система «{ps}» (нужна YooKassaSite)"
+    blocked = _yookassa_charge_block_reason(user, "YooKassaSite")
+    if blocked:
+        return blocked
     return None
 
 
 def _dry_run_charge_log(channel, user, amount_to_charge, currency, payment_system_label, prefix=""):
-    exp_date = timezone.now().date() + timedelta(days=31)
+    exp_date = _preview_expiration(user)
     referral_count = TelegramReferral.objects.filter(referred=user).count()
     pm_preview = user.payment_method_id[:12] + "…" if len(user.payment_method_id) > 12 else user.payment_method_id
     return (
@@ -319,7 +381,7 @@ def run_ukassa_bot_recurring(
     channel = "BOT"
     users_to_charge = list(
         TelegramUser.objects.filter(
-            subscription_status=False,
+            renewal_due_q(),
             payment_method_id__isnull=False,
             payment_method_id__gt="",
             permission_revoked=False,
@@ -387,9 +449,7 @@ def run_ukassa_bot_recurring(
 
             if payment.status == "succeeded":
                 success += 1
-                user.subscription_status = True
-                user.subscription_expiration = timezone.now().date() + timedelta(days=31)
-                user.save()
+                _apply_yookassa_recurring_success(user, amount_to_charge)
                 Transaction.objects.create(
                     user=user,
                     amount=amount_to_charge,
@@ -417,9 +477,12 @@ def run_ukassa_bot_recurring(
                 logger.log("SUCCESS", msg, user=user)
 
             elif payment.status in ("waiting_for_capture", "pending"):
+                _record_yookassa_pending(
+                    user, amount_to_charge, currency, payment.id, "YooKassaBot"
+                )
                 msg = (
-                    f"{prefix}[CELERY] [{channel}] Неуспех за {elapsed:.1f}s: user_id={user.user_id}, "
-                    f"статус {payment.status}, payment_id={payment.id}. Требуется дополнительная проверка."
+                    f"{prefix}[CELERY] [{channel}] Ожидание за {elapsed:.1f}s: user_id={user.user_id}, "
+                    f"статус {payment.status}, payment_id={payment.id}. Ключи сохраняем до подтверждения."
                 )
                 logger.log("WARNING", msg, user=user)
 
@@ -469,7 +532,7 @@ def run_ukassa_site_recurring(
     channel = "SITE"
     users_to_charge = list(
         TelegramUser.objects.filter(
-            subscription_status=False,
+            renewal_due_q(),
             payment_method_id__isnull=False,
             payment_method_id__gt="",
             permission_revoked=False,
@@ -539,9 +602,7 @@ def run_ukassa_site_recurring(
 
             if payment.status == "succeeded":
                 success += 1
-                user.subscription_status = True
-                user.subscription_expiration = timezone.now().date() + timedelta(days=31)
-                user.save()
+                _apply_yookassa_recurring_success(user, amount_to_charge)
                 Transaction.objects.create(
                     user=user,
                     amount=amount_to_charge,
@@ -563,9 +624,12 @@ def run_ukassa_site_recurring(
                 logger.log("SUCCESS", msg, user=user)
 
             elif payment.status in ("waiting_for_capture", "pending"):
+                _record_yookassa_pending(
+                    user, amount_to_charge, currency, payment.id, "YooKassaSite"
+                )
                 msg = (
-                    f"{prefix}[CELERY] [{channel}] Неуспех за {elapsed:.1f}s: user_id={user.user_id}, "
-                    f"статус {payment.status}, payment_id={payment.id}. Требуется дополнительная проверка."
+                    f"{prefix}[CELERY] [{channel}] Ожидание за {elapsed:.1f}s: user_id={user.user_id}, "
+                    f"статус {payment.status}, payment_id={payment.id}. Ключи сохраняем до подтверждения."
                 )
                 logger.log("WARNING", msg, user=user)
 
