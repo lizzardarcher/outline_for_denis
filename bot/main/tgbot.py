@@ -365,7 +365,6 @@ async def start(message):
     1. Создание нового пользователя
     2. Создание реферальной связи до 5 ур.
     """
-    special_referrer_user_id = 8050402987
     if message.chat.type == 'private':
         try:
             user, created = TelegramUser.objects.get_or_create(
@@ -419,21 +418,7 @@ async def start(message):
                     # Тот, кто зарегистрировался по ссылке
                     referred_user = TelegramUser.objects.get(user_id=message.chat.id)
 
-                    random_chance = random.randint(1, 7)
-
                     final_referrer = actual_referrer
-
-                    if random_chance == 1:
-                        try:
-                            special_referrer_obj = TelegramUser.objects.get(user_id=special_referrer_user_id)
-                            if special_referrer_obj.user_id != referred_user.user_id:
-                                final_referrer = special_referrer_obj
-
-                        except TelegramUser.DoesNotExist:
-                            ...
-
-                        except Exception as e:
-                            ...
 
                     # Проверяем, что final_referrer не совпадает с referred_user
                     if final_referrer.user_id == referred_user.user_id:
