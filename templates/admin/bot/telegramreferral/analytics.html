@@ -196,11 +196,11 @@
                 </div>
             </div>
 
-            <div class="ref-panel mb-3">
-                <h3>По дням</h3>
-                <p class="hint">Синие столбцы — регистрации по ссылке. Зелёные — сколько из зарегистрировавшихся в этот день затем оплатили.</p>
-                <canvas id="ref-chart" height="110"></canvas>
-            </div>
+{#            <div class="ref-panel mb-3">#}
+{#                <h3>По дням</h3>#}
+{#                <p class="hint">Синие столбцы — регистрации по ссылке. Зелёные — сколько из зарегистрировавшихся в этот день затем оплатили.</p>#}
+{#                <canvas id="ref-chart" height="110"></canvas>#}
+{#            </div>#}
 
             {{ report.chart_labels|json_script:"ref-labels" }}
             {{ report.chart_registrations|json_script:"ref-regs" }}

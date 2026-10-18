@@ -530,7 +530,7 @@ class TelegramBotAdmin(admin.ModelAdmin):
         os.system('systemctl restart telegram_bot.service')
 
 
-# @admin.register(TelegramReferral)
+@admin.register(TelegramReferral)
 class TelegramReferralAdmin(BaseAdmin):
     list_display = ('referrer', 'referred', 'level')
     search_fields = ('referrer__username', 'referred__username', 'referrer__first_name', 'referred__first_name',
