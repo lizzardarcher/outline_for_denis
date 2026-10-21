@@ -111,12 +111,17 @@ def for_sender():
     return markup
 
 
+
 def get_avail_location(protocol: str):
+    from apps.admindashboardx.panel_health import exclude_panel_down_servers
+
     markup = InlineKeyboardMarkup()
     if protocol == "hysteria2":
-        servers = Server.objects.filter(is_active=True, is_c3celeryty_activated=True)
+        servers = exclude_panel_down_servers(
+            Server.objects.filter(is_active=True, is_c3celeryty_activated=True)
+        )
     else:
-        servers = Server.objects.filter(is_active=True)
+        servers = exclude_panel_down_servers(Server.objects.filter(is_active=True))
     countries = set([x.country for x in servers if x.country_id])
     for country in countries:
         markup.add(InlineKeyboardButton(text=country.name_for_app, callback_data=f'country:{protocol}:{country.name}'))

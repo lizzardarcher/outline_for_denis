@@ -54,9 +54,12 @@ class ProfileView(LoginRequiredMixin, SuccessMessageMixin, TemplateView):
             for n in notifications
         ]
 
-        context['servers'] = Server.objects.filter(is_active=True).values_list('country__name_for_app',
 
-                                                                               flat=True).distinct()
+        from apps.admindashboardx.panel_health import exclude_panel_down_servers
+
+        context['servers'] = exclude_panel_down_servers(
+            Server.objects.filter(is_active=True)
+        ).values_list('country__name_for_app', flat=True).distinct()
         try:
             context['vpn_key'] = VpnKey.objects.select_related('user', 'server', 'server__country').get(user=tg_user)
         except VpnKey.DoesNotExist:

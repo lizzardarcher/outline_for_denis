@@ -47,6 +47,21 @@ _HEALTHY_STATUSES = frozenset(
 _PENDING_STATUSES = frozenset({"connecting", "syncing"})
 
 
+
+def exclude_panel_down_servers(queryset):
+    """Убрать серверы, у которых текущий статус панелей = down.
+
+    Ping не учитывается. Серверы без записи health_states остаются в выборке
+    (ещё не проверялись). Используется при выдаче ключей и в списках стран.
+    """
+    from apps.admindashboardx.models import ServerHealthState
+
+    return queryset.exclude(
+        health_states__channel=ServerHealthState.CHANNEL_PANEL,
+        health_states__status=STATUS_DOWN,
+    )
+
+
 def get_cached_snapshot() -> Optional[dict]:
     payload = cache.get(CACHE_KEY)
     if isinstance(payload, dict):

@@ -12,6 +12,8 @@ from bot.main.pasarguard_key_issue import (
     try_delete_pasarguard_user,
 )
 
+
+from apps.admindashboardx.panel_health import exclude_panel_down_servers
 from bot.models import Country, Server, TelegramUser, VpnKey
 
 KEY_LIMIT = settings.KEY_LIMIT
@@ -27,6 +29,11 @@ def _pasarguard_dual_write() -> bool:
 
 def _vless_link_source() -> str:
     return (getattr(settings, "VPN_VLESS_LINK_SOURCE", None) or "pasarguard").strip().lower()
+
+
+def _eligible_servers(**filters):
+    """Активные серверы для выдачи: без panel=down в ServerHealthState."""
+    return exclude_panel_down_servers(Server.objects.filter(is_active=True, **filters))
 
 
 def marzban_create_and_get_user(telegram_user: TelegramUser, protocol: str) -> dict:
@@ -86,8 +93,7 @@ def _upsert_vpn_key(
 
 def _server_for_marzban(country: Country) -> Optional[Server]:
     return (
-        Server.objects.filter(
-            is_active=True,
+        _eligible_servers(
             is_activated_vless=True,
             country=country,
             keys_generated__lte=KEY_LIMIT,
@@ -99,8 +105,7 @@ def _server_for_marzban(country: Country) -> Optional[Server]:
 
 def _server_for_pasarguard(country: Country) -> Optional[Server]:
     return (
-        Server.objects.filter(
-            is_active=True,
+        _eligible_servers(
             is_pasarguard_activated=True,
             country=country,
             keys_generated__lte=KEY_LIMIT,
@@ -123,8 +128,7 @@ def _server_for_vless_outline(country: Country) -> Optional[Server]:
 
 def _server_for_hysteria2(country: Country) -> Optional[Server]:
     return (
-        Server.objects.filter(
-            is_active=True,
+        _eligible_servers(
             is_c3celeryty_activated=True,
             country=country,
             keys_generated__lte=KEY_LIMIT,
