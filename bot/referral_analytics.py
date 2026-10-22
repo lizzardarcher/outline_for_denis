@@ -1,6 +1,5 @@
-
 """Когорта прямых рефералов: регистрации и оплаты за период."""
-from datetime import datetime, timedelta
+from datetime import datetime, time, timedelta
 from decimal import Decimal
 
 from django.db.models import Count, Q
@@ -69,12 +68,30 @@ def _as_local(ts):
         return None
     if timezone.is_aware(ts):
         return timezone.localtime(ts)
-    return ts
+    # Naive: считаем уже в текущей TIME_ZONE (как пишет datetime.now() на сервере).
+    return timezone.make_aware(ts, timezone.get_current_timezone())
+
+
+def _period_datetimes(date_from, date_to):
+    """[start, end) в текущей TIME_ZONE — границы календарных дней периода."""
+    tz = timezone.get_current_timezone()
+    start = timezone.make_aware(datetime.combine(date_from, time.min), tz)
+    end = timezone.make_aware(datetime.combine(date_to + timedelta(days=1), time.min), tz)
+    return start, end
+
+
+def _in_period(ts, date_from, date_to):
+    local = _as_local(ts)
+    if local is None:
+        return False
+    day = local.date()
+    return date_from <= day <= date_to
+
 
 def build_report(referrer, date_from, date_to):
     """
     Регистрации — прямые рефералы с join_date в периоде.
-    В таблице и суммах — только платежи (и начисления) с датой в периоде
+    В таблице и суммах — только платежи (и начисления) с timestamp в периоде
     по всем прямым рефералам.
     """
     all_direct = list(
@@ -86,20 +103,28 @@ def build_report(referrer, date_from, date_to):
         row.referred for row in all_direct
         if row.referred.join_date and date_from <= row.referred.join_date <= date_to
     ]
-    cohort_ids = {user.pk for user in cohort_users}
     all_referred_ids = [row.referred_id for row in all_direct]
     referred_by_id = {row.referred_id: row.referred for row in all_direct}
 
+    start_dt, end_dt = _period_datetimes(date_from, date_to)
     payments = []
     if all_referred_ids:
-        for tx in (
-            Transaction.objects.filter(SUCCESS_Q, user_id__in=all_referred_ids)
+        # __date — календарный день в TIME_ZONE; диапазон datetime — доп. ограничение.
+        qs = (
+            Transaction.objects.filter(
+                SUCCESS_Q,
+                user_id__in=all_referred_ids,
+                timestamp__date__gte=date_from,
+                timestamp__date__lte=date_to,
+                timestamp__gte=start_dt,
+                timestamp__lt=end_dt,
+            )
             .exclude(side=WITHDRAWAL_SIDE)
             .select_related("user")
             .order_by("timestamp", "id")
-        ):
-            day = _as_local(tx.timestamp).date()
-            if date_from <= day <= date_to:
+        )
+        for tx in qs:
+            if _in_period(tx.timestamp, date_from, date_to):
                 payments.append(tx)
 
     payments_by_day = {}
@@ -108,10 +133,13 @@ def build_report(referrer, date_from, date_to):
     payer_ids_in_period = set()
     rows = []
     for tx in payments:
+        local_ts = _as_local(tx.timestamp)
+        day = local_ts.date()
+        if not (date_from <= day <= date_to):
+            continue
         payment_count += 1
         amount = tx.amount or Decimal("0")
         payment_sum += amount
-        day = _as_local(tx.timestamp).date()
         bucket = payments_by_day.setdefault(day, {"count": 0, "sum": Decimal("0")})
         bucket["count"] += 1
         bucket["sum"] += amount
@@ -119,7 +147,7 @@ def build_report(referrer, date_from, date_to):
         user = tx.user or referred_by_id.get(tx.user_id)
         rows.append({
             "user": user,
-            "paid_at": _as_local(tx.timestamp),
+            "paid_at": local_ts,
             "amount": amount,
             "tx_id": tx.pk,
         })
@@ -131,19 +159,16 @@ def build_report(referrer, date_from, date_to):
             ReferralTransaction.objects.filter(
                 referral__referrer=referrer,
                 referral__level=1,
+                timestamp__gte=start_dt,
+                timestamp__lt=end_dt,
             )
             .select_related("transaction", "referral")
             .order_by("timestamp", "id")
         ):
-            day = _as_local(rt.timestamp).date()
-            tx_day = (
-                _as_local(rt.transaction.timestamp).date()
-                if rt.transaction_id and rt.transaction
-                else None
-            )
-            if date_from <= day <= date_to or (tx_day and date_from <= tx_day <= date_to):
-                referral_income_count += 1
-                referral_income_sum += rt.amount or Decimal("0")
+            if not _in_period(rt.timestamp, date_from, date_to):
+                continue
+            referral_income_count += 1
+            referral_income_sum += rt.amount or Decimal("0")
 
     regs_by_day = {}
     for user in cohort_users:
@@ -220,10 +245,7 @@ def excel_response(report):
         ])
 
     people = wb.create_sheet("Платежи")
-    people.append([
-        "user_id", "Имя", "Фамилия", "username", "Дата регистрации",
-        "Дата оплаты", "Сумма",
-    ])
+    people.append(["user_id", "Имя", "Фамилия", "username", "Дата оплаты", "Сумма"])
     for row in report["rows"]:
         user = row["user"]
         paid_at = row["paid_at"]
@@ -232,7 +254,6 @@ def excel_response(report):
             (user.first_name or "") if user else "",
             (user.last_name or "") if user else "",
             (user.username or "") if user else "",
-            user.join_date.isoformat() if user and user.join_date else "",
             paid_at.strftime("%Y-%m-%d %H:%M") if paid_at else "",
             float(row["amount"]) if row["amount"] is not None else "",
         ])

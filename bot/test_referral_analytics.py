@@ -128,12 +128,27 @@ class ReferralCohortAnalyticsTest(TestCase):
         self.assertEqual(report["payment_sum"], Decimal("0"))
         self.assertEqual(report["rows"], [])
 
+
+    def test_old_timestamp_excluded_from_period(self):
+        """Платёж с timestamp вне периода не попадает в таблицу, даже если реферал активен."""
+        old_ts = timezone.now() - timedelta(days=10)
+        Transaction.objects.filter(pk=self.tx_paid.pk).update(timestamp=old_ts)
+        Transaction.objects.filter(pk=self.tx_old.pk).update(timestamp=old_ts)
+        ReferralTransaction.objects.all().update(timestamp=old_ts)
+        report = build_report(self.referrer, self.today, self.today)
+        self.assertEqual(report["payment_count"], 0)
+        self.assertEqual(report["payment_sum"], Decimal("0"))
+        self.assertEqual(report["rows"], [])
+        self.assertEqual(report["referral_income_count"], 0)
+
     def test_older_referral_payment_in_period_counts(self):
         """Оплаты пользователей, зарегистрированных по ссылке раньше периода, тоже учитываются."""
         report = build_report(self.referrer, self.today, self.today)
         old_rows = [row for row in report["rows"] if row["user"].username == "olduser"]
         self.assertEqual(len(old_rows), 1)
         self.assertEqual(old_rows[0]["amount"], Decimal("300.00"))
+        paid_at = old_rows[0]["paid_at"]
+        self.assertEqual(timezone.localtime(paid_at).date(), self.today)
 
     def test_admin_page_and_excel(self):
         User = get_user_model()
