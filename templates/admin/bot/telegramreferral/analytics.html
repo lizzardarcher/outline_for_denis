@@ -180,7 +180,14 @@
                     <div class="ref-box tone-blue">
                         <p class="ref-value">{{ report.registrations }}</p>
                         <p class="ref-label">Новых за этот период</p>
-                        <p class="ref-label mt-1">из них оплатили: {{ report.paid_users }} (конверсия {{ report.conversion_pct }}%)</p>
+
+                        <p class="ref-label mt-1">из них оплатили: {{ report.paid_users }}</p>
+                    </div>
+                </div>
+                <div class="col-6 col-xl mb-3 mb-xl-0">
+                    <div class="ref-box tone-amber">
+                        <p class="ref-value">{{ report.conversion_pct }}%</p>
+                        <p class="ref-label">Конверсия</p>
                     </div>
                 </div>
                 <div class="col-6 col-xl mb-3 mb-xl-0">
@@ -191,7 +198,6 @@
                     </div>
                 </div>
                 <div class="col-6 col-xl">
-
                     <div class="ref-box tone-green" id="ref-income-box"
                          data-count-new="{{ report.referral_income_count_new }}"
                          data-sum-new="{{ report.referral_income_sum_new }}"
