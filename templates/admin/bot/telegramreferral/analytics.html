@@ -67,6 +67,12 @@
             padding: 3px 10px;
             font-size: 0.8rem;
         }
+
+        .ref-pay-tabs .btn.active {
+            pointer-events: none;
+        }
+        .ref-pay-panel { display: none; }
+        .ref-pay-panel.is-active { display: block; }
     </style>
 {% endblock %}
 
@@ -173,31 +179,22 @@
                 <div class="col-6 col-xl mb-3 mb-xl-0">
                     <div class="ref-box tone-blue">
                         <p class="ref-value">{{ report.registrations }}</p>
-                        <p class="ref-label">Зарегистрировались по ссылке</p>
-                    </div>
-                </div>
-                <div class="col-6 col-xl mb-3 mb-xl-0">
-                    <div class="ref-box tone-green">
-                        <p class="ref-value">{{ report.paid_users }}</p>
-                        <p class="ref-label">Из них оплатили</p>
-                    </div>
-                </div>
-                <div class="col-6 col-xl mb-3 mb-xl-0">
-                    <div class="ref-box tone-amber">
-                        <p class="ref-value">{{ report.conversion_pct }}%</p>
-                        <p class="ref-label">Конверсия</p>
+                        <p class="ref-label">Новых за этот период</p>
+                        <p class="ref-label mt-1">из них оплатили: {{ report.paid_users }} (конверсия {{ report.conversion_pct }}%)</p>
                     </div>
                 </div>
                 <div class="col-6 col-xl mb-3 mb-xl-0">
                     <div class="ref-box tone-violet">
                         <p class="ref-value">{{ report.payment_count }}</p>
-                        <p class="ref-label">Оплат рефералов на {{ report.payment_sum }} ₽</p>
+                        <p class="ref-label">Оплат всех рефералов за этот период</p>
+                        <p class="ref-label mt-1">на {{ report.payment_sum }} ₽</p>
                     </div>
                 </div>
                 <div class="col-6 col-xl">
                     <div class="ref-box tone-green">
                         <p class="ref-value">{{ report.referral_income_count }}</p>
-                        <p class="ref-label">Начислений на {{ report.referral_income_sum }} ₽</p>
+                        <p class="ref-label">Начислений за этот период</p>
+                        <p class="ref-label mt-1">на {{ report.referral_income_sum }} ₽</p>
                     </div>
                 </div>
             </div>
@@ -256,37 +253,96 @@
             </script>
 
             <div class="card">
-                <div class="card-header">
-                    Платежи за период
-                    <span class="text-muted font-weight-normal">
-                        {{ date_from|date:"d.m.Y" }} — {{ date_to|date:"d.m.Y" }}
-                    </span>
+                <div class="card-header d-flex flex-wrap justify-content-between align-items-center">
+                    <div>
+                        Платежи
+                        <span class="text-muted font-weight-normal">
+                            {{ date_from|date:"d.m.Y" }} — {{ date_to|date:"d.m.Y" }}
+                        </span>
+                    </div>
+                    <div class="btn-group btn-group-sm ref-pay-tabs" role="group">
+                        <button type="button" class="btn btn-outline-info active" data-pay-tab="new">
+                            Платежи от новых пользователей за период ({{ report.payment_count_new }})
+                        </button>
+                        <button type="button" class="btn btn-outline-info" data-pay-tab="all">
+                            Платежи от всех рефералов за период ({{ report.payment_count }})
+                        </button>
+                    </div>
                 </div>
                 <div class="card-body p-0">
-                    <table class="table table-striped table-hover mb-0 ref-table">
-                        <thead>
-                        <tr>
-                            <th>Имя</th>
-                            <th>Username</th>
-                            <th>Дата оплаты</th>
-                            <th>Сумма</th>
-                        </tr>
-                        </thead>
-                        <tbody>
-                        {% for row in report.rows %}
+                    <div class="ref-pay-panel is-active" data-pay-panel="new">
+                        <p class="small text-muted px-3 pt-3 mb-0">
+                            Только оплаты людей, зарегистрировавшихся по ссылке в этом периоде.
+                            Сумма: {{ report.payment_sum_new }} ₽
+                        </p>
+                        <table class="table table-striped table-hover mb-0 ref-table">
+                            <thead>
                             <tr>
-                                <td>{% if row.user %}{{ row.user.first_name }} {{ row.user.last_name }}{% else %}—{% endif %}</td>
-                                <td>{% if row.user and row.user.username %}@{{ row.user.username }}{% else %}—{% endif %}</td>
-                                <td>{{ row.paid_at|date:"d.m.Y H:i" }}</td>
-                                <td>{{ row.amount }} ₽</td>
+                                <th>Имя</th>
+                                <th>Username</th>
+                                <th>Дата оплаты</th>
+                                <th>Сумма</th>
                             </tr>
-                        {% empty %}
-                            <tr><td colspan="4" class="text-muted">За этот период нет оплат по реферальной ссылке.</td></tr>
-                        {% endfor %}
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody>
+                            {% for row in report.rows_new %}
+                                <tr>
+                                    <td>{% if row.user %}{{ row.user.first_name }} {{ row.user.last_name }}{% else %}—{% endif %}</td>
+                                    <td>{% if row.user and row.user.username %}@{{ row.user.username }}{% else %}—{% endif %}</td>
+                                    <td>{{ row.paid_at|date:"d.m.Y H:i" }}</td>
+                                    <td>{{ row.amount }} ₽</td>
+                                </tr>
+                            {% empty %}
+                                <tr><td colspan="4" class="text-muted">Нет оплат от новых рефералов за этот период.</td></tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="ref-pay-panel" data-pay-panel="all">
+                        <p class="small text-muted px-3 pt-3 mb-0">
+                            Оплаты всех прямых рефералов за период (включая зарегистрированных раньше).
+                            Сумма: {{ report.payment_sum }} ₽
+                        </p>
+                        <table class="table table-striped table-hover mb-0 ref-table">
+                            <thead>
+                            <tr>
+                                <th>Имя</th>
+                                <th>Username</th>
+                                <th>Дата оплаты</th>
+                                <th>Сумма</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            {% for row in report.rows_all %}
+                                <tr>
+                                    <td>{% if row.user %}{{ row.user.first_name }} {{ row.user.last_name }}{% else %}—{% endif %}</td>
+                                    <td>{% if row.user and row.user.username %}@{{ row.user.username }}{% else %}—{% endif %}</td>
+                                    <td>{{ row.paid_at|date:"d.m.Y H:i" }}</td>
+                                    <td>{{ row.amount }} ₽</td>
+                                </tr>
+                            {% empty %}
+                                <tr><td colspan="4" class="text-muted">За этот период нет оплат по реферальной ссылке.</td></tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
+            <script>
+                (function () {
+                    const tabs = document.querySelectorAll("[data-pay-tab]");
+                    const panels = document.querySelectorAll("[data-pay-panel]");
+                    tabs.forEach(function (btn) {
+                        btn.addEventListener("click", function () {
+                            const key = btn.getAttribute("data-pay-tab");
+                            tabs.forEach(function (b) { b.classList.toggle("active", b === btn); });
+                            panels.forEach(function (p) {
+                                p.classList.toggle("is-active", p.getAttribute("data-pay-panel") === key);
+                            });
+                        });
+                    });
+                })();
+            </script>
         {% endif %}
     </div>
 {% endblock %}

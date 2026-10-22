@@ -88,11 +88,23 @@ def _in_period(ts, date_from, date_to):
     return date_from <= day <= date_to
 
 
+
+def _payment_row(tx, referred_by_id):
+    local_ts = _as_local(tx.timestamp)
+    return {
+        "user": tx.user or referred_by_id.get(tx.user_id),
+        "paid_at": local_ts,
+        "amount": tx.amount or Decimal("0"),
+        "tx_id": tx.pk,
+        "user_id": tx.user_id,
+    }
+
+
 def build_report(referrer, date_from, date_to):
     """
-    Регистрации — прямые рефералы с join_date в периоде.
-    В таблице и суммах — только платежи (и начисления) с timestamp в периоде
-    по всем прямым рефералам.
+    Новые за период — join_date в периоде.
+    Оплаты/начисления — timestamp в периоде по всем прямым рефералам;
+    отдельно список оплат только от новых.
     """
     all_direct = list(
         TelegramReferral.objects.filter(referrer=referrer, level=1)
@@ -103,13 +115,13 @@ def build_report(referrer, date_from, date_to):
         row.referred for row in all_direct
         if row.referred.join_date and date_from <= row.referred.join_date <= date_to
     ]
+    cohort_ids = {user.pk for user in cohort_users}
     all_referred_ids = [row.referred_id for row in all_direct]
     referred_by_id = {row.referred_id: row.referred for row in all_direct}
 
     start_dt, end_dt = _period_datetimes(date_from, date_to)
     payments = []
     if all_referred_ids:
-        # __date — календарный день в TIME_ZONE; диапазон datetime — доп. ограничение.
         qs = (
             Transaction.objects.filter(
                 SUCCESS_Q,
@@ -130,27 +142,29 @@ def build_report(referrer, date_from, date_to):
     payments_by_day = {}
     payment_count = 0
     payment_sum = Decimal("0")
+    payment_count_new = 0
+    payment_sum_new = Decimal("0")
     payer_ids_in_period = set()
-    rows = []
+    rows_all = []
+    rows_new = []
     for tx in payments:
         local_ts = _as_local(tx.timestamp)
         day = local_ts.date()
         if not (date_from <= day <= date_to):
             continue
+        row = _payment_row(tx, referred_by_id)
+        amount = row["amount"]
         payment_count += 1
-        amount = tx.amount or Decimal("0")
         payment_sum += amount
         bucket = payments_by_day.setdefault(day, {"count": 0, "sum": Decimal("0")})
         bucket["count"] += 1
         bucket["sum"] += amount
         payer_ids_in_period.add(tx.user_id)
-        user = tx.user or referred_by_id.get(tx.user_id)
-        rows.append({
-            "user": user,
-            "paid_at": local_ts,
-            "amount": amount,
-            "tx_id": tx.pk,
-        })
+        rows_all.append(row)
+        if tx.user_id in cohort_ids:
+            payment_count_new += 1
+            payment_sum_new += amount
+            rows_new.append(row)
 
     referral_income_count = 0
     referral_income_sum = Decimal("0")
@@ -208,9 +222,13 @@ def build_report(referrer, date_from, date_to):
         "conversion_pct": conversion,
         "payment_count": payment_count,
         "payment_sum": payment_sum,
+        "payment_count_new": payment_count_new,
+        "payment_sum_new": payment_sum_new,
         "referral_income_count": referral_income_count,
         "referral_income_sum": referral_income_sum,
-        "rows": rows,
+        "rows": rows_all,
+        "rows_all": rows_all,
+        "rows_new": rows_new,
         "daily": daily,
         "chart_labels": [day["date"].strftime("%d.%m") for day in daily],
         "chart_registrations": [day["registrations"] for day in daily],
@@ -225,13 +243,15 @@ def excel_response(report):
     summary.title = "Сводка"
     summary.append(["Реферер", referrer.first_name or "", referrer.last_name or "", referrer.username or "", referrer.user_id])
     summary.append(["Период", report["date_from"].isoformat(), report["date_to"].isoformat()])
-    summary.append(["Регистрации", report["registrations"]])
-    summary.append(["Оплатили", report["paid_users"]])
-    summary.append(["Конверсия, %", float(report["conversion_pct"])])
-    summary.append(["Оплат", report["payment_count"]])
-    summary.append(["Сумма", float(report["payment_sum"])])
-    summary.append(["Реферальных начислений", report["referral_income_count"]])
-    summary.append(["Сумма начислений", float(report["referral_income_sum"])])
+    summary.append(["Новых за период", report["registrations"]])
+    summary.append(["Из них оплатили", report["paid_users"]])
+    summary.append(["Конверсия новых, %", float(report["conversion_pct"])])
+    summary.append(["Оплат всех рефералов за период", report["payment_count"]])
+    summary.append(["Сумма оплат всех рефералов", float(report["payment_sum"])])
+    summary.append(["Оплат новых за период", report["payment_count_new"]])
+    summary.append(["Сумма оплат новых", float(report["payment_sum_new"])])
+    summary.append(["Начислений за период", report["referral_income_count"]])
+    summary.append(["Сумма начислений за период", float(report["referral_income_sum"])])
 
     daily_ws = wb.create_sheet("По дням")
     daily_ws.append(["Дата", "Регистрации", "Из них оплатили", "Оплат за день", "Сумма за день"])
@@ -244,19 +264,23 @@ def excel_response(report):
             float(day["payment_sum"]),
         ])
 
-    people = wb.create_sheet("Платежи")
-    people.append(["user_id", "Имя", "Фамилия", "username", "Дата оплаты", "Сумма"])
-    for row in report["rows"]:
-        user = row["user"]
-        paid_at = row["paid_at"]
-        people.append([
-            user.user_id if user else "",
-            (user.first_name or "") if user else "",
-            (user.last_name or "") if user else "",
-            (user.username or "") if user else "",
-            paid_at.strftime("%Y-%m-%d %H:%M") if paid_at else "",
-            float(row["amount"]) if row["amount"] is not None else "",
-        ])
+    def _write_payments_sheet(title, rows):
+        ws = wb.create_sheet(title)
+        ws.append(["user_id", "Имя", "Фамилия", "username", "Дата оплаты", "Сумма"])
+        for row in rows:
+            user = row["user"]
+            paid_at = row["paid_at"]
+            ws.append([
+                user.user_id if user else "",
+                (user.first_name or "") if user else "",
+                (user.last_name or "") if user else "",
+                (user.username or "") if user else "",
+                paid_at.strftime("%Y-%m-%d %H:%M") if paid_at else "",
+                float(row["amount"]) if row["amount"] is not None else "",
+            ])
+
+    _write_payments_sheet("Платежи новые", report["rows_new"])
+    _write_payments_sheet("Платежи общие", report["rows_all"])
 
     response = HttpResponse(
         content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
