@@ -71,12 +71,11 @@ def _as_local(ts):
         return timezone.localtime(ts)
     return ts
 
-
 def build_report(referrer, date_from, date_to):
     """
     Регистрации — прямые рефералы с join_date в периоде.
-    Оплаты и реферальные начисления — только с датой в выбранном периоде
-    (по всем прямым рефералам, не только зарегистрированным в периоде).
+    В таблице и суммах — только платежи (и начисления) с датой в периоде
+    по всем прямым рефералам.
     """
     all_direct = list(
         TelegramReferral.objects.filter(referrer=referrer, level=1)
@@ -96,17 +95,18 @@ def build_report(referrer, date_from, date_to):
         for tx in (
             Transaction.objects.filter(SUCCESS_Q, user_id__in=all_referred_ids)
             .exclude(side=WITHDRAWAL_SIDE)
+            .select_related("user")
             .order_by("timestamp", "id")
         ):
             day = _as_local(tx.timestamp).date()
             if date_from <= day <= date_to:
                 payments.append(tx)
 
-    first_payment = {}
     payments_by_day = {}
     payment_count = 0
     payment_sum = Decimal("0")
-    payer_ids_in_scope = set()
+    payer_ids_in_period = set()
+    rows = []
     for tx in payments:
         payment_count += 1
         amount = tx.amount or Decimal("0")
@@ -115,9 +115,14 @@ def build_report(referrer, date_from, date_to):
         bucket = payments_by_day.setdefault(day, {"count": 0, "sum": Decimal("0")})
         bucket["count"] += 1
         bucket["sum"] += amount
-        payer_ids_in_scope.add(tx.user_id)
-        if tx.user_id not in first_payment:
-            first_payment[tx.user_id] = tx
+        payer_ids_in_period.add(tx.user_id)
+        user = tx.user or referred_by_id.get(tx.user_id)
+        rows.append({
+            "user": user,
+            "paid_at": _as_local(tx.timestamp),
+            "amount": amount,
+            "tx_id": tx.pk,
+        })
 
     referral_income_count = 0
     referral_income_sum = Decimal("0")
@@ -140,37 +145,17 @@ def build_report(referrer, date_from, date_to):
                 referral_income_count += 1
                 referral_income_sum += rt.amount or Decimal("0")
 
-    # Строки: зарегистрированные в периоде + прямые рефералы с оплатой в периоде.
-    row_users = list(cohort_users)
-    seen = set(cohort_ids)
-    for user_id in sorted(payer_ids_in_scope):
-        if user_id in seen:
-            continue
-        user = referred_by_id.get(user_id)
-        if user is None:
-            continue
-        row_users.append(user)
-        seen.add(user_id)
-
     regs_by_day = {}
+    for user in cohort_users:
+        regs_by_day[user.join_date] = regs_by_day.get(user.join_date, 0) + 1
+
     paid_by_join = {}
-    rows = []
-    for user in row_users:
-        in_cohort = user.pk in cohort_ids
-        if in_cohort:
-            regs_by_day[user.join_date] = regs_by_day.get(user.join_date, 0) + 1
-        first = first_payment.get(user.pk)
-        if in_cohort and first:
+    for user in cohort_users:
+        if user.pk in payer_ids_in_period:
             paid_by_join[user.join_date] = paid_by_join.get(user.join_date, 0) + 1
-        rows.append({
-            "user": user,
-            "paid": first is not None,
-            "first_at": _as_local(first.timestamp) if first else None,
-            "first_amount": first.amount if first else None,
-        })
 
     registrations = len(cohort_users)
-    paid_users = sum(1 for user in cohort_users if user.pk in first_payment)
+    paid_users = sum(1 for user in cohort_users if user.pk in payer_ids_in_period)
     if registrations:
         conversion = (Decimal(paid_users) * Decimal("100") / Decimal(registrations)).quantize(Decimal("0.1"))
     else:
@@ -234,23 +219,22 @@ def excel_response(report):
             float(day["payment_sum"]),
         ])
 
-    people = wb.create_sheet("Люди")
+    people = wb.create_sheet("Платежи")
     people.append([
         "user_id", "Имя", "Фамилия", "username", "Дата регистрации",
-        "Оплатил", "Первая оплата в периоде", "Сумма",
+        "Дата оплаты", "Сумма",
     ])
     for row in report["rows"]:
         user = row["user"]
-        first_at = row["first_at"]
+        paid_at = row["paid_at"]
         people.append([
-            user.user_id,
-            user.first_name or "",
-            user.last_name or "",
-            user.username or "",
-            user.join_date.isoformat() if user.join_date else "",
-            "да" if row["paid"] else "нет",
-            first_at.strftime("%Y-%m-%d %H:%M") if first_at else "",
-            float(row["first_amount"]) if row["first_amount"] is not None else "",
+            user.user_id if user else "",
+            (user.first_name or "") if user else "",
+            (user.last_name or "") if user else "",
+            (user.username or "") if user else "",
+            user.join_date.isoformat() if user and user.join_date else "",
+            paid_at.strftime("%Y-%m-%d %H:%M") if paid_at else "",
+            float(row["amount"]) if row["amount"] is not None else "",
         ])
 
     response = HttpResponse(

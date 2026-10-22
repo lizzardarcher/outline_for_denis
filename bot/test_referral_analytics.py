@@ -111,8 +111,12 @@ class ReferralCohortAnalyticsTest(TestCase):
         self.assertEqual(report["payment_sum"], Decimal("800.00"))
         self.assertEqual(report["referral_income_count"], 2)
         self.assertEqual(report["referral_income_sum"], Decimal("120.00"))
+
+        # в таблице только платежи периода, без неоплативших регистраций
         names = {row["user"].username for row in report["rows"]}
-        self.assertEqual(names, {"paiduser", "freeuser", "olduser"})
+        self.assertEqual(names, {"paiduser", "olduser"})
+        amounts = sorted(row["amount"] for row in report["rows"])
+        self.assertEqual(amounts, [Decimal("300.00"), Decimal("500.00")])
 
     def test_payment_outside_period_not_counted(self):
         yesterday = self.today - timedelta(days=1)
@@ -122,14 +126,14 @@ class ReferralCohortAnalyticsTest(TestCase):
         self.assertEqual(report["paid_users"], 0)
         self.assertEqual(report["payment_count"], 0)
         self.assertEqual(report["payment_sum"], Decimal("0"))
+        self.assertEqual(report["rows"], [])
 
     def test_older_referral_payment_in_period_counts(self):
         """Оплаты пользователей, зарегистрированных по ссылке раньше периода, тоже учитываются."""
         report = build_report(self.referrer, self.today, self.today)
         old_rows = [row for row in report["rows"] if row["user"].username == "olduser"]
         self.assertEqual(len(old_rows), 1)
-        self.assertTrue(old_rows[0]["paid"])
-        self.assertEqual(old_rows[0]["first_amount"], Decimal("300.00"))
+        self.assertEqual(old_rows[0]["amount"], Decimal("300.00"))
 
     def test_admin_page_and_excel(self):
         User = get_user_model()
@@ -144,8 +148,10 @@ class ReferralCohortAnalyticsTest(TestCase):
         response = self.client.get(page, params, secure=True)
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Paid")
+        self.assertContains(response, "Платежи за период")
         self.assertContains(response, "Из них оплатили")
         self.assertNotContains(response, "Deep")
+        self.assertNotContains(response, "Free")
 
         changelist = self.client.get(reverse("admin:bot_telegramreferral_changelist"), secure=True)
         self.assertContains(changelist, "Расширенный анализ")
@@ -161,9 +167,9 @@ class ReferralCohortAnalyticsTest(TestCase):
         self.assertEqual(summary["A8"].value, "Реферальных начислений")
         self.assertEqual(summary["B8"].value, 2)
         self.assertEqual(summary["B9"].value, 120.0)
-        people = book["Люди"]
-        exported_ids = {people.cell(row=i, column=1).value for i in range(2, people.max_row + 1)}
-        self.assertEqual(exported_ids, {1002, 1003, 1005})
+        payments_ws = book["Платежи"]
+        exported_ids = {payments_ws.cell(row=i, column=1).value for i in range(2, payments_ws.max_row + 1)}
+        self.assertEqual(exported_ids, {1002, 1005})
 
     def test_support_cannot_open_analytics(self):
         from django.conf import settings
