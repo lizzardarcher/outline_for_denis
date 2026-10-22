@@ -115,6 +115,9 @@ class ReferralCohortAnalyticsTest(TestCase):
         self.assertEqual(report["referral_income_count"], 2)
         self.assertEqual(report["referral_income_sum"], Decimal("120.00"))
 
+        self.assertEqual(report["referral_income_count_new"], 1)
+        self.assertEqual(report["referral_income_sum_new"], Decimal("75.00"))
+
         names_all = {row["user"].username for row in report["rows_all"]}
         self.assertEqual(names_all, {"paiduser", "olduser"})
         names_new = {row["user"].username for row in report["rows_new"]}
@@ -168,7 +171,7 @@ class ReferralCohortAnalyticsTest(TestCase):
         self.assertContains(response, "Платежи общие за период")
         self.assertContains(response, "Новых за этот период")
         self.assertContains(response, "Оплат всех рефералов за этот период")
-        self.assertContains(response, "Начислений за этот период")
+        self.assertContains(response, "Начислений от новых за этот период")
         self.assertNotContains(response, "Deep")
 
         changelist = self.client.get(reverse("admin:bot_telegramreferral_changelist"), secure=True)
@@ -183,9 +186,12 @@ class ReferralCohortAnalyticsTest(TestCase):
         self.assertEqual(summary["B3"].value, 2)
         self.assertEqual(summary["A6"].value, "Оплат всех рефералов за период")
         self.assertEqual(summary["B6"].value, 2)
-        self.assertEqual(summary["A10"].value, "Начислений за период")
-        self.assertEqual(summary["B10"].value, 2)
-        self.assertEqual(summary["B11"].value, 120.0)
+        self.assertEqual(summary["A10"].value, "Начислений от новых за период")
+        self.assertEqual(summary["B10"].value, 1)
+        self.assertEqual(summary["B11"].value, 75.0)
+        self.assertEqual(summary["A12"].value, "Начислений всех за период")
+        self.assertEqual(summary["B12"].value, 2)
+        self.assertEqual(summary["B13"].value, 120.0)
         new_ws = book["Платежи новые"]
         all_ws = book["Платежи общие"]
         new_ids = {new_ws.cell(row=i, column=1).value for i in range(2, new_ws.max_row + 1)}

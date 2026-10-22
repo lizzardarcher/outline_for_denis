@@ -168,6 +168,9 @@ def build_report(referrer, date_from, date_to):
 
     referral_income_count = 0
     referral_income_sum = Decimal("0")
+
+    referral_income_count_new = 0
+    referral_income_sum_new = Decimal("0")
     if all_referred_ids:
         for rt in (
             ReferralTransaction.objects.filter(
@@ -181,8 +184,13 @@ def build_report(referrer, date_from, date_to):
         ):
             if not _in_period(rt.timestamp, date_from, date_to):
                 continue
+            amount = rt.amount or Decimal("0")
             referral_income_count += 1
-            referral_income_sum += rt.amount or Decimal("0")
+            referral_income_sum += amount
+            referred_id = rt.referral.referred_id if rt.referral_id else None
+            if referred_id in cohort_ids:
+                referral_income_count_new += 1
+                referral_income_sum_new += amount
 
     regs_by_day = {}
     for user in cohort_users:
@@ -226,6 +234,8 @@ def build_report(referrer, date_from, date_to):
         "payment_sum_new": payment_sum_new,
         "referral_income_count": referral_income_count,
         "referral_income_sum": referral_income_sum,
+        "referral_income_count_new": referral_income_count_new,
+        "referral_income_sum_new": referral_income_sum_new,
         "rows": rows_all,
         "rows_all": rows_all,
         "rows_new": rows_new,
@@ -250,8 +260,10 @@ def excel_response(report):
     summary.append(["Сумма оплат всех рефералов", float(report["payment_sum"])])
     summary.append(["Оплат новых за период", report["payment_count_new"]])
     summary.append(["Сумма оплат новых", float(report["payment_sum_new"])])
-    summary.append(["Начислений за период", report["referral_income_count"]])
-    summary.append(["Сумма начислений за период", float(report["referral_income_sum"])])
+    summary.append(["Начислений от новых за период", report["referral_income_count_new"]])
+    summary.append(["Сумма начислений от новых", float(report["referral_income_sum_new"])])
+    summary.append(["Начислений всех за период", report["referral_income_count"]])
+    summary.append(["Сумма начислений всех", float(report["referral_income_sum"])])
 
     daily_ws = wb.create_sheet("По дням")
     daily_ws.append(["Дата", "Регистрации", "Из них оплатили", "Оплат за день", "Сумма за день"])

@@ -191,10 +191,15 @@
                     </div>
                 </div>
                 <div class="col-6 col-xl">
-                    <div class="ref-box tone-green">
-                        <p class="ref-value">{{ report.referral_income_count }}</p>
-                        <p class="ref-label">Начислений за этот период</p>
-                        <p class="ref-label mt-1">на {{ report.referral_income_sum }} ₽</p>
+
+                    <div class="ref-box tone-green" id="ref-income-box"
+                         data-count-new="{{ report.referral_income_count_new }}"
+                         data-sum-new="{{ report.referral_income_sum_new }}"
+                         data-count-all="{{ report.referral_income_count }}"
+                         data-sum-all="{{ report.referral_income_sum }}">
+                        <p class="ref-value" id="ref-income-count">{{ report.referral_income_count_new }}</p>
+                        <p class="ref-label" id="ref-income-title">Начислений от новых за этот период</p>
+                        <p class="ref-label mt-1" id="ref-income-sum">на {{ report.referral_income_sum_new }} ₽</p>
                     </div>
                 </div>
             </div>
@@ -332,6 +337,27 @@
                 (function () {
                     const tabs = document.querySelectorAll("[data-pay-tab]");
                     const panels = document.querySelectorAll("[data-pay-panel]");
+                    const incomeBox = document.getElementById("ref-income-box");
+                    const incomeCount = document.getElementById("ref-income-count");
+                    const incomeTitle = document.getElementById("ref-income-title");
+                    const incomeSum = document.getElementById("ref-income-sum");
+
+                    function syncIncomeBanner(key) {
+                        if (!incomeBox) return;
+                        const isNew = key === "new";
+                        incomeCount.textContent = isNew
+                            ? incomeBox.getAttribute("data-count-new")
+                            : incomeBox.getAttribute("data-count-all");
+                        incomeTitle.textContent = isNew
+                            ? "Начислений от новых за этот период"
+                            : "Начислений от всех рефералов за этот период";
+                        incomeSum.textContent = "на " + (
+                            isNew
+                                ? incomeBox.getAttribute("data-sum-new")
+                                : incomeBox.getAttribute("data-sum-all")
+                        ) + " ₽";
+                    }
+
                     tabs.forEach(function (btn) {
                         btn.addEventListener("click", function () {
                             const key = btn.getAttribute("data-pay-tab");
@@ -339,8 +365,10 @@
                             panels.forEach(function (p) {
                                 p.classList.toggle("is-active", p.getAttribute("data-pay-panel") === key);
                             });
+                            syncIncomeBanner(key);
                         });
                     });
+                    syncIncomeBanner("new");
                 })();
             </script>
         {% endif %}
