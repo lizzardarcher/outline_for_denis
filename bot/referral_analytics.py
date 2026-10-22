@@ -74,20 +74,19 @@ def _as_local(ts):
 
 def build_report(referrer, date_from, date_to):
     """
-    Регистрации — когорта по join_date в периоде.
-    Оплаты — платежи всех прямых рефералов (level=1): у когорты любые даты,
-    у остальных — только оплаты с датой в периоде. Плюс реферальные начисления.
+    Регистрации — прямые рефералы с join_date в периоде.
+    Оплаты и реферальные начисления — только с датой в выбранном периоде
+    (по всем прямым рефералам, не только зарегистрированным в периоде).
     """
     all_direct = list(
         TelegramReferral.objects.filter(referrer=referrer, level=1)
         .select_related("referred")
         .order_by("referred__join_date", "referred_id")
     )
-    cohort = [
-        row for row in all_direct
+    cohort_users = [
+        row.referred for row in all_direct
         if row.referred.join_date and date_from <= row.referred.join_date <= date_to
     ]
-    cohort_users = [row.referred for row in cohort]
     cohort_ids = {user.pk for user in cohort_users}
     all_referred_ids = [row.referred_id for row in all_direct]
     referred_by_id = {row.referred_id: row.referred for row in all_direct}
@@ -100,7 +99,7 @@ def build_report(referrer, date_from, date_to):
             .order_by("timestamp", "id")
         ):
             day = _as_local(tx.timestamp).date()
-            if tx.user_id in cohort_ids or date_from <= day <= date_to:
+            if date_from <= day <= date_to:
                 payments.append(tx)
 
     first_payment = {}
@@ -120,7 +119,6 @@ def build_report(referrer, date_from, date_to):
         if tx.user_id not in first_payment:
             first_payment[tx.user_id] = tx
 
-    # Реферальные начисления рефереру с прямых рефералов (те же границы, что у оплат).
     referral_income_count = 0
     referral_income_sum = Decimal("0")
     if all_referred_ids:
@@ -132,18 +130,17 @@ def build_report(referrer, date_from, date_to):
             .select_related("transaction", "referral")
             .order_by("timestamp", "id")
         ):
-            referred_id = rt.referral.referred_id if rt.referral_id else None
-            if referred_id is None:
-                continue
             day = _as_local(rt.timestamp).date()
-            tx_day = _as_local(rt.transaction.timestamp).date() if rt.transaction_id and rt.transaction else None
-            in_cohort = referred_id in cohort_ids
-            in_period = date_from <= day <= date_to or (tx_day and date_from <= tx_day <= date_to)
-            if in_cohort or in_period:
+            tx_day = (
+                _as_local(rt.transaction.timestamp).date()
+                if rt.transaction_id and rt.transaction
+                else None
+            )
+            if date_from <= day <= date_to or (tx_day and date_from <= tx_day <= date_to):
                 referral_income_count += 1
                 referral_income_sum += rt.amount or Decimal("0")
 
-    # Строки: когорта + прямые рефералы вне когорты, у которых есть оплата в периоде.
+    # Строки: зарегистрированные в периоде + прямые рефералы с оплатой в периоде.
     row_users = list(cohort_users)
     seen = set(cohort_ids)
     for user_id in sorted(payer_ids_in_scope):
@@ -170,7 +167,6 @@ def build_report(referrer, date_from, date_to):
             "paid": first is not None,
             "first_at": _as_local(first.timestamp) if first else None,
             "first_amount": first.amount if first else None,
-            "in_cohort": in_cohort,
         })
 
     registrations = len(cohort_users)
@@ -180,15 +176,9 @@ def build_report(referrer, date_from, date_to):
     else:
         conversion = Decimal("0.0")
 
-    last_day = date_to
-    cap = date_to + timedelta(days=366)
-    for day in payments_by_day:
-        if date_to < day <= cap and day > last_day:
-            last_day = day
-
     daily = []
     cursor = date_from
-    while cursor <= last_day:
+    while cursor <= date_to:
         pay = payments_by_day.get(cursor, {"count": 0, "sum": Decimal("0")})
         daily.append({
             "date": cursor,
@@ -199,7 +189,6 @@ def build_report(referrer, date_from, date_to):
         })
         cursor += timedelta(days=1)
 
-    chart_daily = [day for day in daily if day["date"] <= date_to]
     return {
         "referrer": referrer,
         "date_from": date_from,
@@ -213,9 +202,9 @@ def build_report(referrer, date_from, date_to):
         "referral_income_sum": referral_income_sum,
         "rows": rows,
         "daily": daily,
-        "chart_labels": [day["date"].strftime("%d.%m") for day in chart_daily],
-        "chart_registrations": [day["registrations"] for day in chart_daily],
-        "chart_paid": [day["paid_users"] for day in chart_daily],
+        "chart_labels": [day["date"].strftime("%d.%m") for day in daily],
+        "chart_registrations": [day["registrations"] for day in daily],
+        "chart_paid": [day["paid_users"] for day in daily],
     }
 
 
@@ -248,7 +237,7 @@ def excel_response(report):
     people = wb.create_sheet("Люди")
     people.append([
         "user_id", "Имя", "Фамилия", "username", "Дата регистрации",
-        "В когорте периода", "Оплатил", "Первая оплата", "Сумма первой оплаты",
+        "Оплатил", "Первая оплата в периоде", "Сумма",
     ])
     for row in report["rows"]:
         user = row["user"]
@@ -259,7 +248,6 @@ def excel_response(report):
             user.last_name or "",
             user.username or "",
             user.join_date.isoformat() if user.join_date else "",
-            "да" if row.get("in_cohort", True) else "нет",
             "да" if row["paid"] else "нет",
             first_at.strftime("%Y-%m-%d %H:%M") if first_at else "",
             float(row["first_amount"]) if row["first_amount"] is not None else "",

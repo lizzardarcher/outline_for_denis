@@ -263,9 +263,8 @@
                             <th>Имя</th>
                             <th>Username</th>
                             <th>Регистрация</th>
-                            <th>Когорта</th>
                             <th>Оплата</th>
-                            <th>Первая оплата</th>
+                            <th>Первая оплата в периоде</th>
                             <th>Сумма</th>
                         </tr>
                         </thead>
@@ -275,13 +274,6 @@
                                 <td>{{ row.user.first_name }} {{ row.user.last_name }}</td>
                                 <td>{% if row.user.username %}@{{ row.user.username }}{% else %}—{% endif %}</td>
                                 <td>{{ row.user.join_date|date:"d.m.Y" }}</td>
-                                <td>
-                                    {% if row.in_cohort %}
-                                        <span class="badge-paid">в периоде</span>
-                                    {% else %}
-                                        <span class="badge-wait">раньше</span>
-                                    {% endif %}
-                                </td>
                                 <td>
                                     {% if row.paid %}
                                         <span class="badge-paid">оплатил</span>
@@ -293,7 +285,7 @@
                                 <td>{% if row.first_at %}{{ row.first_amount }} ₽{% else %}—{% endif %}</td>
                             </tr>
                         {% empty %}
-                            <tr><td colspan="7" class="text-muted">За этот период нет регистраций и оплат по ссылке.</td></tr>
+                            <tr><td colspan="6" class="text-muted">За этот период нет регистраций и оплат по ссылке.</td></tr>
                         {% endfor %}
                         </tbody>
                     </table>

@@ -114,20 +114,20 @@ class ReferralCohortAnalyticsTest(TestCase):
         names = {row["user"].username for row in report["rows"]}
         self.assertEqual(names, {"paiduser", "freeuser", "olduser"})
 
-    def test_payment_after_period_still_counts(self):
+    def test_payment_outside_period_not_counted(self):
         yesterday = self.today - timedelta(days=1)
         TelegramUser.objects.filter(pk=self.paid.pk).update(join_date=yesterday)
         report = build_report(self.referrer, yesterday, yesterday)
         self.assertEqual(report["registrations"], 1)
-        self.assertEqual(report["paid_users"], 1)
-        self.assertEqual(report["payment_count"], 1)
+        self.assertEqual(report["paid_users"], 0)
+        self.assertEqual(report["payment_count"], 0)
+        self.assertEqual(report["payment_sum"], Decimal("0"))
 
     def test_older_referral_payment_in_period_counts(self):
         """Оплаты пользователей, зарегистрированных по ссылке раньше периода, тоже учитываются."""
         report = build_report(self.referrer, self.today, self.today)
         old_rows = [row for row in report["rows"] if row["user"].username == "olduser"]
         self.assertEqual(len(old_rows), 1)
-        self.assertFalse(old_rows[0]["in_cohort"])
         self.assertTrue(old_rows[0]["paid"])
         self.assertEqual(old_rows[0]["first_amount"], Decimal("300.00"))
 
