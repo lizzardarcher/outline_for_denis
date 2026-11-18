@@ -778,6 +778,59 @@ def set_is_activated_vless_false(modeladmin, request, queryset):
     modeladmin.message_user(request, f'is_activated_vless снят у {updated} сервер(ов).')
 
 
+
+def _server_install_done(server) -> bool:
+    role = (server.node_role or "").strip()
+    if role == Server.NODE_ROLE_HYSTERIA2:
+        return bool(server.is_c3celeryty_activated)
+    if role in (Server.NODE_ROLE_OUTLINE, Server.NODE_ROLE_VLESS):
+        return bool(server.is_activated_vless)
+    return bool(server.is_activated_vless and server.is_c3celeryty_activated)
+
+
+@admin.action(description="Инициализировать выбранные серверы")
+def initialize_selected_servers(modeladmin, request, queryset):
+    from apps.admindashboardx.tasks import initialize_server_task
+
+    queued = []
+    skipped = []
+    failed = []
+    for server in queryset:
+        label = server.ip_address or server.hosting or f"pk={server.pk}"
+        if _server_install_done(server):
+            skipped.append(label)
+            continue
+        try:
+            initialize_server_task.delay(server.pk)
+        except Exception as exc:
+            failed.append(f"{label}: {exc}")
+            continue
+        queued.append(label)
+
+    if queued:
+        modeladmin.message_user(
+            request,
+            "Установка запущена для "
+            + ", ".join(queued)
+            + ". Результат смотрите в логах VPN: строка «готово» и включённая панель.",
+            level=messages.SUCCESS,
+        )
+    if skipped:
+        modeladmin.message_user(
+            request,
+            "Уже установлены, повторно не запускались: " + ", ".join(skipped) + ".",
+            level=messages.WARNING,
+        )
+    if failed:
+        modeladmin.message_user(
+            request,
+            "Не удалось поставить в очередь: " + "; ".join(failed) + ".",
+            level=messages.ERROR,
+        )
+    if not queued and not skipped and not failed:
+        modeladmin.message_user(request, "Серверы не выбраны.", level=messages.WARNING)
+
+
 class ServerAdminForm(forms.ModelForm):
     _ASSIGNABLE_ROLES = (
         (Server.NODE_ROLE_OUTLINE, "SS"),
@@ -825,6 +878,7 @@ class ServerAdmin(BaseAdmin):
     form = ServerAdminForm
 
     actions = [
+        initialize_selected_servers,
         set_is_activated_vless_true,
         set_is_activated_vless_false,
     ]

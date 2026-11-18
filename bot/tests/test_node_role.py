@@ -1,9 +1,12 @@
 
+
+from unittest.mock import patch
+
 from django.contrib.admin.sites import AdminSite
 from django.test import RequestFactory, SimpleTestCase, TestCase, override_settings
 
 from apps.admindashboardx.panel_health import STATUS_DOWN
-from bot.admin import ServerAdmin
+from bot.admin import ServerAdmin, initialize_selected_servers
 from bot.main.node_firewall import build_role_init_script, ufw_rules_for_role
 from bot.main.server_protocol import countries_for_protocol, pick_server_for_protocol
 from bot.main.server_provision import servers_pending_marzban_or_celerity
@@ -214,3 +217,27 @@ class DjangoAdminServerAddTests(TestCase):
         })
         self.assertFalse(form.is_valid())
         self.assertIn("Сервер с таким IP уже есть.", form.errors["ip_address"])
+
+    @patch("apps.admindashboardx.tasks.initialize_server_task.delay")
+    def test_initialize_action_queues_only_uninstalled_servers(self, delay):
+        pending = Server.objects.create(
+            hosting="pending",
+            ip_address="10.9.1.1",
+            is_active=True,
+            node_role=Server.NODE_ROLE_VLESS,
+        )
+        installed = Server.objects.create(
+            hosting="done",
+            ip_address="10.9.1.2",
+            is_active=True,
+            node_role=Server.NODE_ROLE_VLESS,
+            is_activated_vless=True,
+        )
+        request = RequestFactory().get("/admin/bot/server/")
+        with patch.object(self.admin, "message_user"):
+            initialize_selected_servers(
+                self.admin,
+                request,
+                Server.objects.filter(pk__in=[pending.pk, installed.pk]),
+            )
+        delay.assert_called_once_with(pending.pk)
