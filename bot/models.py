@@ -334,7 +334,16 @@ class Server(models.Model):
     )
 
     hosting = models.CharField(max_length=1000, blank=True, null=True, verbose_name='Хостинг')
-    ip_address = models.CharField(max_length=1000, blank=True, null=True, verbose_name='IP Address')
+
+    ip_address = models.CharField(
+        max_length=1000,
+        blank=True,
+        null=True,
+        unique=True,
+        verbose_name='IP Address',
+        help_text='Один адрес можно завести только один раз, в том числе для другого протокола.',
+        error_messages={'unique': 'Сервер с таким IP уже есть.'},
+    )
     user = models.CharField(max_length=1000, blank=True, null=True, default='root', verbose_name='Пользователь')
     password = models.CharField(max_length=1000, blank=True, null=True, default='<PASSWORD>', verbose_name='Пароль')
     rental_price = models.DecimalField(max_digits=10, blank=True, null=True, decimal_places=2,
@@ -387,6 +396,21 @@ class Server(models.Model):
         verbose_name='Hysteria cert sync',
         help_text='Когда последний раз снимали pin/SNI по SSH.',
     )
+
+    def clean(self):
+        super().clean()
+        self.ip_address = self._normalized_ip(self.ip_address)
+
+    def save(self, *args, **kwargs):
+        self.ip_address = self._normalized_ip(self.ip_address)
+        super().save(*args, **kwargs)
+
+    @staticmethod
+    def _normalized_ip(value):
+        if value is None:
+            return None
+        value = str(value).strip()
+        return value or None
 
     def __str__(self):
         return f"{self.hosting} ({self.created_at}) {self.country.name}"

@@ -193,3 +193,24 @@ class DjangoAdminServerAddTests(TestCase):
         self.assertIn("node_role", readonly)
         form_class = self.admin.get_form(self.request, obj=server)
         self.assertNotIn("node_role", form_class.base_fields)
+
+
+    def test_same_ip_cannot_be_added_for_another_protocol(self):
+        Server.objects.create(
+            hosting="already",
+            ip_address="10.9.0.1",
+            is_active=True,
+            node_role=Server.NODE_ROLE_OUTLINE,
+            is_activated_vless=True,
+        )
+        form_class = self.admin.get_form(self.request, obj=None)
+        form = form_class(data={
+            "hosting": "again",
+            "ip_address": " 10.9.0.1 ",
+            "user": "root",
+            "password": "secret",
+            "is_active": True,
+            "node_role": Server.NODE_ROLE_VLESS,
+        })
+        self.assertFalse(form.is_valid())
+        self.assertIn("Сервер с таким IP уже есть.", form.errors["ip_address"])

@@ -19,6 +19,8 @@
                 <div class="col-md-6">
                     <label class="form-label">IP Address</label>
                     {{ form.ip_address }}
+
+                    {% if form.ip_address.help_text %}<div class="form-text">{{ form.ip_address.help_text }}</div>{% endif %}
                     {% if form.ip_address.errors %}<div class="text-danger small">{{ form.ip_address.errors|join:", " }}</div>{% endif %}
                 </div>
                 <div class="col-md-4">
