@@ -249,7 +249,8 @@ class ServerInline(admin.TabularInline):
     model = Server
     extra = 1
     fields = (
-        'hosting', 'ip_address', 'user', 'password', 'rental_price',
+
+        'hosting', 'ip_address', 'user', 'password',
         'is_active', 'panels_active',
     )
     readonly_fields = ('panels_active',)
@@ -904,17 +905,17 @@ class ServerAdmin(BaseAdmin):
         return obj.get_node_role_display()
 
     list_display = (
-        'hosting', 'country', 'ip_address', 'user', 'password', 'rental_price', 'is_active',
+        'hosting', 'country', 'ip_address', 'user', 'password', 'is_active',
         'node_role_label', 'panels_active', 'get_key_generated', 'created_at',
     )
     list_display_links = ('hosting',)
     fields = (
-        'hosting', 'ip_address', 'user', 'password', 'rental_price', 'max_keys', 'is_active', 'country',
-        'node_role', 'created_at', 'panels_active', 'is_activated_vless',
-        'hysteria_tls_sni', 'hysteria_pin_sha256', 'hysteria_cert_synced_at',
+        'hosting', 'ip_address', 'user', 'password', 'max_keys', 'is_active', 'country',
+        'node_role',
+        'hysteria_tls_sni', 'hysteria_pin_sha256',
     )
     readonly_fields = (
-        'max_keys', 'created_at', 'panels_active', 'hysteria_cert_synced_at',
+        'max_keys',
     )
 
     def get_readonly_fields(self, request, obj=None):
@@ -1003,6 +1004,30 @@ class ServerAdmin(BaseAdmin):
             "samples_page": samples_page,
         }
         return render(request, "admin/bot/server/panel_health_log.html", context)
+
+
+@admin.register(ServerRemoved)
+class ServerRemovedAdmin(BaseAdmin):
+    list_display = (
+        "original_id", "hosting", "ip_address", "country_name", "node_role",
+        "is_active", "removed_at",
+    )
+    list_display_links = ("original_id", "hosting")
+    fields = (
+        "original_id", "removed_at", "hosting", "ip_address", "user", "password",
+        "max_keys", "keys_generated", "is_active", "created_at",
+        "country_name", "country_name_for_app", "node_role",
+        "is_activated_vless", "is_pasarguard_activated", "is_c3celeryty_activated",
+        "hysteria_tls_sni", "hysteria_pin_sha256", "hysteria_cert_synced_at",
+    )
+    readonly_fields = fields
+    ordering = ("-removed_at", "-id")
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(Country)

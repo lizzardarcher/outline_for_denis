@@ -70,7 +70,7 @@ class ServerForm(forms.ModelForm):
             "ip_address",
             "user",
             "password",
-            "rental_price",
+
             "keys_generated",
             "is_active",
             "country",

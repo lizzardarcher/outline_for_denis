@@ -7,11 +7,12 @@ from django.test import RequestFactory, SimpleTestCase, TestCase, override_setti
 
 from apps.admindashboardx.panel_health import STATUS_DOWN
 from bot.admin import ServerAdmin, initialize_selected_servers
+
+from bot.models import Country, Server, ServerRemoved
 from bot.main.node_firewall import build_role_init_script, ufw_rules_for_role
 from bot.main.server_protocol import countries_for_protocol, pick_server_for_protocol
 from bot.main.server_provision import servers_pending_marzban_or_celerity
 from bot.main.vpn_key_issue import _server_for_hysteria2, _server_for_vless_outline
-from bot.models import Country, Server
 from bot.tests.test_vpn_key_issue_panel_health import _set_panel_status
 
 
@@ -161,6 +162,11 @@ class DjangoAdminServerAddTests(TestCase):
             "node_role": "",
         })
         self.assertIn("node_role", form.fields)
+        self.assertNotIn("rental_price", form.fields)
+        self.assertNotIn("created_at", form.fields)
+        self.assertNotIn("panels_active", form.fields)
+        self.assertNotIn("is_activated_vless", form.fields)
+        self.assertNotIn("hysteria_cert_synced_at", form.fields)
         self.assertTrue(form.fields["node_role"].required)
         choice_values = [value for value, _label in form.fields["node_role"].choices]
         self.assertIn(Server.NODE_ROLE_OUTLINE, choice_values)
@@ -241,3 +247,30 @@ class DjangoAdminServerAddTests(TestCase):
                 Server.objects.filter(pk__in=[pending.pk, installed.pk]),
             )
         delay.assert_called_once_with(pending.pk)
+
+    @patch("bot.main.server_panel_cleanup.delete_server_from_panels")
+    def test_deleted_server_is_copied_to_server_removed(self, _cleanup):
+        country = Country.objects.create(name="DE", name_for_app="Германия", is_active=True)
+        server = Server.objects.create(
+            hosting="gone",
+            ip_address="10.9.2.1",
+            user="root",
+            password="secret",
+            country=country,
+            is_active=True,
+            node_role=Server.NODE_ROLE_VLESS,
+            is_activated_vless=True,
+            keys_generated=3,
+        )
+        original_id = server.pk
+        server.delete()
+        archived = ServerRemoved.objects.get(original_id=original_id)
+        self.assertFalse(Server.objects.filter(pk=original_id).exists())
+        self.assertEqual(archived.ip_address, "10.9.2.1")
+        self.assertEqual(archived.password, "secret")
+        self.assertEqual(archived.country_name, "DE")
+        self.assertEqual(archived.country_name_for_app, "Германия")
+        self.assertEqual(archived.node_role, Server.NODE_ROLE_VLESS)
+        self.assertTrue(archived.is_activated_vless)
+        self.assertEqual(archived.keys_generated, 3)
+        self.assertIsNotNone(archived.removed_at)

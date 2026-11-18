@@ -46,11 +46,7 @@
                     {% if form.node_role.errors %}<div class="text-danger small">{{ form.node_role.errors|join:", " }}</div>{% endif %}
                 </div>
                 <div class="col-md-4">
-                    <label class="form-label">Цена аренды в месяц</label>
-                    {{ form.rental_price }}
-                    {% if form.rental_price.errors %}<div class="text-danger small">{{ form.rental_price.errors|join:", " }}</div>{% endif %}
-                </div>
-                <div class="col-md-4">
+
                     <label class="form-label">Ключей сгенерировано</label>
                     {{ form.keys_generated }}
                     {% if form.keys_generated.errors %}<div class="text-danger small">{{ form.keys_generated.errors|join:", " }}</div>{% endif %}

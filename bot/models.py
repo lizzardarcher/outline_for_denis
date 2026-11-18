@@ -346,8 +346,7 @@ class Server(models.Model):
     )
     user = models.CharField(max_length=1000, blank=True, null=True, default='root', verbose_name='Пользователь')
     password = models.CharField(max_length=1000, blank=True, null=True, default='<PASSWORD>', verbose_name='Пароль')
-    rental_price = models.DecimalField(max_digits=10, blank=True, null=True, decimal_places=2,
-                                       verbose_name='Цена аренды в месяц')
+
     max_keys = models.IntegerField(default=200, blank=True, null=True, verbose_name='Лимит ключей', editable=False)
     keys_generated = models.IntegerField(default=0, blank=True, null=True, verbose_name='Ключей сгенерировано')
     is_active = models.BooleanField(default=True, verbose_name='Сервер Активен')
@@ -418,6 +417,37 @@ class Server(models.Model):
     class Meta:
         verbose_name = 'VPN сервер'
         verbose_name_plural = 'VPN сервера'
+
+
+class ServerRemoved(models.Model):
+    original_id = models.IntegerField(verbose_name='ID сервера')
+    hosting = models.CharField(max_length=1000, blank=True, null=True, verbose_name='Хостинг')
+    ip_address = models.CharField(max_length=1000, blank=True, null=True, verbose_name='IP Address')
+    user = models.CharField(max_length=1000, blank=True, null=True, verbose_name='Пользователь')
+    password = models.CharField(max_length=1000, blank=True, null=True, verbose_name='Пароль')
+    max_keys = models.IntegerField(blank=True, null=True, verbose_name='Лимит ключей')
+    keys_generated = models.IntegerField(blank=True, null=True, verbose_name='Ключей сгенерировано')
+    is_active = models.BooleanField(default=False, verbose_name='Сервер Активен')
+    created_at = models.DateField(blank=True, null=True, verbose_name='Дата создания')
+    country_name = models.CharField(max_length=100, blank=True, default='', verbose_name='Страна')
+    country_name_for_app = models.CharField(max_length=100, blank=True, default='', verbose_name='Страна в приложении')
+    node_role = models.CharField(max_length=16, blank=True, default='', verbose_name='Протокол сервера')
+    is_activated_vless = models.BooleanField(default=False, verbose_name='Панель Vless/SS')
+    is_pasarguard_activated = models.BooleanField(default=False, verbose_name='PasarGuard')
+    is_c3celeryty_activated = models.BooleanField(default=False, verbose_name='Панель C3 Celeryty')
+    hysteria_tls_sni = models.CharField(max_length=255, blank=True, default='', verbose_name='Hysteria TLS SNI')
+    hysteria_pin_sha256 = models.CharField(max_length=64, blank=True, default='', verbose_name='Hysteria pinSHA256')
+    hysteria_cert_synced_at = models.DateTimeField(blank=True, null=True, verbose_name='Hysteria cert sync')
+    removed_at = models.DateTimeField(auto_now_add=True, verbose_name='Удалён')
+
+    def __str__(self):
+        when = self.removed_at.strftime("%Y-%m-%d") if self.removed_at else ""
+        return f"{self.hosting or self.ip_address or self.original_id} ({when})"
+
+    class Meta:
+        verbose_name = 'Удалённый VPN сервер'
+        verbose_name_plural = 'Удалённые VPN сервера'
+        ordering = ('-removed_at', '-id')
 
 
 class Country(models.Model):
