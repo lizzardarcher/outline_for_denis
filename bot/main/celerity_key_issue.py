@@ -68,6 +68,14 @@ def sanitize_hysteria2_uri_for_happ(
     return urlunparse(parsed._replace(query=urlencode(query)))
 
 
+
+def hysteria2_uri_has_salamander(uri: str) -> bool:
+    query = dict(parse_qsl(urlparse(uri).query, keep_blank_values=True))
+    obfs = (query.get("obfs") or "").strip().lower()
+    password = (query.get("obfs-password") or "").strip()
+    return obfs == "salamander" and bool(password)
+
+
 def pick_hysteria2_tls_uri(subscription_text: str, server_ip: str) -> Optional[str]:
     """
     Из многострочного ответа GET /files/:token?format=uri — строка hysteria2:// для server_ip
@@ -204,5 +212,8 @@ def issue_hysteria2_tls_for_user(
         )
     except ValueError as e:
         return False, str(e)
+
+    if (server.node_role or "") == Server.NODE_ROLE_HYSTERIA2 and not hysteria2_uri_has_salamander(uri):
+        return False, f"Нода {server_ip}: в ссылке нет obfs salamander"
 
     return True, uri

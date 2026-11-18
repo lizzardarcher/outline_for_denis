@@ -1,6 +1,14 @@
-from django.test import SimpleTestCase
 
-from bot.main.celerity_key_issue import sanitize_hysteria2_uri_for_happ
+from unittest.mock import patch
+
+from django.test import SimpleTestCase, TestCase
+
+from bot.main.celerity_key_issue import (
+    hysteria2_uri_has_salamander,
+    issue_hysteria2_tls_for_user,
+    sanitize_hysteria2_uri_for_happ,
+)
+from bot.models import Server
 from bot.main.hysteria_tls_meta import (
     parse_hysteria_cert_ssh_output,
     parse_pin_sha256_from_fingerprint_line,
@@ -67,6 +75,63 @@ class SanitizeHysteriaUriTests(SimpleTestCase):
         self.assertIn("sni=bing.com", out)
         self.assertIn("pinSHA256=3E0CAA6110D55DC28123208EB5495C8D8C881DB3D8371C1E2F87AD0CEECDDB6E", out)
         self.assertNotIn("insecure", out)
+
+    def test_sanitize_keeps_salamander(self):
+        raw = "hysteria2://u:p@10.9.3.1:443?obfs=salamander&obfs-password=keep-me&insecure=1"
+        out = sanitize_hysteria2_uri_for_happ(raw, sni="bing.com", pin_sha256="AB")
+        self.assertTrue(hysteria2_uri_has_salamander(out))
+        self.assertNotIn("insecure", out)
+
+
+class HysteriaRoleLinkTests(TestCase):
+    def _server(self, role):
+        return Server.objects.create(
+            hosting="hy",
+            ip_address="10.9.3.1",
+            is_active=True,
+            is_c3celeryty_activated=True,
+            node_role=role,
+            hysteria_tls_sni="bing.com",
+            hysteria_pin_sha256="AB",
+        )
+
+    def _issue(self, subscription):
+        api = type("Api", (), {})()
+        api.delete_user = lambda uid: (True, None)
+        api.create_user = lambda body: (True, {})
+        api.get_user = lambda uid: (True, {"subscriptionToken": "tok"})
+        api.get_subscription_content = lambda token, params=None: (True, subscription)
+        with patch("bot.main.celerity_key_issue.CelerityAPI", return_value=api), \
+                patch("bot.main.celerity_key_issue.MarzbanAPI"), \
+                patch("bot.main.celerity_key_issue.try_delete_pasarguard_user"), \
+                patch("bot.main.celerity_key_issue._celerity_group_id", return_value="g1"):
+            return issue_hysteria2_tls_for_user(
+                telegram_user_id=7,
+                display_username="user",
+                server_ip="10.9.3.1",
+            )
+
+    def test_role_server_rejects_tls_link_without_salamander(self):
+        self._server(Server.NODE_ROLE_HYSTERIA2)
+        ok, detail = self._issue("hysteria2://u:p@10.9.3.1:443?insecure=1\n")
+        self.assertFalse(ok)
+        self.assertIn("salamander", detail)
+
+    def test_legacy_server_still_accepts_tls_link(self):
+        self._server("")
+        ok, uri = self._issue("hysteria2://u:p@10.9.3.1:443?insecure=1\n")
+        self.assertTrue(ok, uri)
+        self.assertIn("pinSHA256=AB", uri)
+        self.assertNotIn("obfs=salamander", uri)
+
+    def test_role_server_accepts_salamander_link(self):
+        self._server(Server.NODE_ROLE_HYSTERIA2)
+        ok, uri = self._issue(
+            "hysteria2://u:p@10.9.3.1:443?obfs=salamander&obfs-password=keep-me\n"
+        )
+        self.assertTrue(ok, uri)
+        self.assertIn("obfs=salamander", uri)
+        self.assertIn("obfs-password=keep-me", uri)
 
     def test_sanitize_requires_pin_and_sni(self):
         with self.assertRaises(ValueError):

@@ -7,6 +7,8 @@ from django.test import SimpleTestCase, override_settings
 from bot.main.celerity_node_bootstrap import (
     bootstrap_celerity_for_server,
     build_celerity_node_payload,
+
+    ensure_hysteria_salamander,
     hysteria_restart_looks_failed,
     pin_sha256_from_setup_logs,
     resolve_celerity_node_sni,
@@ -153,3 +155,71 @@ class PanelSshInstallTests(SimpleTestCase):
         self.assertEqual(save.call_args.kwargs["sni"], "bing.com")
         mark.assert_called_once()
         self.assertEqual(api.updates[0]["initScript"], "echo MARZBAN_NODE_UP")
+
+
+class _SalamanderApi(_Api):
+    def __init__(self, reads):
+        super().__init__()
+        self.reads = list(reads)
+        self.config_calls = 0
+
+    def get_node(self, node_id):
+        if not self.reads:
+            return False, "empty"
+        return True, self.reads.pop(0)
+
+    def update_node_config(self, node_id, request_timeout=180):
+        self.config_calls += 1
+        return True, {"ok": True}
+
+
+class HysteriaSalamanderTests(SimpleTestCase):
+    def test_existing_password_is_kept(self):
+        api = _SalamanderApi([
+            {"obfs": {"type": "salamander", "password": "keep-me"}},
+            {"obfs": {"type": "salamander", "password": "keep-me"}},
+        ])
+        notes = []
+        ok, detail = ensure_hysteria_salamander(api, "node-1", lambda level, msg: notes.append(msg))
+        self.assertTrue(ok)
+        self.assertEqual(api.updates, [])
+        self.assertEqual(api.config_calls, 1)
+        self.assertNotIn("keep-me", detail)
+        self.assertNotIn("keep-me", " ".join(notes))
+
+    def test_new_password_is_not_logged(self):
+        api = _SalamanderApi([
+            {},
+            {"obfs": {"type": "salamander", "password": "from-panel"}},
+        ])
+        notes = []
+        ok, detail = ensure_hysteria_salamander(api, "node-1", lambda level, msg: notes.append(msg))
+        self.assertTrue(ok)
+        self.assertEqual(api.updates[0]["obfs"]["type"], "salamander")
+        password = api.updates[0]["obfs"]["password"]
+        self.assertTrue(password)
+        self.assertNotIn(password, detail)
+        self.assertNotIn(password, " ".join(notes))
+        self.assertEqual(api.config_calls, 1)
+
+    @patch("bot.main.celerity_node_bootstrap._celerity_group_id", return_value="g1")
+    @patch("bot.main.celerity_node_bootstrap.mark_server_c3_activated")
+    @patch(
+        "bot.main.celerity_node_bootstrap.try_sync_hysteria_tls_meta_after_setup",
+        return_value=True,
+    )
+    def test_role_install_waits_for_confirmed_obfs(self, _sync, mark, _group):
+        api = _SalamanderApi([{}])
+        ok, detail = bootstrap_celerity_for_server(_Server(), api=api, salamander=True)
+        self.assertFalse(ok)
+        self.assertIn("salamander", detail)
+        mark.assert_not_called()
+
+        api = _SalamanderApi([
+            {},
+            {"obfs": {"type": "salamander", "password": "secret-obfs"}},
+        ])
+        ok, detail = bootstrap_celerity_for_server(_Server(), api=api, salamander=True)
+        self.assertTrue(ok)
+        self.assertNotIn("secret-obfs", detail)
+        mark.assert_called_once()

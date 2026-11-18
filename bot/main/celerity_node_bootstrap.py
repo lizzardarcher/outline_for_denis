@@ -6,6 +6,8 @@ from __future__ import annotations
 
 import json
 import re
+
+import secrets
 from typing import Any, Callable, Optional, Tuple
 
 from django.conf import settings
@@ -253,6 +255,57 @@ def _pull_pin_via_panel_setup(
     return pin, False
 
 
+def _node_obfs_password(payload: Any) -> str:
+    node = payload.get("node") if isinstance(payload, dict) and isinstance(payload.get("node"), dict) else payload
+    if not isinstance(node, dict):
+        return ""
+    obfs = node.get("obfs")
+    if not isinstance(obfs, dict):
+        return ""
+    if str(obfs.get("type") or "").strip().lower() != "salamander":
+        return ""
+    return str(obfs.get("password") or "").strip()
+
+
+def ensure_hysteria_salamander(
+    api: CelerityAPI,
+    node_id: str,
+    emit: Callable[[str, str], None],
+) -> Tuple[bool, str]:
+    """
+    Включает obfs salamander на ноде панели и отправляет конфиг.
+
+    Уже заданный пароль не меняется и в лог не попадает.
+    """
+    ok, node = api.get_node(node_id)
+    if not ok:
+        emit("ERROR", "GET node перед obfs не удался")
+        return False, "GET node перед obfs не удался"
+    if not _node_obfs_password(node):
+        ok_put, _err = api.update_node(
+            node_id,
+            {"obfs": {"type": "salamander", "password": secrets.token_urlsafe(24)}},
+        )
+        if not ok_put:
+            emit("ERROR", "PUT obfs отклонён панелью")
+            return False, "PUT obfs отклонён панелью"
+        emit("DEBUG", "на ноду записан obfs salamander")
+    else:
+        emit("DEBUG", "obfs salamander уже задан, пароль не менялся")
+
+    ok_cfg, err_cfg = api.update_node_config(node_id)
+    if not ok_cfg:
+        emit("ERROR", f"update-config: {err_cfg!r}"[:1500])
+        return False, f"update-config: {err_cfg!r}"[:1500]
+
+    ok_check, node_after = api.get_node(node_id)
+    if not ok_check or not _node_obfs_password(node_after):
+        emit("ERROR", "панель не подтвердила obfs salamander")
+        return False, "панель не подтвердила obfs salamander"
+    emit("INFO", "obfs salamander подтверждён")
+    return True, "obfs salamander подтверждён"
+
+
 def bootstrap_celerity_for_server(
     server: Server,
     *,
@@ -261,11 +314,14 @@ def bootstrap_celerity_for_server(
     setup_timeout: int = 300,
     log_fn: Optional[Callable[[str, str], None]] = None,
     init_script: Optional[str] = None,
-
     setup_body: Optional[dict] = None,
+    salamander: bool = False,
 ) -> Tuple[bool, str]:
     """
     provision + setup для одного Server. При успехе — is_c3celeryty_activated=True.
+
+    salamander=True только для новой ноды с ролью Hysteria2: галка ставится
+    после подтверждения obfs в панели. Старым серверам флаг не передаётся.
 
     log_fn(level, message) — опционально (например для Logging в БД).
     """
@@ -352,6 +408,11 @@ def bootstrap_celerity_for_server(
             if marzban_up:
                 failed = "MARZBAN_NODE_UP " + failed
             return False, failed
+
+    if salamander:
+        ok_obfs, obfs_detail = ensure_hysteria_salamander(api, node_id, _emit)
+        if not ok_obfs:
+            return False, obfs_detail
 
     mark_server_c3_activated(server)
     detail = "MARZBAN_NODE_UP " if marzban_up else ""

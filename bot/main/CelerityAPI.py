@@ -220,6 +220,16 @@ class CelerityAPI:
         nid = quote(str(node_id), safe="")
         return self._make_request("POST", f"/nodes/{nid}/sync")
 
+
+    def update_node_config(self, node_id: str, *, request_timeout: int = 180):
+        """POST /nodes/:id/update-config — отправить текущий конфиг ноды по SSH."""
+        nid = quote(str(node_id), safe="")
+        return self._make_request(
+            "POST",
+            f"/nodes/{nid}/update-config",
+            timeout=request_timeout,
+        )
+
     def setup_node(
         self,
         node_id: str,

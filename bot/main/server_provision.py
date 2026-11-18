@@ -150,6 +150,8 @@ def _provision_hysteria_role(server: Server, *, log_prefix: str) -> None:
         setup_body=_HYSTERIA_SETUP,
         setup_timeout=900,
         log_fn=_log,
+
+        salamander=True,
     )
     if not ok:
         _log("ERROR", str(detail)[:1500])
