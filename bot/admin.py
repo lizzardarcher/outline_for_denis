@@ -251,9 +251,10 @@ class ServerInline(admin.TabularInline):
     fields = (
 
         'hosting', 'ip_address', 'user', 'password',
-        'is_active', 'panels_active',
+        'is_active',
+        # 'panels_active',
     )
-    readonly_fields = ('panels_active',)
+    # readonly_fields = ('panels_active',)
 
     @admin.display(description='Активна в панелях', boolean=True)
     def panels_active(self, obj):
@@ -906,7 +907,9 @@ class ServerAdmin(BaseAdmin):
 
     list_display = (
         'hosting', 'country', 'ip_address', 'user', 'password', 'is_active',
-        'node_role_label', 'panels_active', 'get_key_generated', 'created_at',
+        'node_role_label',
+        # 'panels_active',
+        'get_key_generated', 'created_at',
     )
     list_display_links = ('hosting',)
     fields = (
