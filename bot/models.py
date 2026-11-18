@@ -346,7 +346,6 @@ class Server(models.Model):
     )
     user = models.CharField(max_length=1000, blank=True, null=True, default='root', verbose_name='Пользователь')
     password = models.CharField(max_length=1000, blank=True, null=True, default='<PASSWORD>', verbose_name='Пароль')
-
     max_keys = models.IntegerField(default=200, blank=True, null=True, verbose_name='Лимит ключей', editable=False)
     keys_generated = models.IntegerField(default=0, blank=True, null=True, verbose_name='Ключей сгенерировано')
     is_active = models.BooleanField(default=True, verbose_name='Сервер Активен')
@@ -359,7 +358,7 @@ class Server(models.Model):
         db_index=True,
         choices=NODE_ROLE_CHOICES,
         verbose_name="Протокол сервера",
-        help_text="Пусто — сервер как раньше, все протоколы. Иначе на машине только выбранный протокол.",
+        help_text=".",
     )
     is_activated_vless = models.BooleanField(editable=True, default=False,
                                              verbose_name='Панель Vless/SS')
@@ -367,33 +366,33 @@ class Server(models.Model):
         editable=True,
         default=False,
         verbose_name='PasarGuard',
-        help_text='Нода marzban-node зарегистрирована в панели PasarGuard и готова к выдаче ключей.',
+        help_text='.',
     )
     is_c3celeryty_activated = models.BooleanField(
         editable=True,
         default=False,
         verbose_name='Панель C3 Celeryty',
-        help_text='Нода Hysteria2 в панели C3 Celeryty настроена и готова к выдаче ключей.',
+        help_text='.',
     )
     hysteria_tls_sni = models.CharField(
         max_length=255,
         blank=True,
         default='',
         verbose_name='Hysteria TLS SNI',
-        help_text='CN из /etc/hysteria/cert.pem (для Happ и клиентов без insecure=1).',
+        help_text='.',
     )
     hysteria_pin_sha256 = models.CharField(
         max_length=64,
         blank=True,
         default='',
         verbose_name='Hysteria pinSHA256',
-        help_text='SHA-256 fingerprint cert.pem, hex без двоеточий.',
+        help_text='.',
     )
     hysteria_cert_synced_at = models.DateTimeField(
         null=True,
         blank=True,
         verbose_name='Hysteria cert sync',
-        help_text='Когда последний раз снимали pin/SNI по SSH.',
+        help_text='.',
     )
 
     def clean(self):
