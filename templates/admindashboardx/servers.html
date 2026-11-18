@@ -40,6 +40,8 @@
                     <th>Хостинг</th>
                     <th>IP</th>
                     <th>Страна</th>
+
+                    <th>Протокол</th>
                     <th>Активен</th>
                     <th>VLESS MB</th>
                     <th>Ключей</th>
@@ -59,6 +61,7 @@
                             {% endif %}
                         </td>
                         <td>{% if s.country %}{{ s.country.name_for_app|default:s.country.name }}{% else %}—{% endif %}</td>
+                        <td>{{ s.get_node_role_display }}</td>
                         <td>{% if s.is_active %}✅{% else %}—{% endif %}</td>
                         <td>{% if s.is_activated_vless %}✅{% else %}—{% endif %}</td>
                         <td>{{ s.keys_generated|default:0 }} / {{ s.max_keys|default:"—" }}</td>
@@ -72,7 +75,7 @@
                         </td>
                     </tr>
                 {% empty %}
-                    <tr><td colspan="8" class="text-center text-secondary">Нет данных</td></tr>
+                    <tr><td colspan="9" class="text-center text-secondary">Нет данных</td></tr>
                 {% endfor %}
                 </tbody>
             </table>

@@ -56,6 +56,13 @@ from .models import ManualTaskRun, ManualTaskLog
 from .panel_health import attach_duration_labels, collect_and_store, get_cached_snapshot
 
 class ServerForm(forms.ModelForm):
+
+    _ASSIGNABLE_ROLES = (
+        (Server.NODE_ROLE_OUTLINE, "SS"),
+        (Server.NODE_ROLE_VLESS, "VLESS"),
+        (Server.NODE_ROLE_HYSTERIA2, "Hysteria2"),
+    )
+
     class Meta:
         model = Server
         fields = (
@@ -67,20 +74,48 @@ class ServerForm(forms.ModelForm):
             "keys_generated",
             "is_active",
             "country",
+            "node_role",
         )
         widgets = {
             "password": forms.PasswordInput(render_value=True, attrs={"class": "form-control"}),
             "is_active": forms.CheckboxInput(attrs={"class": "form-check-input"}),
+            "node_role": forms.Select(attrs={"class": "form-select"}),
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         for name, field in self.fields.items():
-            if name in ("is_active",):
+            if name in ("is_active", "node_role"):
                 continue
             css = field.widget.attrs.get("class", "")
             field.widget.attrs["class"] = f"{css} form-control".strip()
         self.fields["country"].queryset = Country.objects.filter(is_active=True).order_by("name_for_app", "name")
+        role = self.fields["node_role"]
+        installed = bool(
+            self.instance.pk
+            and (self.instance.is_activated_vless or self.instance.is_c3celeryty_activated)
+        )
+        if not self.instance.pk:
+            role.choices = [("", "Выберите протокол")] + list(self._ASSIGNABLE_ROLES)
+            role.required = True
+            role.help_text = (
+                "На этот сервер ставится только выбранный протокол. "
+                "Уже работающие серверы без выбора остаются со всеми протоколами."
+            )
+        elif installed:
+            role.disabled = True
+            role.required = False
+            role.help_text = "После установки протокол не меняется."
+        elif self.instance.node_role:
+            role.choices = list(self._ASSIGNABLE_ROLES)
+            role.required = True
+            role.help_text = "Можно сменить, пока установка не прошла."
+        else:
+            role.required = False
+            role.help_text = (
+                "Пустое значение — сервер со всеми протоколами, как раньше. "
+                "Протокол можно задать, пока установка не прошла."
+            )
 
 
 class CountryForm(forms.ModelForm):
@@ -1592,6 +1627,7 @@ class ServersListView(DashboardBaseView):
             "ip_address",
             "is_active",
             "is_activated_vless",
+            "node_role",
             "keys_generated",
             "max_keys",
             "created_at",
@@ -2536,6 +2572,7 @@ class ServerDetailView(DashboardBaseView):
                 "created_at",
                 "is_active",
                 "is_activated_vless",
+                "node_role",
                 "keys_generated",
                 "max_keys",
                 "country__name",

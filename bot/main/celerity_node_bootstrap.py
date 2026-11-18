@@ -261,6 +261,8 @@ def bootstrap_celerity_for_server(
     setup_timeout: int = 300,
     log_fn: Optional[Callable[[str, str], None]] = None,
     init_script: Optional[str] = None,
+
+    setup_body: Optional[dict] = None,
 ) -> Tuple[bool, str]:
     """
     provision + setup для одного Server. При успехе — is_c3celeryty_activated=True.
@@ -305,7 +307,7 @@ def bootstrap_celerity_for_server(
     node_update: dict = {"sni": sni}
     if init_script:
         node_update["initScript"] = init_script
-        _emit("DEBUG", "initScript: marzban-node ставится по SSH панели Celerity, до Hysteria")
+        _emit("DEBUG", "initScript будет выполнен при setup")
     ok_sni, err_sni = api.update_node(node_id, node_update)
     if not ok_sni:
         _emit("ERROR", f"PUT sni={sni}: {err_sni!r}")
@@ -313,7 +315,11 @@ def bootstrap_celerity_for_server(
     _emit("DEBUG", f"Hysteria TLS SNI={sni}")
 
     _emit("DEBUG", f"POST setup node_id={node_id!r} (timeout {setup_timeout}s)")
-    ok_setup, data = api.setup_node(node_id, request_timeout=setup_timeout)
+    ok_setup, data = api.setup_node(
+        node_id,
+        data=setup_body,
+        request_timeout=setup_timeout,
+    )
     logs_text = flatten_setup_logs(data)
     marzban_up = "MARZBAN_NODE_UP" in logs_text
     if not ok_setup:
@@ -353,3 +359,78 @@ def bootstrap_celerity_for_server(
         detail += json.dumps(data, ensure_ascii=False, default=str)[:1500]
     _emit("INFO", "setup OK, pinSHA256 сохранён, is_c3celeryty_activated=True")
     return True, detail or "OK"
+
+
+def run_setup_init_script(
+    server: Server,
+    init_script: str,
+    *,
+    api: Optional[CelerityAPI] = None,
+    setup_body: Optional[dict] = None,
+    setup_timeout: int = 900,
+    log_fn: Optional[Callable[[str, str], None]] = None,
+) -> Tuple[bool, str, str]:
+    """
+    Прогнать initScript через SSH панели Celerity, не помечая сервер как Hysteria.
+
+    Returns:
+        (setup_ok, detail, node_id). node_id пустой, если нода не создана.
+    """
+    def _emit(level: str, msg: str) -> None:
+        if log_fn:
+            log_fn(level, msg)
+
+    ip = (server.ip_address or "").strip()
+    if not ip:
+        _emit("ERROR", "пустой ip_address")
+        return False, "Пустой ip_address", ""
+    if django_ssh_looks_weak(server):
+        _emit("WARNING", "пустой или заглушечный SSH password")
+        return False, "Пустой или заглушечный SSH password", ""
+
+    api = api or CelerityAPI()
+    try:
+        group_id = _celerity_group_id(api)
+    except RuntimeError as exc:
+        _emit("ERROR", str(exc))
+        return False, str(exc), ""
+
+    ok_find, found = api.find_node_id_by_ip(ip, "hysteria")
+    if ok_find:
+        node_id = found
+        _emit("DEBUG", f"временная нода уже в панели node_id={node_id!r}")
+    else:
+        _emit("DEBUG", "POST /nodes (временная нода для SSH)")
+        ok_c, node_id, err_c = create_celerity_node_or_find(
+            api, server, group_id, "hysteria", ip
+        )
+        if not ok_c:
+            _emit("ERROR", f"create_node: {err_c!r}")
+            return False, f"create_node: {err_c!r}", ""
+
+    node_update = {"sni": resolve_celerity_node_sni(), "initScript": init_script}
+    ok_put, err_put = api.update_node(node_id, node_update)
+    if not ok_put:
+        _emit("ERROR", f"PUT initScript: {err_put!r}")
+        return False, f"PUT initScript: {err_put!r}", node_id
+
+    body = setup_body if setup_body is not None else {
+        "installHysteria": False,
+        "setupPortHopping": False,
+        "restartService": False,
+    }
+    _emit("DEBUG", f"POST setup node_id={node_id!r} (timeout {setup_timeout}s)")
+    ok_setup, data = api.setup_node(node_id, data=body, request_timeout=setup_timeout)
+    logs_text = flatten_setup_logs(data)
+    if not ok_setup:
+        detail = f"setup_node: {data!r}"
+        if "MARZBAN_NODE_UP" in logs_text:
+            detail = "MARZBAN_NODE_UP " + detail
+        _emit("ERROR", detail[:1500])
+        return False, detail, node_id
+
+    detail = logs_text or "OK"
+    if "MARZBAN_NODE_UP" not in detail and "MARZBAN_NODE_UP" in str(data):
+        detail = "MARZBAN_NODE_UP " + detail
+    _emit("INFO", "initScript выполнен")
+    return True, detail, node_id

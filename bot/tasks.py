@@ -187,7 +187,12 @@ def reload_servers():
 
 @shared_task
 def init_marzban_servers():
-    servers = Server.objects.filter(is_active=True, is_activated_vless=False).select_related('country')
+
+    servers = Server.objects.filter(
+        is_active=True,
+        node_role="",
+        is_activated_vless=False,
+    ).select_related('country')
     for server in servers:
         _init_marzban_single_server(server)
 
@@ -195,6 +200,7 @@ def init_marzban_servers():
 def init_celerity_servers():
     servers = Server.objects.filter(
         is_active=True,
+        node_role="",
         is_c3celeryty_activated=False,
     ).select_related('country')
     for server in servers:
@@ -217,6 +223,7 @@ def init_celerity_servers():
 def init_pasarguard_servers():
     servers = Server.objects.filter(
         is_active=True,
+        node_role="",
         is_pasarguard_activated=False,
     ).select_related("country")
     for server in servers:
@@ -238,7 +245,7 @@ def init_all_panel_servers():
     Комбинированный прогон для нового VPS: PasarGuard-node, Marzban (если enabled), Celerity.
     """
     qs = (
-        Server.objects.filter(is_active=True)
+        Server.objects.filter(is_active=True, node_role="")
         .filter(
             Q(is_pasarguard_activated=False)
             | Q(is_c3celeryty_activated=False)

@@ -6,14 +6,9 @@ from django.conf import settings
 
 from bot.main.MarzbanAPI import MarzbanAPI
 from bot.main.celerity_key_issue import issue_hysteria2_tls_for_user, try_delete_celerity_user
-from bot.main.pasarguard_key_issue import (
-    pasarguard_create_and_get_user,
-    pick_pasarguard_link,
-    try_delete_pasarguard_user,
-)
-
 
 from apps.admindashboardx.panel_health import exclude_panel_down_servers
+from bot.main.server_protocol import pick_server_for_protocol
 from bot.models import Country, Server, TelegramUser, VpnKey
 
 KEY_LIMIT = settings.KEY_LIMIT
@@ -21,14 +16,6 @@ KEY_LIMIT = settings.KEY_LIMIT
 
 def _marzban_enabled() -> bool:
     return bool(getattr(settings, "VPN_MARZBAN_ENABLED", True))
-
-
-def _pasarguard_dual_write() -> bool:
-    return bool(getattr(settings, "VPN_PASARGUARD_DUAL_WRITE", True))
-
-
-def _vless_link_source() -> str:
-    return (getattr(settings, "VPN_VLESS_LINK_SOURCE", None) or "pasarguard").strip().lower()
 
 
 def _eligible_servers(**filters):
@@ -95,6 +82,7 @@ def _server_for_marzban(country: Country) -> Optional[Server]:
     return (
         _eligible_servers(
             is_activated_vless=True,
+            node_role="",
             country=country,
             keys_generated__lte=KEY_LIMIT,
         )
@@ -107,6 +95,7 @@ def _server_for_pasarguard(country: Country) -> Optional[Server]:
     return (
         _eligible_servers(
             is_pasarguard_activated=True,
+            node_role="",
             country=country,
             keys_generated__lte=KEY_LIMIT,
         )
@@ -115,60 +104,20 @@ def _server_for_pasarguard(country: Country) -> Optional[Server]:
     )
 
 
-def _server_for_vless_outline(country: Country) -> Optional[Server]:
-    """Сервер для vless/outline: предпочитаем PasarGuard, иначе Marzban."""
-    if _vless_link_source() == "pasarguard":
-        server = _server_for_pasarguard(country)
-        if server:
-            return server
-    if _marzban_enabled():
-        return _server_for_marzban(country)
-    return _server_for_pasarguard(country)
+def _server_for_vless_outline(country: Country, protocol: str = "vless") -> Optional[Server]:
+    """Сервер Marzban: сначала роль протокола, иначе старый сервер без роли."""
+    return pick_server_for_protocol(country, protocol)
 
 
 def _server_for_hysteria2(country: Country) -> Optional[Server]:
-    return (
-        _eligible_servers(
-            is_c3celeryty_activated=True,
-            country=country,
-            keys_generated__lte=KEY_LIMIT,
-        )
-        .order_by("keys_generated")
-        .first()
-    )
+    return pick_server_for_protocol(country, "hysteria2")
 
 
-def _create_vless_outline_users(telegram_user: TelegramUser, protocol: str) -> Tuple[dict, dict]:
-    """Dual-write Marzban + PasarGuard. Returns (marzban_result, pasarguard_result)."""
-    mb_result: dict = {}
-    pg_result: dict = {}
-
-    if _marzban_enabled():
-        mb_result = marzban_create_and_get_user(telegram_user, protocol)
-    if _pasarguard_dual_write():
-        pg_result = pasarguard_create_and_get_user(telegram_user, protocol)
-
-    if not mb_result and not pg_result:
-        raise ValueError("Ни Marzban, ни PasarGuard не настроены для выдачи ключа")
-
-    return mb_result, pg_result
-
-
-def _pick_vless_outline_link(
-    *,
-    server: Server,
-    protocol: str,
-    marzban_result: dict,
-    pasarguard_result: dict,
-) -> str:
-    source = _vless_link_source()
-    if source == "marzban" and marzban_result:
-        return _pick_marzban_link(marzban_result.get("links") or [], server, protocol)
-    if pasarguard_result:
-        return pick_pasarguard_link(pasarguard_result.get("links") or [], server, protocol)
-    if marzban_result:
-        return _pick_marzban_link(marzban_result.get("links") or [], server, protocol)
-    return "---"
+def _create_vless_outline_users(telegram_user: TelegramUser, protocol: str) -> dict:
+    """Пользователь создаётся в Marzban. PasarGuard в выдаче не используется."""
+    if not _marzban_enabled():
+        raise ValueError("Marzban не настроен для выдачи ключа")
+    return marzban_create_and_get_user(telegram_user, protocol)
 
 
 def issue_vpn_key_for_user(
@@ -187,7 +136,7 @@ def issue_vpn_key_for_user(
     protocol = (protocol or "").strip().lower()
 
     if protocol in ("outline", "vless"):
-        server = _server_for_vless_outline(country)
+        server = _server_for_vless_outline(country, protocol)
         if not server:
             return (
                 False,
@@ -197,16 +146,11 @@ def issue_vpn_key_for_user(
 
         try_delete_celerity_user(user.user_id)
         try:
-            mb_result, pg_result = _create_vless_outline_users(user, protocol)
+            mb_result = _create_vless_outline_users(user, protocol)
         except ValueError as exc:
             return False, f"Ошибка создания ключа: {exc}", None
 
-        access_url = _pick_vless_outline_link(
-            server=server,
-            protocol=protocol,
-            marzban_result=mb_result,
-            pasarguard_result=pg_result,
-        )
+        access_url = _pick_marzban_link(mb_result.get("links") or [], server, protocol)
         method = "ss" if protocol == "outline" else "vless"
         _upsert_vpn_key(
             user=user,

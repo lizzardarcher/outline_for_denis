@@ -1,6 +1,7 @@
 from celery import shared_task
 
-from bot.main.server_provision import provision_marzban_then_celerity
+
+from bot.main.server_provision import provision_server
 from bot.models import Server
 
 
@@ -23,7 +24,7 @@ def check_server_health():
 def initialize_server_task(server_id: int):
     """Кнопка инициализации: ss/vless (marzban-node), затем hysteria (Celerity + pinSHA256)."""
     server = Server.objects.select_related("country").get(id=server_id)
-    provision_marzban_then_celerity(server, log_prefix="[ADMIN]")
+    provision_server(server, log_prefix="[ADMIN]")
     return None
 
 

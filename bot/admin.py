@@ -4,6 +4,8 @@ from datetime import datetime
 from functools import update_wrapper
 
 from django.conf import settings
+
+from django import forms
 from django.contrib import admin, messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth.admin import UserAdmin as DjangoUserAdmin
@@ -776,8 +778,51 @@ def set_is_activated_vless_false(modeladmin, request, queryset):
     modeladmin.message_user(request, f'is_activated_vless снят у {updated} сервер(ов).')
 
 
+class ServerAdminForm(forms.ModelForm):
+    _ASSIGNABLE_ROLES = (
+        (Server.NODE_ROLE_OUTLINE, "SS"),
+        (Server.NODE_ROLE_VLESS, "VLESS"),
+        (Server.NODE_ROLE_HYSTERIA2, "Hysteria2"),
+    )
+
+    class Meta:
+        model = Server
+        fields = "__all__"
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        role = self.fields.get("node_role")
+        if role is None:
+            return
+        installed = bool(
+            self.instance.pk
+            and (self.instance.is_activated_vless or self.instance.is_c3celeryty_activated)
+        )
+        if not self.instance.pk:
+            role.choices = [("", "Выберите протокол")] + list(self._ASSIGNABLE_ROLES)
+            role.required = True
+            role.help_text = (
+                "На этот сервер ставится только выбранный протокол. "
+                "Уже работающие серверы без выбора остаются со всеми протоколами."
+            )
+        elif installed:
+            role.required = False
+            role.help_text = "После установки протокол не меняется."
+        elif self.instance.node_role:
+            role.choices = list(self._ASSIGNABLE_ROLES)
+            role.required = True
+            role.help_text = "Можно сменить, пока установка не прошла."
+        else:
+            role.required = False
+            role.help_text = (
+                "Пустое значение — сервер со всеми протоколами, как раньше. "
+                "Протокол можно задать, пока установка не прошла."
+            )
+
+
 @admin.register(Server)
 class ServerAdmin(BaseAdmin):
+    form = ServerAdminForm
 
     actions = [
         set_is_activated_vless_true,
@@ -800,17 +845,29 @@ class ServerAdmin(BaseAdmin):
     def panels_active(self, obj):
         return bool(obj.is_activated_vless and obj.is_c3celeryty_activated)
 
+    @admin.display(description='Протокол')
+    def node_role_label(self, obj):
+        return obj.get_node_role_display()
+
     list_display = (
         'hosting', 'country', 'ip_address', 'user', 'password', 'rental_price', 'is_active',
-        'panels_active', 'get_key_generated', 'created_at',
+        'node_role_label', 'panels_active', 'get_key_generated', 'created_at',
     )
     list_display_links = ('hosting',)
     fields = (
         'hosting', 'ip_address', 'user', 'password', 'rental_price', 'max_keys', 'is_active', 'country',
-        'created_at', 'panels_active', 'is_activated_vless',
+        'node_role', 'created_at', 'panels_active', 'is_activated_vless',
         'hysteria_tls_sni', 'hysteria_pin_sha256', 'hysteria_cert_synced_at',
     )
-    readonly_fields = ('max_keys', 'created_at', 'panels_active', 'hysteria_cert_synced_at')
+    readonly_fields = (
+        'max_keys', 'created_at', 'panels_active', 'hysteria_cert_synced_at',
+    )
+
+    def get_readonly_fields(self, request, obj=None):
+        readonly = list(super().get_readonly_fields(request, obj))
+        if obj and (obj.is_activated_vless or obj.is_c3celeryty_activated):
+            readonly.append("node_role")
+        return readonly
     ordering = ('country', 'ip_address')
 
     def get_urls(self):

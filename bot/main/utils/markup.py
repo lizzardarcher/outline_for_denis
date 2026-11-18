@@ -10,6 +10,8 @@ from bot.models import Prices, Country, TelegramUser, Server
 
 from apps.payment.cryptocloud_common import is_cryptocloud_allowed_for_user
 
+from bot.main.server_protocol import countries_for_protocol
+
 btn_back = InlineKeyboardButton(text=f'🔙 Назад', callback_data=f'back')
 DOMAIN = settings.DOMAIN
 ALIAS_DOMAIN = settings.ALIAS_DOMAIN
@@ -111,20 +113,15 @@ def for_sender():
     return markup
 
 
-
 def get_avail_location(protocol: str):
-    from apps.admindashboardx.panel_health import exclude_panel_down_servers
-
     markup = InlineKeyboardMarkup()
-    if protocol == "hysteria2":
-        servers = exclude_panel_down_servers(
-            Server.objects.filter(is_active=True, is_c3celeryty_activated=True)
-        )
-    else:
-        servers = exclude_panel_down_servers(Server.objects.filter(is_active=True))
-    countries = set([x.country for x in servers if x.country_id])
-    for country in countries:
-        markup.add(InlineKeyboardButton(text=country.name_for_app, callback_data=f'country:{protocol}:{country.name}'))
+    for country in countries_for_protocol(protocol):
+        if not (country.name or "").strip():
+            continue
+        markup.add(InlineKeyboardButton(
+            text=country.name_for_app,
+            callback_data=f'country:{protocol}:{country.name}',
+        ))
     markup.add(btn_back)
     return markup
 

@@ -319,6 +319,8 @@
             <div class="modal-body pt-2">
                 <form id="create-vpn-key-form" action="{% url 'get_new_key' %}" method="post">
                     {% csrf_token %}
+
+                    {{ protocol_countries|json_script:"protocol-countries" }}
                     <div id="create-vpn-key-alert" class="alert d-none mb-3" role="alert"></div>
                     <div class="form-group">
                         <label for="country" class="font-weight-bold">Страна</label>
@@ -365,6 +367,41 @@
     var form = document.getElementById('create-vpn-key-form');
     if (!form) {
         return;
+    }
+
+    var protocolSelect = document.getElementById('protocol');
+    var countrySelect = document.getElementById('country');
+    var protocolCountriesNode = document.getElementById('protocol-countries');
+    var protocolCountries = {};
+    if (protocolCountriesNode) {
+        try {
+            protocolCountries = JSON.parse(protocolCountriesNode.textContent || '{}');
+        } catch (e) {
+            protocolCountries = {};
+        }
+    }
+
+    function fillCountries() {
+        if (!protocolSelect || !countrySelect || !protocolCountriesNode) {
+            return;
+        }
+        var items = protocolCountries[protocolSelect.value] || [];
+        var current = countrySelect.value;
+        countrySelect.innerHTML = '';
+        items.forEach(function (item) {
+            var option = document.createElement('option');
+            option.value = item.name;
+            option.textContent = item.label;
+            countrySelect.appendChild(option);
+        });
+        if (current) {
+            countrySelect.value = current;
+        }
+    }
+
+    if (protocolSelect) {
+        protocolSelect.addEventListener('change', fillCountries);
+        fillCountries();
     }
 
     var submitBtn = document.getElementById('create-vpn-key-submit');

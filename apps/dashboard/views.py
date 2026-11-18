@@ -18,6 +18,8 @@ from apps.authentication.forms import DashboardPasswordChangeForm
 from apps.mtproxy.services import can_use_mtproxy, get_active_key, issue_or_get_key, reissue_key, revoke_all_user_keys
 
 from apps.payment.cryptocloud_common import is_cryptocloud_allowed_for_user
+
+from bot.main.server_protocol import countries_for_protocol, protocol_country_payload
 from bot.main.vpn_key_issue import issue_vpn_key_for_user, logging_context_for_protocol
 from bot.main.vpn_key_lock import acquire_vpn_key_create_lock, release_vpn_key_create_lock
 from bot.models import VpnKey, Server, TelegramUser, Country, Prices, UserProfile, ReferralSettings, TelegramReferral, \
@@ -65,7 +67,8 @@ class ProfileView(LoginRequiredMixin, SuccessMessageMixin, TemplateView):
         except VpnKey.DoesNotExist:
             context['vpn_key'] = None
         context['total_users'] = TelegramUser.objects.count()
-        context['countries'] = Country.objects.filter(is_active=True)
+        context['countries'] = countries_for_protocol("outline")
+        context['protocol_countries'] = protocol_country_payload()
         context['subscription'] = Prices.objects.get(id=1)
 
         from apps.payment.retention_offer import is_retention_offer_available, special_month_price

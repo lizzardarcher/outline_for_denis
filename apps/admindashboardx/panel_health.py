@@ -57,8 +57,11 @@ def exclude_panel_down_servers(queryset):
     from apps.admindashboardx.models import ServerHealthState
 
     return queryset.exclude(
-        health_states__channel=ServerHealthState.CHANNEL_PANEL,
-        health_states__status=STATUS_DOWN,
+
+        pk__in=ServerHealthState.objects.filter(
+            channel=ServerHealthState.CHANNEL_PANEL,
+            status=STATUS_DOWN,
+        ).values("server_id")
     )
 
 

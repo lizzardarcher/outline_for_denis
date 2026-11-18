@@ -37,6 +37,13 @@
                     {% if form.country.errors %}<div class="text-danger small">{{ form.country.errors|join:", " }}</div>{% endif %}
                 </div>
                 <div class="col-md-4">
+
+                    <label class="form-label">Протокол</label>
+                    {{ form.node_role }}
+                    {% if form.node_role.help_text %}<div class="form-text">{{ form.node_role.help_text }}</div>{% endif %}
+                    {% if form.node_role.errors %}<div class="text-danger small">{{ form.node_role.errors|join:", " }}</div>{% endif %}
+                </div>
+                <div class="col-md-4">
                     <label class="form-label">Цена аренды в месяц</label>
                     {{ form.rental_price }}
                     {% if form.rental_price.errors %}<div class="text-danger small">{{ form.rental_price.errors|join:", " }}</div>{% endif %}

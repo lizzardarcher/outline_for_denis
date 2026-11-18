@@ -36,6 +36,8 @@
                 <div class="col-md-4"><strong>IP:</strong> {{ server.ip_address|default:"—" }}</div>
                 <div class="col-md-4"><strong>Страна:</strong> {% if server.country %}{{ server.country.name_for_app|default:server.country.name }}{% else %}—{% endif %}</div>
                 <div class="col-md-4"><strong>Создан:</strong> {{ server.created_at|date:"d.m.Y" }}</div>
+
+                <div class="col-md-4"><strong>Протокол:</strong> {{ server.get_node_role_display }}</div>
                 <div class="col-md-4"><strong>Активен:</strong> {% if server.is_active %}✅{% else %}—{% endif %}</div>
                 <div class="col-md-4"><strong>VLESS MB:</strong> {% if server.is_activated_vless %}✅{% else %}—{% endif %}</div>
                 <div class="col-md-4"><strong>Ключей:</strong> {{ server.keys_generated|default:0 }} / {{ server.max_keys|default:"—" }}</div>

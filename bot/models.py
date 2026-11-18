@@ -321,6 +321,18 @@ class VpnKey(models.Model):
 
 
 class Server(models.Model):
+
+    NODE_ROLE_LEGACY = ""
+    NODE_ROLE_OUTLINE = "outline"
+    NODE_ROLE_VLESS = "vless"
+    NODE_ROLE_HYSTERIA2 = "hysteria2"
+    NODE_ROLE_CHOICES = (
+        (NODE_ROLE_LEGACY, "все протоколы"),
+        (NODE_ROLE_OUTLINE, "SS"),
+        (NODE_ROLE_VLESS, "VLESS"),
+        (NODE_ROLE_HYSTERIA2, "Hysteria2"),
+    )
+
     hosting = models.CharField(max_length=1000, blank=True, null=True, verbose_name='Хостинг')
     ip_address = models.CharField(max_length=1000, blank=True, null=True, verbose_name='IP Address')
     user = models.CharField(max_length=1000, blank=True, null=True, default='root', verbose_name='Пользователь')
@@ -332,6 +344,15 @@ class Server(models.Model):
     is_active = models.BooleanField(default=True, verbose_name='Сервер Активен')
     created_at = models.DateField(auto_now_add=True, verbose_name='Дата создания')
     country = models.ForeignKey('Country', on_delete=models.CASCADE, null=True, blank=True, verbose_name='Страна')
+    node_role = models.CharField(
+        max_length=16,
+        blank=True,
+        default="",
+        db_index=True,
+        choices=NODE_ROLE_CHOICES,
+        verbose_name="Протокол сервера",
+        help_text="Пусто — сервер как раньше, все протоколы. Иначе на машине только выбранный протокол.",
+    )
     is_activated_vless = models.BooleanField(editable=True, default=False,
                                              verbose_name='Панель Vless/SS')
     is_pasarguard_activated = models.BooleanField(
