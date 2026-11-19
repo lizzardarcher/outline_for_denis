@@ -188,6 +188,39 @@ class DjangoAdminServerAddTests(TestCase):
         self.assertEqual(server.node_role, Server.NODE_ROLE_VLESS)
         self.assertNotIn("node_role", self.admin.get_readonly_fields(self.request, obj=None))
 
+
+    def test_change_form_can_clear_install_flags(self):
+        server = Server.objects.create(
+            hosting="bad",
+            ip_address="10.9.0.3",
+            user="root",
+            password="secret",
+            is_active=True,
+            node_role=Server.NODE_ROLE_OUTLINE,
+            is_activated_vless=True,
+            is_c3celeryty_activated=True,
+        )
+        form_class = self.admin.get_form(self.request, obj=server)
+        self.assertIn("is_activated_vless", form_class.base_fields)
+        self.assertIn("is_c3celeryty_activated", form_class.base_fields)
+        form = form_class(data={
+            "hosting": "bad",
+            "ip_address": "10.9.0.3",
+            "user": "root",
+            "password": "secret",
+            "is_active": True,
+            "is_activated_vless": False,
+            "is_c3celeryty_activated": False,
+            "hysteria_tls_sni": "",
+            "hysteria_pin_sha256": "",
+        }, instance=server)
+        self.assertIn("Снимите", form.fields["is_activated_vless"].help_text)
+        self.assertIn("Снимите", form.fields["is_c3celeryty_activated"].help_text)
+        self.assertTrue(form.is_valid(), form.errors)
+        saved = form.save()
+        self.assertFalse(saved.is_activated_vless)
+        self.assertFalse(saved.is_c3celeryty_activated)
+
     def test_installed_server_role_is_readonly(self):
         country = Country.objects.create(name="KZ", name_for_app="Казахстан", is_active=True)
         server = Server.objects.create(

@@ -846,6 +846,21 @@ class ServerAdminForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+
+        vless_flag = self.fields.get("is_activated_vless")
+        if vless_flag is not None:
+            vless_flag.help_text = (
+                "Снимите, если SS или VLESS встали криво: после сохранения "
+                "инициализацию можно запустить снова. Включите, если нода уже работает, "
+                "а галка не проставилась."
+            )
+        hysteria_flag = self.fields.get("is_c3celeryty_activated")
+        if hysteria_flag is not None:
+            hysteria_flag.help_text = (
+                "Снимите, если Hysteria2 встала криво: после сохранения "
+                "инициализацию можно запустить снова. Включите, если нода уже работает, "
+                "а галка не проставилась."
+            )
         role = self.fields.get("node_role")
         if role is None:
             return
@@ -920,6 +935,15 @@ class ServerAdmin(BaseAdmin):
     readonly_fields = (
         'max_keys',
     )
+
+    def get_fields(self, request, obj=None):
+        fields = list(super().get_fields(request, obj))
+        if obj is None:
+            return fields
+        for name in ("is_activated_vless", "is_c3celeryty_activated"):
+            if name not in fields:
+                fields.append(name)
+        return fields
 
     def get_readonly_fields(self, request, obj=None):
         readonly = list(super().get_readonly_fields(request, obj))
