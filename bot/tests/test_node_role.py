@@ -5,7 +5,8 @@ from unittest.mock import patch
 from django.contrib.admin.sites import AdminSite
 from django.test import RequestFactory, SimpleTestCase, TestCase, override_settings
 
-from apps.admindashboardx.panel_health import STATUS_DOWN
+
+from apps.admindashboardx.panel_health import STATUS_DOWN, STATUS_OK, STATUS_UNKNOWN
 from bot.admin import ServerAdmin, initialize_selected_servers
 
 from bot.models import Country, Server, ServerRemoved
@@ -188,6 +189,28 @@ class DjangoAdminServerAddTests(TestCase):
         self.assertEqual(server.node_role, Server.NODE_ROLE_VLESS)
         self.assertNotIn("node_role", self.admin.get_readonly_fields(self.request, obj=None))
 
+
+    def test_list_shows_panel_availability_after_active_flag(self):
+        self.assertEqual(
+            self.admin.list_display[self.admin.list_display.index("is_active") + 1],
+            "panel_available",
+        )
+        server = Server.objects.create(
+            hosting="health",
+            ip_address="10.9.0.4",
+            is_active=True,
+            node_role=Server.NODE_ROLE_VLESS,
+        )
+        self.assertIsNone(self.admin.panel_available(server))
+        _set_panel_status(server, STATUS_OK)
+        server.refresh_from_db()
+        self.assertTrue(self.admin.panel_available(server))
+        _set_panel_status(server, STATUS_DOWN)
+        server.refresh_from_db()
+        self.assertFalse(self.admin.panel_available(server))
+        _set_panel_status(server, STATUS_UNKNOWN)
+        server.refresh_from_db()
+        self.assertIsNone(self.admin.panel_available(server))
 
     def test_change_form_can_clear_install_flags(self):
         server = Server.objects.create(

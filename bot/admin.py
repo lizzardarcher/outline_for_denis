@@ -27,7 +27,15 @@ from django_celery_beat.models import *
 from django_admin_inline_paginator.admin import TabularInlinePaginated
 
 from apps.admindashboardx.models import ManualTaskRun
-from apps.admindashboardx.panel_health import attach_duration_labels, collect_and_store, format_streak, get_cached_snapshot
+
+from apps.admindashboardx.panel_health import (
+    STATUS_DOWN,
+    STATUS_OK,
+    attach_duration_labels,
+    collect_and_store,
+    format_streak,
+    get_cached_snapshot,
+)
 from bot.models import *
 from bot.referral_analytics import build_report, excel_response, parse_period, search_referrers
 
@@ -916,12 +924,25 @@ class ServerAdmin(BaseAdmin):
     def panels_active(self, obj):
         return bool(obj.is_activated_vless and obj.is_c3celeryty_activated)
 
+    @admin.display(description='Доступность', boolean=True)
+    def panel_available(self, obj):
+        states = obj.health_states.all()
+        state = next((item for item in states if item.channel == "panel"), None)
+        if state is None:
+            return None
+        if state.status == STATUS_OK:
+            return True
+        if state.status == STATUS_DOWN:
+            return False
+        return None
+
     @admin.display(description='Протокол')
     def node_role_label(self, obj):
         return obj.get_node_role_display()
 
     list_display = (
         'hosting', 'country', 'ip_address', 'user', 'password', 'is_active',
+        'panel_available',
         'node_role_label',
         # 'panels_active',
         'get_key_generated', 'created_at',
@@ -944,6 +965,9 @@ class ServerAdmin(BaseAdmin):
             if name not in fields:
                 fields.append(name)
         return fields
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).prefetch_related("health_states")
 
     def get_readonly_fields(self, request, obj=None):
         readonly = list(super().get_readonly_fields(request, obj))
