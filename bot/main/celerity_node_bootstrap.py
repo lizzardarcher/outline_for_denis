@@ -7,6 +7,8 @@ from __future__ import annotations
 import json
 import re
 
+import time
+
 import secrets
 from typing import Any, Callable, Optional, Tuple
 
@@ -14,6 +16,7 @@ from django.conf import settings
 
 from bot.main.CelerityAPI import CelerityAPI
 from bot.main.celerity_key_issue import _celerity_group_id
+from bot.main.celerity_panel_form import save_node_obfs_via_panel
 from bot.main.hysteria_tls_meta import (
     save_hysteria_tls_meta_to_server,
     try_sync_hysteria_tls_meta_after_setup,
@@ -255,16 +258,39 @@ def _pull_pin_via_panel_setup(
     return pin, False
 
 
-def _node_obfs_password(payload: Any) -> str:
-    node = payload.get("node") if isinstance(payload, dict) and isinstance(payload.get("node"), dict) else payload
-    if not isinstance(node, dict):
-        return ""
-    obfs = node.get("obfs")
+
+def _node_document(payload: Any) -> dict:
+    if isinstance(payload, dict) and isinstance(payload.get("node"), dict):
+        return payload["node"]
+    return payload if isinstance(payload, dict) else {}
+
+
+def _node_obfs(payload: Any) -> Tuple[str, str]:
+    obfs = _node_document(payload).get("obfs")
     if not isinstance(obfs, dict):
+        return "", ""
+    return str(obfs.get("type") or "").strip().lower(), str(obfs.get("password") or "").strip()
+
+
+def _node_obfs_password(payload: Any) -> str:
+    kind, password = _node_obfs(payload)
+    if kind != "salamander" or not password:
         return ""
-    if str(obfs.get("type") or "").strip().lower() != "salamander":
-        return ""
-    return str(obfs.get("password") or "").strip()
+    return password
+
+
+def _push_node_config(api: CelerityAPI, node_id: str, emit: Callable[[str, str], None]) -> Tuple[bool, str]:
+    last = "update-config не ответил"
+    for attempt in range(1, 4):
+        ok_cfg, err_cfg = api.update_node_config(node_id)
+        if ok_cfg:
+            return True, ""
+        last = f"update-config: {err_cfg!r}"[:1500]
+        emit("DEBUG", f"{last}, попытка {attempt}")
+        if attempt < 3:
+            time.sleep(5)
+    emit("ERROR", last)
+    return False, last
 
 
 def ensure_hysteria_salamander(
@@ -276,34 +302,54 @@ def ensure_hysteria_salamander(
     Включает obfs salamander на ноде панели и отправляет конфиг.
 
     Уже заданный пароль не меняется и в лог не попадает.
+    API это поле не пишет, поэтому при пустом ответе GET идёт форма панели.
     """
     ok, node = api.get_node(node_id)
     if not ok:
         emit("ERROR", "GET node перед obfs не удался")
         return False, "GET node перед obfs не удался"
-    if not _node_obfs_password(node):
+    if _node_obfs_password(node):
+        emit("DEBUG", "obfs salamander уже задан, пароль не менялся")
+    else:
+        password = secrets.token_urlsafe(24)
         ok_put, _err = api.update_node(
             node_id,
-            {"obfs": {"type": "salamander", "password": secrets.token_urlsafe(24)}},
+            {"obfs": {"type": "salamander", "password": password}},
         )
         if not ok_put:
             emit("ERROR", "PUT obfs отклонён панелью")
             return False, "PUT obfs отклонён панелью"
-        emit("DEBUG", "на ноду записан obfs salamander")
-    else:
-        emit("DEBUG", "obfs salamander уже задан, пароль не менялся")
+        ok_check, node_after = api.get_node(node_id)
+        if ok_check and _node_obfs_password(node_after):
+            emit("DEBUG", "на ноду записан obfs salamander")
+        else:
+            emit("DEBUG", "API не сохранил obfs, записываю через форму панели")
+            ok_form, form_detail = save_node_obfs_via_panel(node_id, node, password)
+            if not ok_form:
+                emit("ERROR", form_detail)
+                return False, form_detail
+            ok_check, node_after = api.get_node(node_id)
+            if not (ok_check and _node_obfs_password(node_after)):
+                detail = "форма панели ответила успехом, но GET не показывает obfs"
+                emit("ERROR", detail)
+                return False, detail
+            emit("DEBUG", "форма панели сохранила obfs salamander")
 
-    ok_cfg, err_cfg = api.update_node_config(node_id)
+    ok_cfg, err_cfg = _push_node_config(api, node_id, emit)
     if not ok_cfg:
-        emit("ERROR", f"update-config: {err_cfg!r}"[:1500])
-        return False, f"update-config: {err_cfg!r}"[:1500]
+        return False, err_cfg
 
     ok_check, node_after = api.get_node(node_id)
-    if not ok_check or not _node_obfs_password(node_after):
-        emit("ERROR", "панель не подтвердила obfs salamander")
-        return False, "панель не подтвердила obfs salamander"
-    emit("INFO", "obfs salamander подтверждён")
-    return True, "obfs salamander подтверждён"
+    if ok_check and _node_obfs_password(node_after):
+        emit("INFO", "obfs salamander подтверждён")
+        return True, "obfs salamander подтверждён"
+    kind, _password = _node_obfs(node_after if ok_check else {})
+    detail = (
+        "панель не сохранила obfs"
+        + (f" (в ответе type={kind or 'пусто'})" if ok_check else "")
+    )
+    emit("ERROR", detail)
+    return False, detail
 
 
 def bootstrap_celerity_for_server(
@@ -495,3 +541,77 @@ def run_setup_init_script(
         detail = "MARZBAN_NODE_UP " + detail
     _emit("INFO", "initScript выполнен")
     return True, detail, node_id
+
+
+MARZBAN_NODE_CHECK_SCRIPT = r"""#!/bin/bash
+set +e
+running="$(docker inspect -f '{{.State.Running}}' marzban-node 2>/dev/null || echo false)"
+if [ "$running" = "true" ]; then
+  echo MARZBAN_NODE_UP
+  exit 0
+fi
+echo MARZBAN_NODE_NOT_RUNNING
+exit 1
+"""
+
+
+def setup_response_pending(detail: str) -> bool:
+    """Ответ setup оборвался или нода ещё занята предыдущей установкой."""
+    text = (detail or "").lower()
+    return any(
+        needle in text
+        for needle in (
+            "node is busy",
+            "timed out",
+            "time-out",
+            "connection aborted",
+            "connection reset",
+            "502",
+            "503",
+            "504",
+            "gateway",
+        )
+    )
+
+
+def wait_for_marzban_node(
+    server: Server,
+    *,
+    api: CelerityAPI,
+    attempts: int = 20,
+    pause_seconds: int = 20,
+    log_fn: Optional[Callable[[str, str], None]] = None,
+) -> Tuple[bool, str, str]:
+    """
+    Короткий setup только проверяет контейнер.
+
+    Долгий docker pull часто не укладывается в таймаут прокси перед панелью.
+    Установка на сервере при этом продолжается, и следующая проверка её видит.
+    """
+    last_detail = ""
+    last_id = ""
+    for attempt in range(1, attempts + 1):
+        if log_fn:
+            log_fn("DEBUG", f"проверка marzban-node, попытка {attempt}")
+        _ok, detail, node_id = run_setup_init_script(
+            server,
+            MARZBAN_NODE_CHECK_SCRIPT,
+            api=api,
+            setup_body={
+                "installHysteria": False,
+                "setupPortHopping": False,
+                "restartService": False,
+            },
+            setup_timeout=180,
+            log_fn=None,
+        )
+        last_detail = detail or ""
+        if node_id:
+            last_id = node_id
+        if "MARZBAN_NODE_UP" in last_detail:
+            return True, last_detail, last_id
+        if not setup_response_pending(last_detail):
+            return False, last_detail, last_id
+        if attempt < attempts:
+            time.sleep(pause_seconds)
+    return False, last_detail, last_id

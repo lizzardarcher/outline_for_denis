@@ -111,7 +111,18 @@ if ! command -v curl >/dev/null 2>&1; then
 fi
 
 if ! command -v docker >/dev/null 2>&1 || ! docker compose version >/dev/null 2>&1; then
-  curl -fsSL https://get.docker.com | sh
+  installed=0
+  for _try in 1 2 3; do
+    if curl -fsSL https://get.docker.com | sh; then
+      installed=1
+      break
+    fi
+    sleep 8
+  done
+  if [ "$installed" != "1" ]; then
+    echo "docker install failed" >&2
+    exit 1
+  fi
 fi
 
 if docker compose version >/dev/null 2>&1; then
@@ -156,7 +167,19 @@ services:
 MARZBAN_COMPOSE_EOF
 
 cd /opt/marzban-node
-compose -f docker-compose.yml -p marzban-node up -d --remove-orphans
+compose_up_ok=0
+for _try in 1 2 3; do
+  if compose -f docker-compose.yml -p marzban-node up -d --remove-orphans; then
+    compose_up_ok=1
+    break
+  fi
+  echo "docker compose up failed, retry" >&2
+  sleep 8
+done
+if [ "$compose_up_ok" != "1" ]; then
+  echo "MARZBAN_NODE_NOT_RUNNING" >&2
+  exit 1
+fi
 
 running="false"
 for _ in 1 2 3 4 5 6 7 8 9 10 11 12; do

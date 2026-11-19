@@ -65,6 +65,10 @@ VPN_VLESS_LINK_SOURCE = (os.getenv('VPN_VLESS_LINK_SOURCE') or 'pasarguard').str
 VPN_MARZBAN_ENABLED = os.getenv('VPN_MARZBAN_ENABLED', 'True').lower() in ('1', 'true', 'yes')
 C3CELERYTY_API_ENDPOINT = os.getenv('C3CELERYTY_API_ENDPOINT')
 C3CELERYTY_API_KEY= os.getenv('C3CELERYTY_API_KEY')
+
+# Логин формы панели. API-ключ obfs не сохраняет, его пишет только эта сессия.
+CELERITY_PANEL_USERNAME = os.getenv('CELERITY_PANEL_USERNAME', '')
+CELERITY_PANEL_PASSWORD = os.getenv('CELERITY_PANEL_PASSWORD', '')
 # Группа серверов в панели Celerity для POST /users (как в bot/main/celerity_deploy.py).
 CELERITY_SERVER_GROUP_NAME = os.getenv('CELERITY_SERVER_GROUP_NAME', 'Марвел')
 CELERITY_SERVER_GROUP_ID = os.getenv('CELERITY_SERVER_GROUP_ID') or None

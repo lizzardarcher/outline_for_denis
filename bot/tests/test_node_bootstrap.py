@@ -12,6 +12,13 @@ from bot.main.celerity_node_bootstrap import (
     hysteria_restart_looks_failed,
     pin_sha256_from_setup_logs,
     resolve_celerity_node_sni,
+    setup_response_pending,
+    wait_for_marzban_node,
+)
+from bot.main.celerity_panel_form import (
+    obfs_form_fields,
+    reset_panel_session_cache,
+    save_node_obfs_via_panel,
 )
 from bot.main.marzban_node_bootstrap import build_marzban_node_install_script
 
@@ -47,6 +54,8 @@ class MarzbanInstallScriptTests(SimpleTestCase):
         self.assertIn("echo \"MARZBAN_NODE_UP\"", script)
         self.assertIn("HYSTERIA_PIN_SHA256=", script)
         self.assertIn("{{.State.Running}}", script)
+        self.assertIn("compose_up_ok", script)
+        self.assertIn("docker install failed", script)
 
 
 class CeleritySniTests(SimpleTestCase):
@@ -191,6 +200,7 @@ class HysteriaSalamanderTests(SimpleTestCase):
         api = _SalamanderApi([
             {},
             {"obfs": {"type": "salamander", "password": "from-panel"}},
+            {"obfs": {"type": "salamander", "password": "from-panel"}},
         ])
         notes = []
         ok, detail = ensure_hysteria_salamander(api, "node-1", lambda level, msg: notes.append(msg))
@@ -202,24 +212,155 @@ class HysteriaSalamanderTests(SimpleTestCase):
         self.assertNotIn(password, " ".join(notes))
         self.assertEqual(api.config_calls, 1)
 
+    @patch(
+        "bot.main.celerity_node_bootstrap.save_node_obfs_via_panel",
+        return_value=(False, "API Celerity не сохраняет obfs"),
+    )
     @patch("bot.main.celerity_node_bootstrap._celerity_group_id", return_value="g1")
     @patch("bot.main.celerity_node_bootstrap.mark_server_c3_activated")
     @patch(
         "bot.main.celerity_node_bootstrap.try_sync_hysteria_tls_meta_after_setup",
         return_value=True,
     )
-    def test_role_install_waits_for_confirmed_obfs(self, _sync, mark, _group):
+    def test_role_install_waits_for_confirmed_obfs(self, _sync, mark, _group, form):
         api = _SalamanderApi([{}])
         ok, detail = bootstrap_celerity_for_server(_Server(), api=api, salamander=True)
         self.assertFalse(ok)
-        self.assertIn("salamander", detail)
+        self.assertIn("не сохраняет obfs", detail)
+        form.assert_called_once()
         mark.assert_not_called()
 
         api = _SalamanderApi([
             {},
+            {"obfs": {"type": "salamander", "password": "secret-obfs"}},
             {"obfs": {"type": "salamander", "password": "secret-obfs"}},
         ])
         ok, detail = bootstrap_celerity_for_server(_Server(), api=api, salamander=True)
         self.assertTrue(ok)
         self.assertNotIn("secret-obfs", detail)
         mark.assert_called_once()
+        self.assertEqual(form.call_count, 1)
+
+    @patch("bot.main.celerity_node_bootstrap._celerity_group_id", return_value="g1")
+    @patch("bot.main.celerity_node_bootstrap.mark_server_c3_activated")
+    @patch(
+        "bot.main.celerity_node_bootstrap.try_sync_hysteria_tls_meta_after_setup",
+        return_value=True,
+    )
+    @patch(
+        "bot.main.celerity_node_bootstrap.save_node_obfs_via_panel",
+        return_value=(True, "форма панели приняла obfs"),
+    )
+    def test_panel_form_saves_obfs_when_api_drops_it(self, form, _sync, mark, _group):
+        saved = {"obfs": {"type": "salamander", "password": "secret-obfs"}}
+        api = _SalamanderApi([{}, {}, saved, saved])
+        notes = []
+        ok, detail = bootstrap_celerity_for_server(
+            _Server(),
+            api=api,
+            salamander=True,
+            log_fn=lambda level, msg: notes.append(msg),
+        )
+        self.assertTrue(ok)
+        form.assert_called_once()
+        posted_password = form.call_args.args[2]
+        self.assertTrue(posted_password)
+        self.assertNotIn(posted_password, detail)
+        self.assertNotIn(posted_password, " ".join(notes))
+        self.assertNotIn("secret-obfs", " ".join(notes))
+        mark.assert_called_once()
+
+
+class MarzbanWaitTests(SimpleTestCase):
+    def test_timeout_and_busy_count_as_pending(self):
+        self.assertTrue(setup_response_pending("setup_node: Read timed out"))
+        self.assertTrue(setup_response_pending("Node is busy: Node setup is running"))
+        self.assertFalse(setup_response_pending("MARZBAN_NODE_NOT_RUNNING"))
+
+    @patch("bot.main.celerity_node_bootstrap.time.sleep")
+    @patch("bot.main.celerity_node_bootstrap.run_setup_init_script")
+    def test_wait_retries_while_setup_is_busy(self, run_setup, sleep):
+        run_setup.side_effect = [
+            (False, "setup_node: Node is busy: Node setup is running", "n1"),
+            (True, "MARZBAN_NODE_UP", "n1"),
+        ]
+        ok, detail, node_id = wait_for_marzban_node(
+            _Server(),
+            api=object(),
+            attempts=3,
+            pause_seconds=1,
+        )
+        self.assertTrue(ok)
+        self.assertIn("MARZBAN_NODE_UP", detail)
+        self.assertEqual(node_id, "n1")
+        sleep.assert_called_once()
+
+
+class PanelFormTests(SimpleTestCase):
+    def test_form_keeps_groups_and_does_not_send_ssh_password(self):
+        fields = dict(obfs_form_fields(
+            {
+                "name": "DE-1",
+                "ip": "203.0.113.10",
+                "sni": "bing.com",
+                "groups": ["group-1"],
+                "ssh": {"password": "ssh-secret"},
+                "initScript": "ufw allow 22/tcp",
+            },
+            "obfs-secret",
+        ))
+        self.assertEqual(fields["obfs.type"], "salamander")
+        self.assertEqual(fields["obfs.password"], "obfs-secret")
+        self.assertEqual(fields["sni"], "bing.com")
+        self.assertIn(("groups", "group-1"), obfs_form_fields(
+            {"name": "DE-1", "groups": ["group-1"]},
+            "obfs-secret",
+        ))
+        self.assertNotIn("ssh.password", fields)
+        self.assertNotIn("ssh-secret", fields.values())
+
+    @override_settings(
+        C3CELERYTY_API_ENDPOINT="https://panel.example/api",
+        CELERITY_PANEL_USERNAME="admin",
+        CELERITY_PANEL_PASSWORD="panel-secret",
+    )
+    def test_login_and_form_post_do_not_return_the_obfs_password(self):
+        reset_panel_session_cache()
+        session = _FormSession()
+        with patch("bot.main.celerity_panel_form.requests.Session", return_value=session):
+            ok, detail = save_node_obfs_via_panel(
+                "node-1",
+                {"name": "DE-1", "ip": "203.0.113.10", "groups": ["group-1"]},
+                "obfs-secret",
+            )
+        self.assertTrue(ok)
+        self.assertNotIn("obfs-secret", detail)
+        self.assertNotIn("panel-secret", detail)
+        form_post = session.posts[1]
+        self.assertIn("/panel/nodes/node-1", form_post[0])
+        posted = dict(form_post[2])
+        self.assertEqual(posted["obfs.password"], "obfs-secret")
+        self.assertEqual(posted["groups"], "group-1")
+        reset_panel_session_cache()
+
+
+class _FormSession:
+    def __init__(self):
+        self.posts = []
+
+    def post(self, url, json=None, data=None, timeout=None, allow_redirects=True):
+        self.posts.append((url, json, data))
+        response = _FormResponse()
+        response.status_code = 200
+        response.url = url
+        response.payload = {"success": True}
+        return response
+
+
+class _FormResponse:
+    status_code = 200
+    url = ""
+    payload = None
+
+    def json(self):
+        return self.payload or {}

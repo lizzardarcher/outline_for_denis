@@ -15,6 +15,9 @@ from django.db.models import Q
 from bot.main.celerity_node_bootstrap import (
     bootstrap_celerity_for_server,
     run_setup_init_script,
+
+    setup_response_pending,
+    wait_for_marzban_node,
 )
 from bot.main.CelerityAPI import CelerityAPI
 from bot.main.marzban_node_bootstrap import (
@@ -176,6 +179,35 @@ def _provision_marzban_role(server: Server, role: str, *, log_prefix: str) -> No
         setup_timeout=900,
         log_fn=_log,
     )
+    if "MARZBAN_NODE_UP" not in (detail or ""):
+        confirmed = False
+        if setup_response_pending(detail):
+            _log("DEBUG", "setup не вернул маркер, жду окончание установки")
+            confirmed, detail, waited_id = wait_for_marzban_node(server, api=api, log_fn=_log)
+            if waited_id:
+                node_id = waited_id
+        if not confirmed and "MARZBAN_NODE_UP" not in (detail or ""):
+            _log("DEBUG", "повторная установка marzban-node")
+            _ok, detail, retry_id = run_setup_init_script(
+                server,
+                init_script,
+                api=api,
+                setup_timeout=900,
+                log_fn=_log,
+            )
+            if retry_id:
+                node_id = retry_id
+            if "MARZBAN_NODE_UP" not in (detail or "") and setup_response_pending(detail):
+                confirmed, detail, waited_id = wait_for_marzban_node(
+                    server,
+                    api=api,
+                    attempts=8,
+                    log_fn=_log,
+                )
+                if waited_id:
+                    node_id = waited_id
+            else:
+                confirmed = "MARZBAN_NODE_UP" in (detail or "")
     if node_id:
         deleted, delete_detail = api.delete_node(node_id)
         if deleted:
