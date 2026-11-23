@@ -230,6 +230,12 @@ class CelerityAPI:
             timeout=request_timeout,
         )
 
+
+    def get_node_config(self, node_id: str, *, request_timeout: int = 60):
+        """GET /nodes/:id/config — yaml, который панель собрала бы для этой ноды."""
+        nid = quote(str(node_id), safe="")
+        return self._make_request("GET", f"/nodes/{nid}/config", timeout=request_timeout)
+
     def setup_node(
         self,
         node_id: str,

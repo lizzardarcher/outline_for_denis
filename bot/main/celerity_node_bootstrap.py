@@ -26,6 +26,10 @@ from bot.models import Server
 _SERVER_PASSWORD_PLACEHOLDERS = frozenset(("", "<PASSWORD>"))
 _DEFAULT_HYSTERIA_SNI = "bing.com"
 _PIN_LINE = re.compile(r"HYSTERIA_PIN_SHA256=([0-9A-Fa-f]{64})")
+
+_OBFS_SALAMANDER_LINE = re.compile(
+    r"(?im)^\s*type:\s*[\"']?salamander[\"']?\s*(?:#.*)?$"
+)
 # Второй setup: cert уже есть. Сервис идёт от User=hysteria, а каталог после
 # install -D часто остаётся 700 root — отсюда tls.key permission denied.
 # Права чиним до перезапуска, который делает сама панель (restartService).
@@ -232,9 +236,12 @@ def _pull_pin_via_panel_setup(
     """
     ok_put, err_put = api.update_node(node_id, {"initScript": HYSTERIA_PIN_INIT_SCRIPT})
     if not ok_put:
-        emit("WARNING", f"PUT pin script: {err_put!r}")
+        emit(
+            "WARNING",
+            f"Не удалось отправить на сервер команду снятия отпечатка сертификата: {err_put!r}",
+        )
         return "", False
-    emit("DEBUG", "права на /etc/hysteria/key.pem и перезапуск hysteria-server")
+    emit("INFO", "Выставляю права на ключ и перезапускаю службу Hysteria.")
     ok_pin, data_pin = api.setup_node(
         node_id,
         data={
@@ -247,14 +254,20 @@ def _pull_pin_via_panel_setup(
     logs_text = flatten_setup_logs(data_pin)
     api.update_node(node_id, {"initScript": ""})
     if not ok_pin:
-        emit("WARNING", f"setup pin: {data_pin!r}")
+        emit(
+            "WARNING",
+            f"Не удалось перезапустить Hysteria и снять отпечаток сертификата: {data_pin!r}",
+        )
         return "", hysteria_restart_looks_failed(logs_text)
     pin = _save_pin_from_logs(server, data_pin, sni)
     if "HYSTERIA_KEY_NOT_READABLE" in logs_text or hysteria_restart_looks_failed(logs_text):
-        emit("ERROR", "hysteria не читает /etc/hysteria/key.pem после chown/chmod")
+        emit(
+            "ERROR",
+            "Hysteria не может прочитать ключ сертификата, служба после перезапуска не поднялась.",
+        )
         return pin, True
     if "HYSTERIA_KEY_READABLE" in logs_text or "active (running)" in logs_text:
-        emit("INFO", "hysteria-server запущен, key.pem доступен пользователю сервиса")
+        emit("INFO", "Служба Hysteria запущена, ключ сертификата ей доступен.")
     return pin, False
 
 
@@ -279,18 +292,156 @@ def _node_obfs_password(payload: Any) -> str:
     return password
 
 
+def generated_config_has_salamander(body: Any) -> bool:
+    """В собранном конфиге есть блок обфускации Salamander, не просто слово в комментарии."""
+    if isinstance(body, dict):
+        text = json.dumps(body, ensure_ascii=False)
+    else:
+        text = str(body or "")
+    if _OBFS_SALAMANDER_LINE.search(text):
+        return True
+    lowered = text.lower().replace("\\n", "\n").replace("\\r", "")
+    if '"type": "salamander"' in lowered or "'type': 'salamander'" in lowered:
+        return True
+    return _OBFS_SALAMANDER_LINE.search(lowered) is not None
+
+
 def _push_node_config(api: CelerityAPI, node_id: str, emit: Callable[[str, str], None]) -> Tuple[bool, str]:
-    last = "update-config не ответил"
+    last = "Панель не ответила на отправку конфига"
     for attempt in range(1, 4):
         ok_cfg, err_cfg = api.update_node_config(node_id)
         if ok_cfg:
             return True, ""
-        last = f"update-config: {err_cfg!r}"[:1500]
-        emit("DEBUG", f"{last}, попытка {attempt}")
+        last = f"Не удалось отправить конфиг на сервер: {err_cfg!r}"[:1500]
+        emit("DEBUG", f"{last}. Попытка {attempt} из 3.")
         if attempt < 3:
             time.sleep(5)
-    emit("ERROR", last)
     return False, last
+
+
+def save_hysteria_salamander(
+    api: CelerityAPI,
+    node_id: str,
+    emit: Callable[[str, str], None],
+) -> Tuple[bool, str]:
+    """
+    Записывает obfs salamander в карточку ноды. На сервер конфиг не отправляет.
+
+    Уже заданный пароль не меняется и в лог не попадает.
+    API это поле молча выбрасывает, поэтому при пустом ответе GET идёт форма панели.
+    Запись нужна до установки: иначе Hysteria собирает конфиг без обфускации,
+    а поздний пуш панель часто затирает.
+    """
+    ok, node = api.get_node(node_id)
+    if not ok:
+        detail = (
+            "Не удалось прочитать ноду в панели перед записью обфускации. "
+            "Проверьте, что панель Celerity открывается и у API-ключа есть право менять ноды. "
+            "Затем запустите инициализацию снова."
+        )
+        emit("ERROR", detail)
+        return False, detail
+    if _node_obfs_password(node):
+        emit("INFO", "Обфускация Salamander уже включена. Пароль не меняю и в лог не пишу.")
+        return True, "obfs salamander уже задан"
+
+    password = secrets.token_urlsafe(24)
+    ok_put, _err = api.update_node(
+        node_id,
+        {"obfs": {"type": "salamander", "password": password}},
+    )
+    if not ok_put:
+        detail = (
+            "Панель отклонила запись обфускации. "
+            "Откройте ноду в Celerity, включите Salamander и нажмите «Настроить сервер». "
+            "Потом снимите галку Celerity у этого сервера в админке и запустите инициализацию снова."
+        )
+        emit("ERROR", detail)
+        return False, detail
+    ok_check, node_after = api.get_node(node_id)
+    if ok_check and _node_obfs_password(node_after):
+        emit("INFO", "Обфускация Salamander записана в карточку ноды.")
+        return True, "obfs salamander записан"
+
+    emit(
+        "INFO",
+        "Обычный запрос к панели обфускацию не сохраняет: этого поля нет в списке разрешённых. "
+        "Записываю её через форму панели, тем же способом, что и кнопка сохранения ноды.",
+    )
+    ok_form, form_detail = save_node_obfs_via_panel(node_id, node, password)
+    if not ok_form:
+        emit("ERROR", form_detail)
+        return False, form_detail
+    ok_check, node_after = api.get_node(node_id)
+    if not (ok_check and _node_obfs_password(node_after)):
+        detail = (
+            "Форма панели ответила без ошибки, но при повторном чтении обфускации нет. "
+            "Откройте ноду в Celerity, включите Salamander, сохраните карточку и нажмите «Настроить сервер». "
+            "Затем снимите галку Celerity у этого сервера и запустите инициализацию снова."
+        )
+        emit("ERROR", detail)
+        return False, detail
+    emit("INFO", "Обфускация Salamander записана в карточку ноды через форму панели.")
+    return True, "obfs salamander записан"
+
+
+def confirm_hysteria_salamander_pushed(
+    api: CelerityAPI,
+    node_id: str,
+    emit: Callable[[str, str], None],
+) -> Tuple[bool, str]:
+    """Отправляет конфиг на сервер и проверяет, что панель собрала его уже с Salamander."""
+    ok_cfg, err_cfg = _push_node_config(api, node_id, emit)
+    if not ok_cfg:
+        detail = (
+            f"{err_cfg}. Карточка ноды с обфускацией уже сохранена, на сервер конфиг не ушёл. "
+            "Подождите минуту и запустите инициализацию снова: сервер мог быть занят установкой. "
+            "Если повтор не поможет, откройте ноду в Celerity и нажмите «Настроить сервер»."
+        )
+        emit("ERROR", detail)
+        return False, detail
+
+    read_config = getattr(api, "get_node_config", None)
+    if not callable(read_config):
+        return _confirm_salamander_on_node(api, node_id, emit)
+    ok_text, body = read_config(node_id)
+    if ok_text and generated_config_has_salamander(body):
+        emit("INFO", "В конфиге, который панель собрала для сервера, есть обфускация Salamander.")
+        return True, "конфиг содержит salamander"
+    if ok_text:
+        detail = (
+            "Панель собрала конфиг без обфускации Salamander. "
+            "В карточке ноды она не включена так, как её читает панель, поэтому на сервер ушёл бы обычный конфиг. "
+            "Откройте ноду в Celerity, выберите Salamander, сохраните и нажмите «Настроить сервер». "
+            "Затем снимите галку Celerity у этого сервера в админке и запустите инициализацию снова."
+        )
+        emit("ERROR", detail)
+        return False, detail
+    emit(
+        "INFO",
+        "Текст конфига отдельно прочитать не удалось. Проверяю карточку ноды: "
+        "без Salamander в ней сервер в выдачу не попадёт.",
+    )
+    return _confirm_salamander_on_node(api, node_id, emit)
+
+
+def _confirm_salamander_on_node(
+    api: CelerityAPI,
+    node_id: str,
+    emit: Callable[[str, str], None],
+) -> Tuple[bool, str]:
+    ok_check, node_after = api.get_node(node_id)
+    if ok_check and _node_obfs_password(node_after):
+        emit("INFO", "Панель подтвердила обфускацию Salamander в карточке ноды.")
+        return True, "obfs salamander подтверждён"
+    kind, _password = _node_obfs(node_after if ok_check else {})
+    detail = (
+        "Панель не сохранила обфускацию"
+        + (f": в ответе тип «{kind or 'пусто'}»." if ok_check else ".")
+        + " Откройте ноду в Celerity, включите Salamander и нажмите «Настроить сервер»."
+    )
+    emit("ERROR", detail)
+    return False, detail
 
 
 def ensure_hysteria_salamander(
@@ -298,58 +449,11 @@ def ensure_hysteria_salamander(
     node_id: str,
     emit: Callable[[str, str], None],
 ) -> Tuple[bool, str]:
-    """
-    Включает obfs salamander на ноде панели и отправляет конфиг.
-
-    Уже заданный пароль не меняется и в лог не попадает.
-    API это поле не пишет, поэтому при пустом ответе GET идёт форма панели.
-    """
-    ok, node = api.get_node(node_id)
+    """Записывает salamander и сразу отправляет конфиг. Для установки ноды используйте два шага отдельно."""
+    ok, detail = save_hysteria_salamander(api, node_id, emit)
     if not ok:
-        emit("ERROR", "GET node перед obfs не удался")
-        return False, "GET node перед obfs не удался"
-    if _node_obfs_password(node):
-        emit("DEBUG", "obfs salamander уже задан, пароль не менялся")
-    else:
-        password = secrets.token_urlsafe(24)
-        ok_put, _err = api.update_node(
-            node_id,
-            {"obfs": {"type": "salamander", "password": password}},
-        )
-        if not ok_put:
-            emit("ERROR", "PUT obfs отклонён панелью")
-            return False, "PUT obfs отклонён панелью"
-        ok_check, node_after = api.get_node(node_id)
-        if ok_check and _node_obfs_password(node_after):
-            emit("DEBUG", "на ноду записан obfs salamander")
-        else:
-            emit("DEBUG", "API не сохранил obfs, записываю через форму панели")
-            ok_form, form_detail = save_node_obfs_via_panel(node_id, node, password)
-            if not ok_form:
-                emit("ERROR", form_detail)
-                return False, form_detail
-            ok_check, node_after = api.get_node(node_id)
-            if not (ok_check and _node_obfs_password(node_after)):
-                detail = "форма панели ответила успехом, но GET не показывает obfs"
-                emit("ERROR", detail)
-                return False, detail
-            emit("DEBUG", "форма панели сохранила obfs salamander")
-
-    ok_cfg, err_cfg = _push_node_config(api, node_id, emit)
-    if not ok_cfg:
-        return False, err_cfg
-
-    ok_check, node_after = api.get_node(node_id)
-    if ok_check and _node_obfs_password(node_after):
-        emit("INFO", "obfs salamander подтверждён")
-        return True, "obfs salamander подтверждён"
-    kind, _password = _node_obfs(node_after if ok_check else {})
-    detail = (
-        "панель не сохранила obfs"
-        + (f" (в ответе type={kind or 'пусто'})" if ok_check else "")
-    )
-    emit("ERROR", detail)
-    return False, detail
+        return False, detail
+    return confirm_hysteria_salamander_pushed(api, node_id, emit)
 
 
 def bootstrap_celerity_for_server(
@@ -366,8 +470,9 @@ def bootstrap_celerity_for_server(
     """
     provision + setup для одного Server. При успехе — is_c3celeryty_activated=True.
 
-    salamander=True только для новой ноды с ролью Hysteria2: галка ставится
-    после подтверждения obfs в панели. Старым серверам флаг не передаётся.
+    salamander=True только для новой ноды с ролью Hysteria2. Обфускация пишется
+    в карточку до установки, галка ставится после проверки собранного конфига.
+    Старым серверам флаг не передаётся.
 
     log_fn(level, message) — опционально (например для Logging в БД).
     """
@@ -377,10 +482,23 @@ def bootstrap_celerity_for_server(
 
     ip = (server.ip_address or "").strip()
     if not ip:
-        _emit("ERROR", "пустой ip_address")
-        return False, "Пустой ip_address"
+        detail = (
+            "У сервера не указан IP. Впишите адрес в карточке сервера и запустите инициализацию снова."
+            if salamander
+            else "Пустой ip_address"
+        )
+        _emit("ERROR", detail)
+        return False, detail
 
     if django_ssh_looks_weak(server):
+        if salamander:
+            detail = (
+                "Пароль SSH у этого сервера пустой или стоит заглушка. "
+                "Панель заходит на сервер по этому паролю, без него Hysteria не установится. "
+                "Впишите настоящий пароль root в карточке сервера и запустите инициализацию снова."
+            )
+            _emit("ERROR", detail)
+            return False, detail
         _emit("WARNING", "пустой или заглушечный SSH password")
         return False, "Пустой или заглушечный SSH password"
 
@@ -389,34 +507,83 @@ def bootstrap_celerity_for_server(
     try:
         group_id = _celerity_group_id(api)
     except RuntimeError as e:
-        _emit("ERROR", str(e))
-        return False, str(e)
+        detail = str(e)
+        if salamander:
+            detail = (
+                f"{detail} "
+                "Проверьте ключ API панели и имя группы серверов в настройках, затем запустите инициализацию снова."
+            )
+        _emit("ERROR", detail)
+        return False, detail
 
+    if salamander:
+        _emit("INFO", f"Шаг 1. Ищу в панели сервер {ip}.")
     ok_find, node_id = api.find_node_id_by_ip(ip, node_type)
     if not ok_find:
-        _emit("DEBUG", "POST /nodes (создание ноды)")
+        if salamander:
+            _emit("INFO", "В панели такой ноды нет. Создаю карточку сервера.")
+        else:
+            _emit("DEBUG", "POST /nodes (создание ноды)")
         ok_c, nid, err_c = create_celerity_node_or_find(
             api, server, group_id, node_type, ip
         )
         if not ok_c:
-            _emit("ERROR", f"create_node: {err_c!r}")
-            return False, f"create_node: {err_c!r}"
+            detail = f"create_node: {err_c!r}"
+            if salamander:
+                detail = (
+                    f"Не удалось создать ноду в панели: {err_c!r}. "
+                    "Проверьте, что панель отвечает и у API-ключа есть право создавать ноды. "
+                    "Затем запустите инициализацию снова."
+                )
+            _emit("ERROR", detail)
+            return False, detail
         node_id = nid
+        if salamander:
+            _emit("INFO", "Карточка ноды создана.")
+    elif salamander:
+        _emit("INFO", "Нода с этим адресом уже есть. Буду настраивать её, новую не создаю.")
     else:
         _emit("DEBUG", f"нода уже в панели node_id={node_id!r}")
+
+    if salamander:
+        _emit(
+            "INFO",
+            "Шаг 2. Включаю обфускацию Salamander до установки Hysteria. "
+            "Пароль в лог не пишу. Если он уже был задан, оставляю его как есть.",
+        )
+        ok_obfs, obfs_detail = save_hysteria_salamander(api, node_id, _emit)
+        if not ok_obfs:
+            return False, obfs_detail
 
     sni = resolve_celerity_node_sni()
     node_update: dict = {"sni": sni}
     if init_script:
         node_update["initScript"] = init_script
-        _emit("DEBUG", "initScript будет выполнен при setup")
+        if salamander:
+            _emit("INFO", "К установке приложен скрипт файрвола: панель выполнит его на сервере.")
+        else:
+            _emit("DEBUG", "initScript будет выполнен при setup")
     ok_sni, err_sni = api.update_node(node_id, node_update)
     if not ok_sni:
-        _emit("ERROR", f"PUT sni={sni}: {err_sni!r}")
-        return False, f"PUT sni={sni}: {err_sni!r}"
-    _emit("DEBUG", f"Hysteria TLS SNI={sni}")
+        detail = f"PUT sni={sni}: {err_sni!r}"
+        if salamander:
+            detail = (
+                f"Не удалось записать адрес маскировки и скрипт установки: {err_sni!r}. "
+                "Обфускация в карточке уже сохранена. Проверьте, что панель доступна, и запустите инициализацию снова."
+            )
+        _emit("ERROR", detail)
+        return False, detail
+    if not salamander:
+        _emit("DEBUG", f"Hysteria TLS SNI={sni}")
 
-    _emit("DEBUG", f"POST setup node_id={node_id!r} (timeout {setup_timeout}s)")
+    if salamander:
+        _emit(
+            "INFO",
+            "Шаг 3. Ставлю Hysteria на сервер по SSH. Обычно это занимает несколько минут, "
+            "страницу админки можно не обновлять.",
+        )
+    else:
+        _emit("DEBUG", f"POST setup node_id={node_id!r} (timeout {setup_timeout}s)")
     ok_setup, data = api.setup_node(
         node_id,
         data=setup_body,
@@ -425,22 +592,46 @@ def bootstrap_celerity_for_server(
     logs_text = flatten_setup_logs(data)
     marzban_up = "MARZBAN_NODE_UP" in logs_text
     if not ok_setup:
-        _emit("ERROR", f"setup_node: {data!r}")
         failed = f"setup_node: {data!r}"
         if marzban_up:
             failed = "MARZBAN_NODE_UP " + failed
+        if salamander:
+            failed = (
+                "Установка Hysteria не завершилась. "
+                "Чаще всего панель не смогла зайти на сервер по SSH или сервер ещё занят прошлой установкой. "
+                "Проверьте пароль SSH и что порт 22 открыт. "
+                "Если в панели у ноды написано, что она занята, подождите пару минут и запустите инициализацию снова. "
+                f"Журнал панели: {failed[:800]}"
+            )
+        _emit("ERROR", failed[:1500])
         return False, failed
 
     pin = _save_pin_from_logs(server, data, sni)
+    if salamander:
+        _emit(
+            "INFO",
+            "Шаг 4. Снимаю отпечаток сертификата и выставляю права на ключ, "
+            "чтобы Hysteria мог его прочитать.",
+        )
     fixed_pin, restart_failed = _pull_pin_via_panel_setup(api, node_id, server, sni, _emit)
     if fixed_pin:
         pin = fixed_pin
-    if pin:
+    if pin and not salamander:
         _emit("INFO", f"hysteria TLS meta: pin={pin[:8]}… sni={sni}")
+    if pin and salamander:
+        _emit("INFO", "Отпечаток сертификата сохранён. Клиент сможет проверить этот сервер.")
     if restart_failed:
         failed = "hysteria-server не online: нет прав на /etc/hysteria/key.pem"
         if marzban_up:
             failed = "MARZBAN_NODE_UP " + failed
+        if salamander:
+            failed = (
+                "Hysteria установлен, но служба не запустилась: у процесса нет права читать ключ сертификата. "
+                "Откройте ноду в Celerity и нажмите «Настроить сервер». "
+                "Если служба снова не поднимется, зайдите на сервер и проверьте файл /etc/hysteria/key.pem. "
+                "Затем снимите галку Celerity у этого сервера и запустите инициализацию снова."
+            )
+            _emit("ERROR", failed)
         return False, failed
     if not pin:
         synced = try_sync_hysteria_tls_meta_after_setup(
@@ -453,17 +644,37 @@ def bootstrap_celerity_for_server(
             failed = "setup прошёл, но pinSHA256 не снят с /etc/hysteria/cert.pem"
             if marzban_up:
                 failed = "MARZBAN_NODE_UP " + failed
+            if salamander:
+                failed += (
+                    ". Установка дошла до конца, но отпечаток сертификата прочитать не удалось, "
+                    "без него клиент не проверит сервер. "
+                    "Откройте ноду в Celerity и нажмите «Настроить сервер». "
+                    "Если в журнале снова нет отпечатка, проверьте, что Hysteria установлен "
+                    "и на сервере есть файл /etc/hysteria/cert.pem. "
+                    "Затем снимите галку Celerity и запустите инициализацию снова."
+                )
+                _emit("ERROR", failed[:1500])
             return False, failed
 
     if salamander:
-        ok_obfs, obfs_detail = ensure_hysteria_salamander(api, node_id, _emit)
-        if not ok_obfs:
-            return False, obfs_detail
+        _emit(
+            "INFO",
+            "Шаг 5. Отправляю конфиг на сервер и проверяю, что в нём есть обфускация Salamander.",
+        )
+        ok_pushed, pushed_detail = confirm_hysteria_salamander_pushed(api, node_id, _emit)
+        if not ok_pushed:
+            return False, pushed_detail
 
     mark_server_c3_activated(server)
     detail = "MARZBAN_NODE_UP " if marzban_up else ""
     if isinstance(data, dict) and data.get("logs"):
         detail += json.dumps(data, ensure_ascii=False, default=str)[:1500]
+    if salamander:
+        done = (
+            "Готово. Обфускация Salamander включена, сервер отмечен как настроенный и его можно выдавать клиентам."
+        )
+        _emit("INFO", done)
+        return True, (detail + " " + done).strip()
     _emit("INFO", "setup OK, pinSHA256 сохранён, is_c3celeryty_activated=True")
     return True, detail or "OK"
 

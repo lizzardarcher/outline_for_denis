@@ -9,6 +9,8 @@ from bot.main.celerity_node_bootstrap import (
     build_celerity_node_payload,
 
     ensure_hysteria_salamander,
+
+    generated_config_has_salamander,
     hysteria_restart_looks_failed,
     pin_sha256_from_setup_logs,
     resolve_celerity_node_sni,
@@ -181,6 +183,12 @@ class _SalamanderApi(_Api):
         self.config_calls += 1
         return True, {"ok": True}
 
+    def get_node_config(self, node_id, request_timeout=60):
+        body = getattr(self, "config_body", "obfs:\n  type: salamander\n")
+        if body is None:
+            return False, "config unavailable"
+        return True, body
+
 
 class HysteriaSalamanderTests(SimpleTestCase):
     def test_existing_password_is_kept(self):
@@ -269,6 +277,33 @@ class HysteriaSalamanderTests(SimpleTestCase):
         self.assertNotIn(posted_password, " ".join(notes))
         self.assertNotIn("secret-obfs", " ".join(notes))
         mark.assert_called_once()
+        story = "\n".join(notes)
+        self.assertLess(story.index("Шаг 2."), story.index("Шаг 3."))
+        self.assertLess(story.index("Шаг 3."), story.index("Шаг 5."))
+
+    @patch("bot.main.celerity_node_bootstrap._celerity_group_id", return_value="g1")
+    @patch("bot.main.celerity_node_bootstrap.mark_server_c3_activated")
+    @patch(
+        "bot.main.celerity_node_bootstrap.try_sync_hysteria_tls_meta_after_setup",
+        return_value=True,
+    )
+    def test_install_stops_when_built_config_has_no_salamander(self, _sync, mark, _group):
+        api = _SalamanderApi([
+            {"obfs": {"type": "salamander", "password": "keep-me"}},
+        ])
+        api.config_body = "listen: :443\n"
+        ok, detail = bootstrap_celerity_for_server(_Server(), api=api, salamander=True)
+        self.assertFalse(ok)
+        self.assertIn("Salamander", detail)
+        self.assertNotIn("keep-me", detail)
+        mark.assert_not_called()
+        self.assertEqual(api.updates[0].get("obfs"), None)
+
+    def test_generated_config_requires_salamander_line(self):
+        self.assertTrue(generated_config_has_salamander("obfs:\n  type: salamander\n"))
+        self.assertTrue(generated_config_has_salamander("type: salamander  # obfs"))
+        self.assertTrue(generated_config_has_salamander({"config": "obfs:\n  type: salamander\n"}))
+        self.assertFalse(generated_config_has_salamander("# type: salamander\nlisten: :443\n"))
 
 
 class MarzbanWaitTests(SimpleTestCase):
@@ -343,16 +378,38 @@ class PanelFormTests(SimpleTestCase):
         self.assertEqual(posted["groups"], "group-1")
         reset_panel_session_cache()
 
+    @override_settings(
+        C3CELERYTY_API_ENDPOINT="https://panel.example/api",
+        CELERITY_PANEL_USERNAME="admin",
+        CELERITY_PANEL_PASSWORD="panel-secret",
+    )
+    def test_form_redirect_with_error_is_not_success(self):
+        reset_panel_session_cache()
+        session = _FormSession(error="Имя обязательно")
+        with patch("bot.main.celerity_panel_form.requests.Session", return_value=session):
+            ok, detail = save_node_obfs_via_panel(
+                "node-1",
+                {"name": "DE-1", "ip": "203.0.113.10", "groups": ["group-1"]},
+                "obfs-secret",
+            )
+        self.assertFalse(ok)
+        self.assertIn("Имя обязательно", detail)
+        self.assertNotIn("obfs-secret", detail)
+        reset_panel_session_cache()
+
 
 class _FormSession:
-    def __init__(self):
+    def __init__(self, error=""):
         self.posts = []
+        self.error = error
 
     def post(self, url, json=None, data=None, timeout=None, allow_redirects=True):
         self.posts.append((url, json, data))
         response = _FormResponse()
         response.status_code = 200
         response.url = url
+        if self.error and data is not None:
+            response.url = url + "?error=" + self.error.replace(" ", "%20")
         response.payload = {"success": True}
         return response
 

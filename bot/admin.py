@@ -817,18 +817,21 @@ def initialize_selected_servers(modeladmin, request, queryset):
             continue
         queued.append(label)
 
+
     if queued:
         modeladmin.message_user(
             request,
             "Установка запущена для "
             + ", ".join(queued)
-            + ". Результат смотрите в логах VPN: строка «готово» и включённая панель.",
+            + ". Ход работы пишется в логи VPN по шагам. В конце будет строка «Готово». "
+            + "Если шаг не прошёл, в той же записи сказано, что случилось и что сделать.",
             level=messages.SUCCESS,
         )
     if skipped:
         modeladmin.message_user(
             request,
-            "Уже установлены, повторно не запускались: " + ", ".join(skipped) + ".",
+            "Уже установлены, повторно не запускались: " + ", ".join(skipped) + ". "
+            + "Если Hysteria встал без обфускации, снимите галку Celerity у этого сервера и запустите действие снова.",
             level=messages.WARNING,
         )
     if failed:

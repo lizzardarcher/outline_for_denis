@@ -10,7 +10,8 @@ from __future__ import annotations
 
 import time
 from typing import Any, List, Optional, Tuple
-from urllib.parse import quote
+
+from urllib.parse import parse_qs, quote, urlparse
 
 import requests
 from django.conf import settings
@@ -136,6 +137,12 @@ def _post_obfs_form(
         return False, "сессия панели истекла"
     if response.status_code >= 400:
         return False, f"форма ноды вернула {response.status_code}"
+    error_text = " ".join(parse_qs(urlparse(final_url).query).get("error") or []).strip()
+    if error_text:
+        return False, (
+            f"Форма панели не сохранила ноду: {error_text[:300]}. "
+            "Откройте эту ноду в Celerity, включите обфускацию Salamander и нажмите «Настроить сервер»."
+        )
     return True, "форма панели приняла obfs"
 
 

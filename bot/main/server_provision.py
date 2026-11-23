@@ -145,19 +145,22 @@ def _provision_hysteria_role(server: Server, *, log_prefix: str) -> None:
     try:
         init_script = build_role_init_script(Server.NODE_ROLE_HYSTERIA2)
     except ValueError as exc:
-        _log("ERROR", str(exc))
+
+        _log(
+            "ERROR",
+            f"Не удалось подготовить скрипт файрвола для этой роли: {exc}. "
+            "Проверьте роль сервера и запустите инициализацию снова.",
+        )
         return
-    ok, detail = bootstrap_celerity_for_server(
+    _log("INFO", "Начинаю установку Hysteria2. Ход работы будет в этих же логах, шаг за шагом.")
+    bootstrap_celerity_for_server(
         server,
         init_script=init_script,
         setup_body=_HYSTERIA_SETUP,
         setup_timeout=900,
         log_fn=_log,
-
         salamander=True,
     )
-    if not ok:
-        _log("ERROR", str(detail)[:1500])
 
 
 def _provision_marzban_role(server: Server, role: str, *, log_prefix: str) -> None:
