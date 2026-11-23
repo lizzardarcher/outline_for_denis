@@ -96,9 +96,13 @@ class ManualTaskLog(models.Model):
 class ServerHealthState(models.Model):
     CHANNEL_PANEL = "panel"
     CHANNEL_PING = "ping"
+
+
+    CHANNEL_CHEBUR = "chebur"
     CHANNEL_CHOICES = (
         (CHANNEL_PANEL, "Панели"),
         (CHANNEL_PING, "Сеть"),
+        (CHANNEL_CHEBUR, "Cheburcheck"),
     )
 
     server = models.ForeignKey(
@@ -138,6 +142,8 @@ class ServerHealthSample(models.Model):
     ping_status = models.CharField(max_length=16, verbose_name="Статус ping")
     ping_detail = models.CharField(max_length=300, blank=True, default="", verbose_name="Детали ping")
     ping_ms = models.PositiveIntegerField(null=True, blank=True, verbose_name="Ping, мс")
+    chebur_status = models.CharField(max_length=16, blank=True, default="", verbose_name="Статус Cheburcheck")
+    chebur_detail = models.CharField(max_length=300, blank=True, default="", verbose_name="Детали Cheburcheck")
 
     class Meta:
         verbose_name = "Проба доступности сервера"
@@ -148,4 +154,7 @@ class ServerHealthSample(models.Model):
         ]
 
     def __str__(self):
-        return f"{self.server_id} {self.checked_at:%Y-%m-%d %H:%M} panel={self.panel_status} ping={self.ping_status}"
+        return (
+            f"{self.server_id} {self.checked_at:%Y-%m-%d %H:%M} "
+            f"panel={self.panel_status} ping={self.ping_status} chebur={self.chebur_status}"
+        )

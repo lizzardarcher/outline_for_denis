@@ -1,4 +1,6 @@
 
+
+
 {% extends "admin/base_site.html" %}
 {% load i18n admin_urls %}
 
@@ -26,6 +28,10 @@
             {% if ping_state %}
                 <div>Сеть: {% include "admin/bot/server/panel_health_status.html" with status=ping_state.status detail=ping_state.detail duration=ping_state.duration_label %}</div>
             {% endif %}
+
+            {% if chebur_state %}
+                <div>Cheburcheck: {% include "admin/bot/server/panel_health_status.html" with status=chebur_state.status detail=chebur_state.detail duration=chebur_state.duration_label %}</div>
+            {% endif %}
         </div>
 
         <div class="card">
@@ -37,6 +43,7 @@
                         <th>Время</th>
                         <th>Панели</th>
                         <th>Сеть</th>
+                        <th>Cheburcheck</th>
                         <th>Ping, мс</th>
                     </tr>
                     </thead>
@@ -46,11 +53,12 @@
                             <td>{{ sample.checked_at|date:"d.m.Y H:i" }}</td>
                             <td>{% include "admin/bot/server/panel_health_status.html" with status=sample.panel_status detail=sample.panel_detail %}</td>
                             <td>{% include "admin/bot/server/panel_health_status.html" with status=sample.ping_status detail=sample.ping_detail %}</td>
+                            <td>{% include "admin/bot/server/panel_health_status.html" with status=sample.chebur_status detail=sample.chebur_detail %}</td>
                             <td>{% if sample.ping_ms is not None %}{{ sample.ping_ms }}{% else %}—{% endif %}</td>
                         </tr>
                     {% empty %}
                         <tr>
-                            <td colspan="4" class="text-center text-muted">Проверок пока нет</td>
+                            <td colspan="5" class="text-center text-muted">Проверок пока нет</td>
                         </tr>
                     {% endfor %}
                     </tbody>

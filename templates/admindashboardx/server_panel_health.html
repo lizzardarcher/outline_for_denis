@@ -27,6 +27,11 @@
         <div class="alert alert-warning">Не удалось полностью опросить панели. Результат может быть неполным.</div>
     {% endif %}
 
+
+    {% if snapshot.chebur_ok == False %}
+        <div class="alert alert-warning">Нет доступа к API Cheburcheck.</div>
+    {% endif %}
+
     <div class="row g-3 mb-3">
         <div class="col-6 col-lg-3">
             <div class="card admx-card h-100">
@@ -105,7 +110,9 @@
                     <th>Активен</th>
                     <th>Панели</th>
                     <th>Сеть</th>
+                    <th>Cheburcheck</th>
                 </tr>
+
                 </thead>
                 <tbody>
                 {% for row in rows_page %}
@@ -132,10 +139,13 @@
                         <td>
                             {% include "admindashboardx/partials/health_status.html" with status=row.ping_status detail=row.ping_detail duration=row.ping_duration %}
                         </td>
+                        <td>
+                            {% include "admindashboardx/partials/health_status.html" with status=row.chebur_status detail=row.chebur_detail duration=row.chebur_duration %}
+                        </td>
                     </tr>
                 {% empty %}
                     <tr>
-                        <td colspan="6" class="text-center text-secondary">
+                        <td colspan="7" class="text-center text-secondary">
                             {% if snapshot %}Нет данных{% else %}Нажмите «Проверить сейчас»{% endif %}
                         </td>
                     </tr>

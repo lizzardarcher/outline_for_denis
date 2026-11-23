@@ -76,6 +76,12 @@ CELERITY_SERVER_GROUP_ID = os.getenv('CELERITY_SERVER_GROUP_ID') or None
 CELERITY_NODE_SNI = os.getenv('CELERITY_NODE_SNI', 'bing.com')
 
 
+
+# Токен сканеров Cheburcheck. Пустое значение — в колонке «нет доступа», без запросов к API.
+CHEBURCHECK_API_TOKEN = os.getenv('CHEBURCHECK_API_TOKEN', '')
+CHEBURCHECK_API_BASE = os.getenv('CHEBURCHECK_API_BASE', 'https://cheburcheck.ru/api/v1').rstrip('/')
+
+
 YOOKASSA_SHOP_ID = os.getenv('YOOKASSA_SHOP_ID_LIVE')
 YOOKASSA_SECRET = os.getenv('YOOKASSA_SECRET_LIVE')
 

@@ -1,3 +1,5 @@
+
+
 {% extends "admin/base_site.html" %}
 {% load i18n admin_urls %}
 
@@ -49,6 +51,10 @@
     <div class="col-12">
         {% if snapshot and not snapshot.panels_ok %}
             <div class="alert alert-warning">Не удалось полностью опросить панели. Результат может быть неполным.</div>
+        {% endif %}
+
+        {% if snapshot.chebur_ok == False %}
+            <div class="alert alert-warning">Нет доступа к API Cheburcheck.</div>
         {% endif %}
 
         <div class="row">
@@ -115,6 +121,7 @@
                         <th>Активен</th>
                         <th>Панели</th>
                         <th>Сеть</th>
+                        <th>Cheburcheck</th>
                         <th></th>
                     </tr>
                     </thead>
@@ -138,6 +145,9 @@
                                 {% include "admin/bot/server/panel_health_status.html" with status=row.ping_status detail=row.ping_detail duration=row.ping_duration %}
                             </td>
                             <td>
+                                {% include "admin/bot/server/panel_health_status.html" with status=row.chebur_status detail=row.chebur_detail duration=row.chebur_duration %}
+                            </td>
+                            <td>
                                 {% if row.server_id %}
                                     <a href="{% url 'admin:bot_server_panel_health_log' row.server_id %}">Лог</a>
                                 {% endif %}
@@ -145,7 +155,7 @@
                         </tr>
                     {% empty %}
                         <tr>
-                            <td colspan="7" class="text-center text-muted">
+                            <td colspan="8" class="text-center text-muted">
                                 {% if snapshot %}Нет данных{% else %}Нажмите «Проверить сейчас»{% endif %}
                             </td>
                         </tr>

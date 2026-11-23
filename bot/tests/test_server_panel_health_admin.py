@@ -28,6 +28,11 @@ class ServerPanelHealthAdminTests(TestCase):
         patcher = patch("apps.admindashboardx.panel_health._ping_servers", return_value={})
         patcher.start()
         self.addCleanup(patcher.stop)
+
+
+        chebur = patch("apps.admindashboardx.panel_health.probe_addresses", return_value={})
+        chebur.start()
+        self.addCleanup(chebur.stop)
         self.admin_user = User.objects.create_user(
             "admin-health",
             password="secret123!",
@@ -116,3 +121,32 @@ class ServerPanelHealthAdminTests(TestCase):
         self.assertContains(log_response, "Zomro DE1")
         self.assertContains(log_response, "✅")
         self.assertContains(log_response, "15")
+        self.assertContains(log_response, "Cheburcheck")
+
+    def test_health_log_shows_question_mark_for_silent_scanners(self):
+        server = Server.objects.create(hosting="Zomro DE2", ip_address="10.1.1.2", is_active=True)
+        collect_and_store(
+            servers=[server],
+            marzban_api=_marzban_api([{"id": 1, "address": "10.1.1.2", "status": "connected"}]),
+            celerity_api=_celerity_api([{"_id": "n1", "ip": "10.1.1.2", "status": "online"}]),
+            ping_hosts={"10.1.1.2": {"status": "ok", "detail": "доступен", "ping_ms": 9}},
+            chebur_hosts={"10.1.1.2": {"status": "question", "detail": "нет ответа сканеров"}},
+        )
+        response = self.client.get(reverse("admin:bot_server_panel_health"))
+        self.assertContains(response, "❓")
+        log_response = self.client.get(reverse("admin:bot_server_panel_health_log", args=[server.pk]))
+        self.assertContains(log_response, "❓")
+        self.assertContains(log_response, "Cheburcheck")
+
+    def test_health_page_shows_no_access_when_api_is_down(self):
+        server = Server.objects.create(hosting="Zomro DE3", ip_address="10.1.1.3", is_active=True)
+        collect_and_store(
+            servers=[server],
+            marzban_api=_marzban_api([{"id": 1, "address": "10.1.1.3", "status": "connected"}]),
+            celerity_api=_celerity_api([{"_id": "n1", "ip": "10.1.1.3", "status": "online"}]),
+            ping_hosts={"10.1.1.3": {"status": "ok", "detail": "доступен", "ping_ms": 9}},
+            chebur_hosts={"10.1.1.3": {"status": "no_access", "detail": "нет доступа"}},
+        )
+        response = self.client.get(reverse("admin:bot_server_panel_health"))
+        self.assertContains(response, "⚠️ нет доступа")
+        self.assertContains(response, "Нет доступа к API Cheburcheck")

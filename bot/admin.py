@@ -1052,6 +1052,9 @@ class ServerAdmin(BaseAdmin):
             "server": server,
             "panel_state": states.get("panel"),
             "ping_state": states.get("ping"),
+
+
+            "chebur_state": states.get("chebur"),
             "samples_page": samples_page,
         }
         return render(request, "admin/bot/server/panel_health_log.html", context)

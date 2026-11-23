@@ -1,7 +1,14 @@
+
+
+
 {% if status == "ok" %}
-    <span class="badge badge-success">✅{% if duration %} ({{ duration }}){% endif %}</span>
+    <span class="badge badge-success"{% if detail %} title="{{ detail }}"{% endif %}>✅{% if duration %} ({{ duration }}){% endif %}</span>
 {% elif status == "down" %}
-    <span class="badge badge-danger">❌{% if duration %} ({{ duration }}){% endif %}</span>
+    <span class="badge badge-danger"{% if detail %} title="{{ detail }}"{% endif %}>❌{% if duration %} ({{ duration }}){% endif %}</span>
+{% elif status == "no_access" %}
+    <span class="badge badge-warning" title="{{ detail|default:'нет доступа' }}">⚠️ нет доступа{% if duration %} ({{ duration }}){% endif %}</span>
+{% elif status == "question" %}
+    <span class="badge badge-secondary"{% if detail %} title="{{ detail }}"{% endif %}>❓{% if duration %} ({{ duration }}){% endif %}</span>
 {% elif status == "unknown" %}
     <span class="badge badge-warning">{{ detail|default:"нет ответа" }}{% if duration %} ({{ duration }}){% endif %}</span>
 {% elif status == "idle" %}
