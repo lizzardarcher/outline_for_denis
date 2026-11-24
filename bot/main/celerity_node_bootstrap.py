@@ -30,38 +30,50 @@ _PIN_LINE = re.compile(r"HYSTERIA_PIN_SHA256=([0-9A-Fa-f]{64})")
 _OBFS_SALAMANDER_LINE = re.compile(
     r"(?im)^\s*type:\s*[\"']?salamander[\"']?\s*(?:#.*)?$"
 )
-# Второй setup: cert уже есть. Сервис идёт от User=hysteria, а каталог после
-# install -D часто остаётся 700 root — отсюда tls.key permission denied.
-# Права чиним до перезапуска, который делает сама панель (restartService).
+
+# Панель ставит hysteria-server от User=hysteria. Установщик пишет key.pem
+# как root:root и часто оставляет каталог 700, поэтому служба падает с
+# permission denied. initScript этого второго setup выполняется ДО перезапуска.
+# Переводим unit на root: так же ноду поднимают вручную, и ключ точно читается.
 HYSTERIA_PIN_INIT_SCRIPT = r"""
-set -e
 mkdir -p /etc/hysteria
-chmod 755 /etc/hysteria
-svc_user="$(sed -n 's/^User=//p' /etc/systemd/system/hysteria-server.service 2>/dev/null | tail -1)"
-if [ -z "$svc_user" ] || [ "$svc_user" = "root" ]; then
-  svc_user="hysteria"
-fi
-if [ -f /etc/hysteria/key.pem ] && id "$svc_user" >/dev/null 2>&1; then
-  chown "$svc_user:$svc_user" /etc/hysteria/key.pem /etc/hysteria/cert.pem
+chmod 755 /etc/hysteria || true
+unit="/etc/systemd/system/hysteria-server.service"
+if [ -f "$unit" ]; then
+  sed -i -E 's/^[[:space:]]*User[[:space:]]*=.*/User=root/' "$unit"
+  sed -i -E 's/^[[:space:]]*Group[[:space:]]*=.*/Group=root/' "$unit"
+  if ! grep -qE '^[[:space:]]*User[[:space:]]*=' "$unit"; then
+    sed -i '/^\[Service\]/a User=root' "$unit"
+  fi
+  if ! grep -qE '^[[:space:]]*Group[[:space:]]*=' "$unit"; then
+    sed -i '/^\[Service\]/a Group=root' "$unit"
+  fi
+  systemctl daemon-reload || true
 fi
 if [ -f /etc/hysteria/key.pem ]; then
-  chmod 600 /etc/hysteria/key.pem
+  chown root:root /etc/hysteria/key.pem || true
+  chmod 600 /etc/hysteria/key.pem || true
 fi
 if [ -f /etc/hysteria/cert.pem ]; then
-  chmod 644 /etc/hysteria/cert.pem
+  chown root:root /etc/hysteria/cert.pem || true
+  chmod 644 /etc/hysteria/cert.pem || true
 fi
-if id "$svc_user" >/dev/null 2>&1 && [ -f /etc/hysteria/key.pem ] && command -v su >/dev/null 2>&1; then
-  if su -s /bin/sh "$svc_user" -c 'test -r /etc/hysteria/key.pem'; then
-    echo "HYSTERIA_KEY_READABLE"
-  else
-    echo "HYSTERIA_KEY_NOT_READABLE"
-    ls -la /etc/hysteria >&2 || true
-  fi
+if [ -f /etc/hysteria/key.pem ] && [ -r /etc/hysteria/key.pem ]; then
+  echo "HYSTERIA_KEY_READABLE"
+else
+  echo "HYSTERIA_KEY_NOT_READABLE"
+  ls -la /etc/hysteria >&2 || true
 fi
 test -f /etc/hysteria/cert.pem
 pin="$(openssl x509 -in /etc/hysteria/cert.pem -outform DER | sha256sum | awk '{print $1}')"
 echo "HYSTERIA_PIN_SHA256=${pin}"
 """
+
+
+def new_salamander_password() -> str:
+    """16 символов, как просили для obfs. В лог этот пароль не пишется."""
+    alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
+    return "".join(secrets.choice(alphabet) for _ in range(16))
 
 
 def _flag_from_country_name_for_app(name: Optional[str]) -> str:
@@ -98,7 +110,12 @@ def django_ssh_looks_weak(server: Server) -> bool:
     return not pwd or pwd in _SERVER_PASSWORD_PLACEHOLDERS
 
 
-def build_celerity_node_payload(server: Server, group_id: str, node_type: str) -> dict:
+def build_celerity_node_payload(
+    server: Server,
+    group_id: str,
+    node_type: str,
+    obfs_password: str = "",
+) -> dict:
     ip = (server.ip_address or "").strip()
     if not ip:
         raise ValueError("У Server пустой ip_address")
@@ -141,6 +158,12 @@ def build_celerity_node_payload(server: Server, group_id: str, node_type: str) -
     if dom:
         body["domain"] = dom
     body["sni"] = resolve_celerity_node_sni()
+    if obfs_password:
+        # Документация ноды: obfs { type, password } в том же теле, что и нода.
+        # Диапазон без дефиса: скрипт прыжков панели тогда пустой и не зовёт iptables.
+        body["obfs"] = {"type": "salamander", "password": obfs_password}
+        body["portRange"] = "443"
+        body["subscriptionVariants"] = "tls"
     return body
 
 
@@ -150,9 +173,12 @@ def create_celerity_node_or_find(
     group_id: str,
     node_type: str,
     ip: str,
+    obfs_password: str = "",
 ) -> Tuple[bool, str, Any]:
     try:
-        body = build_celerity_node_payload(server, group_id, node_type)
+        body = build_celerity_node_payload(
+            server, group_id, node_type, obfs_password=obfs_password
+        )
     except ValueError as e:
         return False, "", str(e)
 
@@ -323,6 +349,7 @@ def save_hysteria_salamander(
     api: CelerityAPI,
     node_id: str,
     emit: Callable[[str, str], None],
+    password: str = "",
 ) -> Tuple[bool, str]:
     """
     Записывает obfs salamander в карточку ноды. На сервер конфиг не отправляет.
@@ -345,7 +372,7 @@ def save_hysteria_salamander(
         emit("INFO", "Обфускация Salamander уже включена. Пароль не меняю и в лог не пишу.")
         return True, "obfs salamander уже задан"
 
-    password = secrets.token_urlsafe(24)
+    password = password or new_salamander_password()
     ok_put, _err = api.update_node(
         node_id,
         {"obfs": {"type": "salamander", "password": password}},
@@ -519,13 +546,21 @@ def bootstrap_celerity_for_server(
     if salamander:
         _emit("INFO", f"Шаг 1. Ищу в панели сервер {ip}.")
     ok_find, node_id = api.find_node_id_by_ip(ip, node_type)
+    obfs_password = ""
+    if salamander and not ok_find:
+        obfs_password = new_salamander_password()
     if not ok_find:
         if salamander:
-            _emit("INFO", "В панели такой ноды нет. Создаю карточку сервера.")
+            _emit(
+                "INFO",
+                "В панели такой ноды нет. Создаю её одним запросом: карточка, "
+                "обфускация Salamander и пароль из 16 символов. Пароль в лог не пишу. "
+                "Прыжки портов не включаю, нода будет только на 443.",
+            )
         else:
             _emit("DEBUG", "POST /nodes (создание ноды)")
         ok_c, nid, err_c = create_celerity_node_or_find(
-            api, server, group_id, node_type, ip
+            api, server, group_id, node_type, ip, obfs_password=obfs_password
         )
         if not ok_c:
             detail = f"create_node: {err_c!r}"
@@ -551,12 +586,19 @@ def bootstrap_celerity_for_server(
             "Шаг 2. Включаю обфускацию Salamander до установки Hysteria. "
             "Пароль в лог не пишу. Если он уже был задан, оставляю его как есть.",
         )
-        ok_obfs, obfs_detail = save_hysteria_salamander(api, node_id, _emit)
+        ok_obfs, obfs_detail = save_hysteria_salamander(
+            api, node_id, _emit, password=obfs_password
+        )
         if not ok_obfs:
             return False, obfs_detail
 
     sni = resolve_celerity_node_sni()
     node_update: dict = {"sni": sni}
+    if salamander:
+        # Пустой диапазон панель подменяет на 20000-50000 и снова зовёт iptables.
+        # «443» без дефиса скрипт прыжков пропускает.
+        node_update["portRange"] = "443"
+        node_update["subscriptionVariants"] = "tls"
     if init_script:
         node_update["initScript"] = init_script
         if salamander:
@@ -591,7 +633,14 @@ def bootstrap_celerity_for_server(
     )
     logs_text = flatten_setup_logs(data)
     marzban_up = "MARZBAN_NODE_UP" in logs_text
-    if not ok_setup:
+    service_is_up = "Active: active (running)" in logs_text or "server up and running" in logs_text
+    key_denied = (
+        salamander
+        and not service_is_up
+        and "key.pem" in logs_text
+        and "permission denied" in logs_text.lower()
+    )
+    if not ok_setup and not key_denied:
         failed = f"setup_node: {data!r}"
         if marzban_up:
             failed = "MARZBAN_NODE_UP " + failed
@@ -605,13 +654,20 @@ def bootstrap_celerity_for_server(
             )
         _emit("ERROR", failed[:1500])
         return False, failed
+    if salamander and key_denied:
+        _emit(
+            "INFO",
+            "Hysteria установлен, но служба сразу упала: она запущена от пользователя hysteria "
+            "и не может прочитать ключ. Это не обрыв установки. "
+            "Дальше перевожу службу на root и запускаю её снова.",
+        )
 
     pin = _save_pin_from_logs(server, data, sni)
     if salamander:
         _emit(
             "INFO",
-            "Шаг 4. Снимаю отпечаток сертификата и выставляю права на ключ, "
-            "чтобы Hysteria мог его прочитать.",
+            "Шаг 4. В файле службы меняю User и Group с hysteria на root "
+            "и снимаю отпечаток сертификата. После этого панель перезапускает Hysteria.",
         )
     fixed_pin, restart_failed = _pull_pin_via_panel_setup(api, node_id, server, sni, _emit)
     if fixed_pin:
@@ -626,10 +682,11 @@ def bootstrap_celerity_for_server(
             failed = "MARZBAN_NODE_UP " + failed
         if salamander:
             failed = (
-                "Hysteria установлен, но служба не запустилась: у процесса нет права читать ключ сертификата. "
-                "Откройте ноду в Celerity и нажмите «Настроить сервер». "
-                "Если служба снова не поднимется, зайдите на сервер и проверьте файл /etc/hysteria/key.pem. "
-                "Затем снимите галку Celerity у этого сервера и запустите инициализацию снова."
+                "Hysteria установлен, служба переведена на root, но после перезапуска всё равно не поднялась. "
+                "Откройте в панели журнал этой ноды: если там снова permission denied на key.pem, "
+                "зайдите на сервер и проверьте, что в /etc/systemd/system/hysteria-server.service "
+                "стоит User=root и Group=root, затем выполните systemctl daemon-reload и systemctl restart hysteria-server. "
+                "Потом снимите галку Celerity у этого сервера и запустите инициализацию снова."
             )
             _emit("ERROR", failed)
         return False, failed

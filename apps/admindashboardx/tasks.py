@@ -19,12 +19,14 @@ def check_server_health():
         "ping_ok": summary.get("ping_ok", 0),
         "ping_down": summary.get("ping_down", 0),
 
-
-        "chebur_ok": summary.get("chebur_ok", 0),
-        "chebur_down": summary.get("chebur_down", 0),
-        "chebur_no_access": summary.get("chebur_no_access", 0),
-        "chebur_question": summary.get("chebur_question", 0),
     }
+
+
+@shared_task(name="admindashboardx.check_cheburcheck")
+def check_cheburcheck():
+    from apps.admindashboardx.chebur_job import run_chebur_round
+
+    return run_chebur_round()
 
 @shared_task(name="admindashboardx.initialize_server_task")
 def initialize_server_task(server_id: int):

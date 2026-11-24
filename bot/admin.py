@@ -35,6 +35,8 @@ from apps.admindashboardx.panel_health import (
     collect_and_store,
     format_streak,
     get_cached_snapshot,
+
+    overlay_chebur_states,
 )
 from bot.models import *
 from bot.referral_analytics import build_report, excel_response, parse_period, search_referrers
@@ -1024,6 +1026,8 @@ class ServerAdmin(BaseAdmin):
                 checked_at = None
 
         rows = list((snapshot or {}).get("rows") or [])
+        if snapshot is not None:
+            snapshot["chebur_ok"] = not overlay_chebur_states(rows)
         attach_duration_labels(rows)
         paginator = Paginator(rows, 50)
         rows_page = paginator.get_page(request.GET.get("page", 1))

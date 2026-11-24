@@ -58,10 +58,6 @@ class PanelHealthCollectorTests(SimpleTestCase):
         self.addCleanup(patcher.stop)
 
 
-        chebur = patch("apps.admindashboardx.panel_health.probe_addresses", return_value={})
-        chebur.start()
-        self.addCleanup(chebur.stop)
-
     def test_combined_ok_when_both_panels_healthy(self):
         payload = collect_server_panel_health(
             servers=[_server()],
@@ -137,9 +133,6 @@ class ServerPanelHealthViewTests(TestCase):
         patcher = patch("apps.admindashboardx.panel_health._ping_servers", return_value={})
         patcher.start()
         self.addCleanup(patcher.stop)
-        chebur = patch("apps.admindashboardx.panel_health.probe_addresses", return_value={})
-        chebur.start()
-        self.addCleanup(chebur.stop)
         self.user = User.objects.create_user("admintest-health", password="secret123!")
         self.client.login(username="admintest-health", password="secret123!")
 
@@ -179,11 +172,26 @@ class ServerPanelHealthViewTests(TestCase):
         self.assertIsNotNone(cache.get(CACHE_KEY))
 
     def test_get_shows_question_mark_when_scanners_are_silent(self):
+        server = Server.objects.create(
+            hosting="host-a",
+            ip_address="1.1.1.1",
+            is_active=True,
+            is_activated_vless=True,
+            is_c3celeryty_activated=True,
+        )
+        now = timezone.now()
+        ServerHealthState.objects.create(
+            server=server,
+            channel=ServerHealthState.CHANNEL_CHEBUR,
+            status="question",
+            detail="нет ответа сканеров",
+            streak_started_at=now,
+            last_checked_at=now,
+        )
         collect_and_store(
-            servers=[_server()],
+            servers=[server],
             marzban_api=_marzban_api([{"id": 1, "address": "1.1.1.1", "status": "connected"}]),
             celerity_api=_celerity_api([{"_id": "n1", "ip": "1.1.1.1", "status": "online"}]),
-            chebur_hosts={"1.1.1.1": {"status": "question", "detail": "нет ответа сканеров"}},
         )
         response = self.client.get(reverse("admindashboardx:server_panel_health"))
         self.assertContains(response, "❓")
@@ -191,11 +199,26 @@ class ServerPanelHealthViewTests(TestCase):
         self.assertNotContains(response, "Нет доступа к API Cheburcheck")
 
     def test_get_shows_no_access_when_api_is_down(self):
+        server = Server.objects.create(
+            hosting="host-a",
+            ip_address="1.1.1.1",
+            is_active=True,
+            is_activated_vless=True,
+            is_c3celeryty_activated=True,
+        )
+        now = timezone.now()
+        ServerHealthState.objects.create(
+            server=server,
+            channel=ServerHealthState.CHANNEL_CHEBUR,
+            status="no_access",
+            detail="нет доступа",
+            streak_started_at=now,
+            last_checked_at=now,
+        )
         collect_and_store(
-            servers=[_server()],
+            servers=[server],
             marzban_api=_marzban_api([{"id": 1, "address": "1.1.1.1", "status": "connected"}]),
             celerity_api=_celerity_api([{"_id": "n1", "ip": "1.1.1.1", "status": "online"}]),
-            chebur_hosts={"1.1.1.1": {"status": "no_access", "detail": "нет доступа"}},
         )
         response = self.client.get(reverse("admindashboardx:server_panel_health"))
         self.assertContains(response, "⚠️ нет доступа")
@@ -212,7 +235,7 @@ class ServerHealthHistoryTests(TestCase):
             _celerity_api([{"_id": "n1", "ip": "10.0.0.8", "status": celerity_status}]),
         )
 
-    def _store(self, server, ping_status="ok", panel_ok=True, chebur_status="ok"):
+    def _store(self, server, ping_status="ok", panel_ok=True):
         if panel_ok:
             marzban, celerity = self._apis()
         else:
@@ -221,19 +244,11 @@ class ServerHealthHistoryTests(TestCase):
             marzban.list_nodes.return_value = (False, "timeout")
             celerity = self._apis()[1]
         ping = {"10.0.0.8": {"status": ping_status, "detail": "доступен" if ping_status == "ok" else "недоступен", "ping_ms": 12 if ping_status == "ok" else None}}
-        chebur_detail = {
-            "ok": "доступен",
-            "down": "ТСПУ",
-            "question": "нет ответа сканеров",
-            "no_access": "нет доступа",
-        }
-        chebur = {"10.0.0.8": {"status": chebur_status, "detail": chebur_detail.get(chebur_status, "")}}
         return collect_and_store(
             servers=[server],
             marzban_api=marzban,
             celerity_api=celerity,
             ping_hosts=ping,
-            chebur_hosts=chebur,
         )
 
     def test_streak_holds_and_resets(self):
@@ -267,24 +282,10 @@ class ServerHealthHistoryTests(TestCase):
         self.assertEqual(panel_state.streak_started_at, panel_started)
         latest = server.health_samples.order_by("-id").first()
         self.assertEqual(latest.panel_status, "unknown")
-
-    def test_chebur_question_replaces_previous_ok(self):
-        server = Server.objects.create(
-            hosting="Zomro DE1",
-            ip_address="10.0.0.8",
-            is_activated_vless=True,
-            is_c3celeryty_activated=True,
+        self.assertEqual(latest.chebur_status, "")
+        self.assertFalse(
+            ServerHealthState.objects.filter(server=server, channel=ServerHealthState.CHANNEL_CHEBUR).exists()
         )
-        self._store(server)
-        state = ServerHealthState.objects.get(server=server, channel=ServerHealthState.CHANNEL_CHEBUR)
-        self.assertEqual(state.status, "ok")
-        self._store(server, chebur_status="question")
-        state.refresh_from_db()
-        self.assertEqual(state.status, "question")
-        self.assertEqual(state.detail, "нет ответа сканеров")
-        latest = server.health_samples.order_by("-id").first()
-        self.assertEqual(latest.chebur_status, "question")
-        self.assertEqual(latest.chebur_detail, "нет ответа сканеров")
 
     def test_purge_keeps_only_seven_days(self):
         server = Server.objects.create(hosting="old", ip_address="10.0.0.9")

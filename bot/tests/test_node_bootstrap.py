@@ -5,10 +5,12 @@ from django.test import SimpleTestCase, override_settings
 
 
 from bot.main.celerity_node_bootstrap import (
+
+    HYSTERIA_PIN_INIT_SCRIPT,
     bootstrap_celerity_for_server,
     build_celerity_node_payload,
-
     ensure_hysteria_salamander,
+    new_salamander_password,
 
     generated_config_has_salamander,
     hysteria_restart_looks_failed,
@@ -70,6 +72,20 @@ class CeleritySniTests(SimpleTestCase):
         body = build_celerity_node_payload(_Server(), "group-1", "hysteria")
         self.assertEqual(body["sni"], "bing.com")
         self.assertNotIn("domain", body)
+        self.assertNotIn("obfs", body)
+
+    def test_role_payload_sends_obfs_with_the_node_and_disables_hopping(self):
+        password = new_salamander_password()
+        body = build_celerity_node_payload(
+            _Server(), "group-1", "hysteria", obfs_password=password
+        )
+        self.assertEqual(len(password), 16)
+        self.assertTrue(password.isalnum())
+        self.assertEqual(body["obfs"], {"type": "salamander", "password": password})
+        self.assertEqual(body["portRange"], "443")
+        self.assertEqual(body["subscriptionVariants"], "tls")
+        self.assertIn("User=root", HYSTERIA_PIN_INIT_SCRIPT)
+        self.assertIn("Group=root", HYSTERIA_PIN_INIT_SCRIPT)
 
 
 class _Api:
@@ -215,7 +231,8 @@ class HysteriaSalamanderTests(SimpleTestCase):
         self.assertTrue(ok)
         self.assertEqual(api.updates[0]["obfs"]["type"], "salamander")
         password = api.updates[0]["obfs"]["password"]
-        self.assertTrue(password)
+        self.assertEqual(len(password), 16)
+        self.assertTrue(password.isalnum())
         self.assertNotIn(password, detail)
         self.assertNotIn(password, " ".join(notes))
         self.assertEqual(api.config_calls, 1)
@@ -298,6 +315,37 @@ class HysteriaSalamanderTests(SimpleTestCase):
         self.assertNotIn("keep-me", detail)
         mark.assert_not_called()
         self.assertEqual(api.updates[0].get("obfs"), None)
+        self.assertTrue(any(item.get("portRange") == "443" for item in api.updates))
+
+    @patch("bot.main.celerity_node_bootstrap._celerity_group_id", return_value="g1")
+    @patch("bot.main.celerity_node_bootstrap.mark_server_c3_activated")
+    @patch("bot.main.celerity_node_bootstrap.save_hysteria_tls_meta_to_server")
+    @patch(
+        "bot.main.celerity_node_bootstrap.try_sync_hysteria_tls_meta_after_setup",
+        return_value=True,
+    )
+    def test_key_permission_denied_switches_service_to_root_and_continues(
+        self, _sync, _save_pin, mark, _group
+    ):
+        api = _SalamanderApi([
+            {"obfs": {"type": "salamander", "password": "keep-me"}},
+        ])
+        api.setups = [
+            (False, {"logs": [
+                "FATAL failed to load server config tls.key: open /etc/hysteria/key.pem: permission denied",
+                "Active: failed",
+            ]}),
+            (True, {"logs": [
+                "Active: active (running)",
+                "HYSTERIA_KEY_READABLE",
+                "HYSTERIA_PIN_SHA256=" + ("ab" * 32),
+            ]}),
+        ]
+        ok, detail = bootstrap_celerity_for_server(_Server(), api=api, salamander=True)
+        self.assertTrue(ok)
+        self.assertNotIn("keep-me", detail)
+        mark.assert_called_once()
+        self.assertEqual(api.setups, [])
 
     def test_generated_config_requires_salamander_line(self):
         self.assertTrue(generated_config_has_salamander("obfs:\n  type: salamander\n"))

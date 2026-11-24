@@ -59,7 +59,9 @@ class Command(BaseCommand):
         if not ips:
             raise CommandError("Укажите IP, --server-id или --limit.")
 
-        results = probe_addresses(ips, trace=self.stdout.write)
+
+        gap = 40 if len(ips) > 1 else 0
+        results = probe_addresses(ips, trace=self.stdout.write, gap=gap)
         self.stdout.write("")
         self.stdout.write("сводка")
         for ip, item in results.items():

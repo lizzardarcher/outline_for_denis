@@ -53,7 +53,8 @@ from .manual_task_log_cleanup import (
 from .models import ManualTaskRun, ManualTaskLog
 
 
-from .panel_health import attach_duration_labels, collect_and_store, get_cached_snapshot
+
+from .panel_health import attach_duration_labels, collect_and_store, get_cached_snapshot, overlay_chebur_states
 
 class ServerForm(forms.ModelForm):
 
@@ -1787,6 +1788,8 @@ class ServerPanelHealthView(DashboardBaseView):
             except ValueError:
                 checked_at = None
         rows = list((snapshot or {}).get("rows") or [])
+        if snapshot is not None:
+            snapshot["chebur_ok"] = not overlay_chebur_states(rows)
         attach_duration_labels(rows)
 
         if query:

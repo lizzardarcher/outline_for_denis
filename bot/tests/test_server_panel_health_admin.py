@@ -6,7 +6,8 @@ from django.utils import timezone
 from unittest.mock import patch
 
 
-from apps.admindashboardx.models import ServerHealthSample
+
+from apps.admindashboardx.models import ServerHealthSample, ServerHealthState
 from apps.admindashboardx.panel_health import CACHE_KEY, collect_and_store
 from apps.admindashboardx.tests.test_panel_health import _celerity_api, _marzban_api, _server
 from bot.models import Server
@@ -28,11 +29,6 @@ class ServerPanelHealthAdminTests(TestCase):
         patcher = patch("apps.admindashboardx.panel_health._ping_servers", return_value={})
         patcher.start()
         self.addCleanup(patcher.stop)
-
-
-        chebur = patch("apps.admindashboardx.panel_health.probe_addresses", return_value={})
-        chebur.start()
-        self.addCleanup(chebur.stop)
         self.admin_user = User.objects.create_user(
             "admin-health",
             password="secret123!",
@@ -125,12 +121,28 @@ class ServerPanelHealthAdminTests(TestCase):
 
     def test_health_log_shows_question_mark_for_silent_scanners(self):
         server = Server.objects.create(hosting="Zomro DE2", ip_address="10.1.1.2", is_active=True)
+        now = timezone.now()
+        ServerHealthState.objects.create(
+            server=server,
+            channel=ServerHealthState.CHANNEL_CHEBUR,
+            status="question",
+            detail="нет ответа сканеров",
+            streak_started_at=now,
+            last_checked_at=now,
+        )
+        ServerHealthSample.objects.create(
+            server=server,
+            checked_at=now,
+            panel_status="",
+            ping_status="",
+            chebur_status="question",
+            chebur_detail="нет ответа сканеров",
+        )
         collect_and_store(
             servers=[server],
             marzban_api=_marzban_api([{"id": 1, "address": "10.1.1.2", "status": "connected"}]),
             celerity_api=_celerity_api([{"_id": "n1", "ip": "10.1.1.2", "status": "online"}]),
             ping_hosts={"10.1.1.2": {"status": "ok", "detail": "доступен", "ping_ms": 9}},
-            chebur_hosts={"10.1.1.2": {"status": "question", "detail": "нет ответа сканеров"}},
         )
         response = self.client.get(reverse("admin:bot_server_panel_health"))
         self.assertContains(response, "❓")
@@ -140,12 +152,20 @@ class ServerPanelHealthAdminTests(TestCase):
 
     def test_health_page_shows_no_access_when_api_is_down(self):
         server = Server.objects.create(hosting="Zomro DE3", ip_address="10.1.1.3", is_active=True)
+        now = timezone.now()
+        ServerHealthState.objects.create(
+            server=server,
+            channel=ServerHealthState.CHANNEL_CHEBUR,
+            status="no_access",
+            detail="нет доступа",
+            streak_started_at=now,
+            last_checked_at=now,
+        )
         collect_and_store(
             servers=[server],
             marzban_api=_marzban_api([{"id": 1, "address": "10.1.1.3", "status": "connected"}]),
             celerity_api=_celerity_api([{"_id": "n1", "ip": "10.1.1.3", "status": "online"}]),
             ping_hosts={"10.1.1.3": {"status": "ok", "detail": "доступен", "ping_ms": 9}},
-            chebur_hosts={"10.1.1.3": {"status": "no_access", "detail": "нет доступа"}},
         )
         response = self.client.get(reverse("admin:bot_server_panel_health"))
         self.assertContains(response, "⚠️ нет доступа")

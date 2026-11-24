@@ -41,7 +41,8 @@ _NO_ACCESS = {"status": STATUS_NO_ACCESS, "detail": "нет доступа"}
 _QUESTION = {"status": STATUS_QUESTION, "detail": "нет ответа сканеров"}
 
 
-def probe_addresses(ips: Sequence[str], trace=None) -> Dict[str, dict]:
+
+def probe_addresses(ips: Sequence[str], trace=None, gap: int = 0, sleep=None) -> Dict[str, dict]:
     unique: List[str] = []
     seen = set()
     for raw in ips:
@@ -66,7 +67,10 @@ def probe_addresses(ips: Sequence[str], trace=None) -> Dict[str, dict]:
             _trace_credits(session, base, token, trace)
         results: Dict[str, dict] = {}
         api_down = False
-        for ip in unique:
+        for index, ip in enumerate(unique):
+            if index and gap and not api_down:
+                _say(trace, f"пауза {gap} с")
+                (sleep or _default_sleep)(gap)
             _say(trace, f"--- {ip}")
             if api_down:
                 _say(trace, "пропуск: API уже недоступен")
@@ -81,6 +85,12 @@ def probe_addresses(ips: Sequence[str], trace=None) -> Dict[str, dict]:
         return results
     finally:
         session.close()
+
+
+def _default_sleep(seconds: float) -> None:
+    import time
+
+    time.sleep(seconds)
 
 
 def _say(trace, message: str) -> None:

@@ -1,4 +1,6 @@
 
+
+from datetime import timedelta
 from unittest.mock import MagicMock, patch
 
 import requests
@@ -203,27 +205,179 @@ class CheburcheckClientTests(SimpleTestCase):
 
 
 class CheburcheckHealthTaskTests(SimpleTestCase):
-    def test_task_returns_chebur_counts(self):
+    def test_main_health_task_does_not_report_chebur(self):
         payload = {
             "checked_at": "2026-11-23T12:00:00+00:00",
-            "summary": {
-                "servers": 3,
-                "ok": 2,
-                "down": 1,
-                "ping_ok": 2,
-                "ping_down": 1,
-                "chebur_ok": 1,
-                "chebur_down": 1,
-                "chebur_no_access": 0,
-                "chebur_question": 1,
-            },
+            "summary": {"servers": 1, "ok": 1, "down": 0, "ping_ok": 1, "ping_down": 0},
         }
         with patch("apps.admindashboardx.panel_health.collect_and_store", return_value=payload):
             result = check_server_health()
-        self.assertEqual(result["chebur_ok"], 1)
-        self.assertEqual(result["chebur_down"], 1)
-        self.assertEqual(result["chebur_question"], 1)
-        self.assertEqual(result["chebur_no_access"], 0)
+        self.assertNotIn("chebur_ok", result)
+
+    def test_chebur_task_runs_separate_round(self):
+        from apps.admindashboardx.tasks import check_cheburcheck
+
+        with patch("apps.admindashboardx.chebur_job.run_chebur_round", return_value={"checked": 2}) as mocked:
+            result = check_cheburcheck()
+        mocked.assert_called_once_with()
+        self.assertEqual(result["checked"], 2)
+
+
+class Clock:
+    def __init__(self):
+        self.t = 0.0
+        self.slept = []
+
+    def monotonic(self):
+        return self.t
+
+    def sleep(self, seconds):
+        self.slept.append(seconds)
+        self.t += seconds
+
+
+class CheburRoundTests(TestCase):
+    def _server(self, ip, hosting="node"):
+        return Server.objects.create(hosting=hosting, ip_address=ip, is_active=True)
+
+    def test_checks_oldest_first_and_stops_before_next_window(self):
+        from apps.admindashboardx.chebur_job import run_chebur_round
+
+        never = self._server("10.0.0.3", "never")
+        older = self._server("10.0.0.1", "older")
+        fresh = self._server("10.0.0.2", "fresh")
+        now = timezone.now()
+        ServerHealthState.objects.create(
+            server=older,
+            channel=ServerHealthState.CHANNEL_CHEBUR,
+            status="ok",
+            detail="доступен",
+            streak_started_at=now - timedelta(hours=2),
+            last_checked_at=now - timedelta(hours=2),
+        )
+        ServerHealthState.objects.create(
+            server=fresh,
+            channel=ServerHealthState.CHANNEL_CHEBUR,
+            status="ok",
+            detail="доступен",
+            streak_started_at=now,
+            last_checked_at=now,
+        )
+        seen = []
+        clock = Clock()
+
+        def probe(ip):
+            seen.append(ip)
+            return {"status": "question", "detail": "нет ответа сканеров"}
+
+        result = run_chebur_round(
+            servers=[fresh, older, never],
+            probe_one=probe,
+            sleep=clock.sleep,
+            monotonic=clock.monotonic,
+            gap=40,
+            window=40,
+            buffer=40,
+        )
+        self.assertEqual(seen, ["10.0.0.3"])
+        self.assertEqual(clock.slept, [])
+        self.assertEqual(result["checked"], 1)
+        self.assertEqual(result["skipped"], 2)
+        state = ServerHealthState.objects.get(server=never, channel=ServerHealthState.CHANNEL_CHEBUR)
+        self.assertEqual(state.status, "question")
+
+    def test_gap_is_forty_seconds_between_nodes(self):
+        from apps.admindashboardx.chebur_job import run_chebur_round
+
+        first = self._server("10.1.0.1")
+        second = self._server("10.1.0.2")
+        clock = Clock()
+        run_chebur_round(
+            servers=[first, second],
+            probe_one=lambda ip: {"status": "ok", "detail": "доступен"},
+            sleep=clock.sleep,
+            monotonic=clock.monotonic,
+            gap=40,
+            window=30 * 60,
+            buffer=120,
+        )
+        self.assertEqual(clock.slept, [40])
+        self.assertEqual(
+            ServerHealthState.objects.filter(channel=ServerHealthState.CHANNEL_CHEBUR).count(),
+            2,
+        )
+
+    def test_same_ip_is_one_request(self):
+        from apps.admindashboardx.chebur_job import run_chebur_round
+
+        first = self._server("10.2.0.1", "a")
+        second = self._server("10.2.0.1", "b")
+        seen = []
+
+        def probe(ip):
+            seen.append(ip)
+            return {"status": "down", "detail": "ТСПУ"}
+
+        run_chebur_round(
+            servers=[first, second],
+            probe_one=probe,
+            sleep=lambda _seconds: None,
+            monotonic=lambda: 0,
+            gap=40,
+            window=100,
+            buffer=0,
+        )
+        self.assertEqual(seen, ["10.2.0.1"])
+        self.assertEqual(
+            ServerHealthState.objects.filter(status="down", channel=ServerHealthState.CHANNEL_CHEBUR).count(),
+            2,
+        )
+
+    def test_api_error_stops_the_round(self):
+        from apps.admindashboardx.chebur_job import run_chebur_round
+        from apps.admindashboardx.cheburcheck import CheburcheckUnavailable
+
+        first = self._server("10.3.0.1")
+        second = self._server("10.3.0.2")
+        seen = []
+
+        def probe(ip):
+            seen.append(ip)
+            raise CheburcheckUnavailable("429")
+
+        result = run_chebur_round(
+            servers=[first, second],
+            probe_one=probe,
+            sleep=lambda _seconds: None,
+            monotonic=lambda: 0,
+            gap=40,
+            window=300,
+            buffer=0,
+        )
+        self.assertEqual(seen, ["10.3.0.1"])
+        self.assertTrue(result["api_down"])
+        self.assertEqual(result["skipped"], 1)
+        self.assertEqual(
+            ServerHealthState.objects.get(server=first, channel=ServerHealthState.CHANNEL_CHEBUR).status,
+            "no_access",
+        )
+        self.assertFalse(
+            ServerHealthState.objects.filter(server=second, channel=ServerHealthState.CHANNEL_CHEBUR).exists()
+        )
+
+    def test_preflight_failure_marks_every_node(self):
+        from apps.admindashboardx.chebur_job import PreflightFailed, run_chebur_round
+
+        first = self._server("10.4.0.1")
+        second = self._server("10.4.0.2")
+        with patch("apps.admindashboardx.chebur_job._LiveProbe", side_effect=PreflightFailed("down")):
+            result = run_chebur_round(servers=[first, second])
+        self.assertTrue(result["api_down"])
+        self.assertEqual(result["no_access"], 2)
+        self.assertEqual(
+            ServerHealthState.objects.filter(status="no_access", channel=ServerHealthState.CHANNEL_CHEBUR).count(),
+            2,
+        )
 
 
 class CheburcheckKeyIssueTests(TestCase):

@@ -1,12 +1,12 @@
 
 
-"""Снимок доступности VPN-серверов: панели Marzban/Celerity, ICMP ping и Cheburcheck.
 
+"""Снимок доступности VPN-серверов: панели Marzban/Celerity и ICMP ping.
 
 Каждые 30 минут (и по кнопке) пишется проба. История хранится 7 дней.
 Длительность статуса считается по непрерывной серии и не сбрасывается,
 если панель или ping один раз не ответили (unknown).
-Cheburcheck пишется отдельным каналом и на выдачу ключей не влияет.
+Cheburcheck сюда не входит: его пишет отдельная задача и на выдачу ключей он не влияет.
 """
 from __future__ import annotations
 
@@ -23,7 +23,6 @@ from django.core.cache import cache
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 
-from apps.admindashboardx.cheburcheck import probe_addresses
 from bot.models import Server
 
 
@@ -78,13 +77,12 @@ def get_cached_snapshot() -> Optional[dict]:
     return None
 
 
-def collect_and_store(*, marzban_api=None, celerity_api=None, servers=None, ping_hosts=None, chebur_hosts=None) -> dict:
+def collect_and_store(*, marzban_api=None, celerity_api=None, servers=None, ping_hosts=None) -> dict:
     payload = collect_server_panel_health(
         marzban_api=marzban_api,
         celerity_api=celerity_api,
         servers=servers,
         ping_hosts=ping_hosts,
-        chebur_hosts=chebur_hosts,
     )
     _persist_health(payload)
     purge_old_health_samples()
@@ -92,7 +90,7 @@ def collect_and_store(*, marzban_api=None, celerity_api=None, servers=None, ping
     return payload
 
 
-def collect_server_panel_health(*, marzban_api=None, celerity_api=None, servers=None, ping_hosts=None, chebur_hosts=None) -> dict:
+def collect_server_panel_health(*, marzban_api=None, celerity_api=None, servers=None, ping_hosts=None) -> dict:
     checked_at = timezone.now()
     server_rows = list(servers) if servers is not None else _load_servers()
 
@@ -100,14 +98,10 @@ def collect_server_panel_health(*, marzban_api=None, celerity_api=None, servers=
     celerity = _fetch_celerity_nodes(celerity_api)
     panels_ok = bool(marzban.get("ok")) and bool(celerity.get("ok"))
     ping_map = ping_hosts if ping_hosts is not None else _ping_servers(server_rows)
-    if chebur_hosts is None:
-        chebur_map = probe_addresses([(getattr(server, "ip_address", None) or "") for server in server_rows])
-    else:
-        chebur_map = chebur_hosts
 
     rows = []
     for server in server_rows:
-        rows.append(_build_row(server, marzban, celerity, ping_map, chebur_map))
+        rows.append(_build_row(server, marzban, celerity, ping_map))
 
     rows.sort(
         key=lambda row: (
@@ -120,16 +114,9 @@ def collect_server_panel_health(*, marzban_api=None, celerity_api=None, servers=
 
     counts = _summary_counts(rows)
 
-    chebur_ok = all(
-        row.get("chebur_status") != STATUS_NO_ACCESS
-        for row in rows
-        if row.get("ip_address")
-    )
-
     return {
         "checked_at": checked_at.isoformat(),
         "panels_ok": panels_ok,
-        "chebur_ok": chebur_ok,
         "summary": counts,
         "rows": rows,
     }
@@ -288,7 +275,7 @@ def _country_label(server) -> str:
     return (getattr(country, "name_for_app", None) or getattr(country, "name", None) or "").strip()
 
 
-def _build_row(server, marzban: Mapping[str, Any], celerity: Mapping[str, Any], ping_map: Mapping[str, Any], chebur_map: Mapping[str, Any]) -> dict:
+def _build_row(server, marzban: Mapping[str, Any], celerity: Mapping[str, Any], ping_map: Mapping[str, Any]) -> dict:
     ip = (getattr(server, "ip_address", None) or "").strip()
     expect_marzban = bool(getattr(server, "is_activated_vless", False))
     expect_celerity = bool(getattr(server, "is_c3celeryty_activated", False))
@@ -308,7 +295,6 @@ def _build_row(server, marzban: Mapping[str, Any], celerity: Mapping[str, Any], 
         )
 
     ping_status, ping_detail, ping_ms = _ping_result_for(ip, ping_map)
-    chebur_status, chebur_detail = _chebur_result_for(ip, chebur_map)
 
     return {
         "server_id": getattr(server, "pk", None) or getattr(server, "id", None),
@@ -323,8 +309,6 @@ def _build_row(server, marzban: Mapping[str, Any], celerity: Mapping[str, Any], 
         "ping_status": ping_status,
         "ping_detail": ping_detail,
         "ping_ms": ping_ms,
-        "chebur_status": chebur_status,
-        "chebur_detail": chebur_detail,
     }
 
 
@@ -339,12 +323,6 @@ def _summary_counts(rows: Sequence[Mapping[str, Any]]) -> dict:
         "ping_down": 0,
         "ping_unknown": 0,
         "ping_idle": 0,
-        "chebur_ok": 0,
-        "chebur_down": 0,
-        "chebur_unknown": 0,
-        "chebur_idle": 0,
-        "chebur_no_access": 0,
-        "chebur_question": 0,
     }
     for row in rows:
         key = row.get("status")
@@ -353,9 +331,6 @@ def _summary_counts(rows: Sequence[Mapping[str, Any]]) -> dict:
         ping_key = "ping_" + str(row.get("ping_status") or "")
         if ping_key in counts:
             counts[ping_key] += 1
-        chebur_key = "chebur_" + str(row.get("chebur_status") or "")
-        if chebur_key in counts:
-            counts[chebur_key] += 1
     return counts
 
 
@@ -376,15 +351,30 @@ def _ping_result_for(ip: str, ping_map: Mapping[str, Any]) -> Tuple[str, str, Op
     return status, detail, ping_ms
 
 
-def _chebur_result_for(ip: str, chebur_map: Mapping[str, Any]) -> Tuple[str, str]:
-    if not ip:
-        return STATUS_IDLE, "нет IP"
-    item = chebur_map.get(ip) if chebur_map else None
-    if not isinstance(item, Mapping):
-        return STATUS_NO_ACCESS, "нет доступа"
-    status = str(item.get("status") or STATUS_NO_ACCESS)
-    detail = str(item.get("detail") or "")
-    return status, detail
+def overlay_chebur_states(rows: Sequence[dict]) -> bool:
+    """Подмешать сохранённый статус Cheburcheck. True, если у кого-то нет доступа к API."""
+    from apps.admindashboardx.models import ServerHealthState
+
+    ids = [row.get("server_id") for row in rows if row.get("server_id")]
+    states = {
+        item.server_id: item
+        for item in ServerHealthState.objects.filter(
+            server_id__in=ids,
+            channel=ServerHealthState.CHANNEL_CHEBUR,
+        )
+    }
+    api_down = False
+    for row in rows:
+        state = states.get(row.get("server_id"))
+        if state is None:
+            row["chebur_status"] = ""
+            row["chebur_detail"] = ""
+            row["chebur_streak_started_at"] = None
+            continue
+        _apply_state_to_row(row, "chebur", state)
+        if row.get("ip_address") and state.status == STATUS_NO_ACCESS:
+            api_down = True
+    return api_down
 
 
 def _ping_servers(servers: Sequence[Any]) -> Dict[str, dict]:
@@ -504,8 +494,6 @@ def _persist_health(payload: dict) -> None:
                 ping_status=row.get("ping_status") or STATUS_UNKNOWN,
                 ping_detail=(row.get("ping_detail") or "")[:300],
                 ping_ms=row.get("ping_ms"),
-                chebur_status=row.get("chebur_status") or STATUS_NO_ACCESS,
-                chebur_detail=(row.get("chebur_detail") or "")[:300],
             )
         )
         panel_state = _upsert_state(
@@ -524,17 +512,8 @@ def _persist_health(payload: dict) -> None:
             row.get("ping_detail") or "",
             checked_at,
         )
-        chebur_state = _upsert_state(
-            ServerHealthState,
-            server_id,
-            ServerHealthState.CHANNEL_CHEBUR,
-            row.get("chebur_status") or STATUS_NO_ACCESS,
-            row.get("chebur_detail") or "",
-            checked_at,
-        )
         _apply_state_to_row(row, "panel", panel_state)
         _apply_state_to_row(row, "ping", ping_state)
-        _apply_state_to_row(row, "chebur", chebur_state)
         row["status"] = row["panel_status"]
         row["detail"] = row["panel_detail"]
     if samples:
