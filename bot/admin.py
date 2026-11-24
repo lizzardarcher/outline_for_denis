@@ -22,7 +22,8 @@ from django.shortcuts import get_object_or_404, redirect, render
 
 from django.urls import path
 from django.utils import timezone
-from django.utils.html import format_html
+
+from django.utils.html import format_html, format_html_join
 from django_celery_beat.models import *
 from django_admin_inline_paginator.admin import TabularInlinePaginated
 
@@ -941,9 +942,23 @@ class ServerAdmin(BaseAdmin):
             return False
         return None
 
-    @admin.display(description='Протокол')
+    _PROTOCOL_LINKS = (
+        (Server.NODE_ROLE_OUTLINE, "SS", "https://mvless.ru/dashboard/#/", "#3d8bfd"),
+        (Server.NODE_ROLE_VLESS, "VLESS", "https://mvless.ru/dashboard/#/", "#2ecc71"),
+        (Server.NODE_ROLE_HYSTERIA2, "Hysteria", "https://dom-tunnel.ru/panel", "#f0a202"),
+    )
+
+    @admin.display(description="Протоколы")
     def node_role_label(self, obj):
-        return obj.get_node_role_display()
+        role = (obj.node_role or "").strip()
+        chosen = [item for item in self._PROTOCOL_LINKS if item[0] == role]
+        links = chosen or self._PROTOCOL_LINKS
+        return format_html_join(
+            " ",
+            '<a href="{}" target="_blank" rel="noopener" '
+            'style="color:{};font-size:1.15rem;font-weight:700;text-decoration:none;">{}</a>',
+            ((url, color, label) for _role, label, url, color in links),
+        )
 
     list_display = (
         'hosting', 'country', 'ip_address', 'user', 'password', 'is_active',

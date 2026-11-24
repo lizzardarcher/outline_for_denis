@@ -190,6 +190,30 @@ class DjangoAdminServerAddTests(TestCase):
         self.assertNotIn("node_role", self.admin.get_readonly_fields(self.request, obj=None))
 
 
+
+    def test_protocol_column_links_to_panels(self):
+        ss = str(self.admin.node_role_label(Server(node_role=Server.NODE_ROLE_OUTLINE)))
+        self.assertIn("https://mvless.ru/dashboard/#/", ss)
+        self.assertIn(">SS<", ss)
+        self.assertNotIn("dom-tunnel.ru", ss)
+
+        vless = str(self.admin.node_role_label(Server(node_role=Server.NODE_ROLE_VLESS)))
+        self.assertIn("https://mvless.ru/dashboard/#/", vless)
+        self.assertIn(">VLESS<", vless)
+        self.assertNotIn("dom-tunnel.ru", vless)
+
+        hysteria = str(self.admin.node_role_label(Server(node_role=Server.NODE_ROLE_HYSTERIA2)))
+        self.assertIn("https://dom-tunnel.ru/panel", hysteria)
+        self.assertIn(">Hysteria<", hysteria)
+        self.assertNotIn("mvless.ru", hysteria)
+
+        legacy = str(self.admin.node_role_label(Server(node_role="")))
+        self.assertEqual(legacy.count("https://mvless.ru/dashboard/#/"), 2)
+        self.assertIn("https://dom-tunnel.ru/panel", legacy)
+        self.assertIn(">SS<", legacy)
+        self.assertIn(">VLESS<", legacy)
+        self.assertIn(">Hysteria<", legacy)
+
     def test_list_shows_panel_availability_after_active_flag(self):
         self.assertEqual(
             self.admin.list_display[self.admin.list_display.index("is_active") + 1],
