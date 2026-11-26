@@ -16,7 +16,9 @@ from typing import Callable, Optional, Tuple
 import paramiko
 from django.conf import settings
 
+
 from bot.main.MarzbanAPI import MarzbanAPI
+from bot.main.node_firewall import build_ufw_commands
 from bot.models import Server
 
 _SERVER_PASSWORD_PLACEHOLDERS = frozenset(("", "<PASSWORD>"))
@@ -278,6 +280,7 @@ def bootstrap_marzban_for_server(
     api: Optional[MarzbanAPI] = None,
     log_fn: Optional[Callable[[str, str], None]] = None,
     cert_pem: Optional[str] = None,
+    firewall_role: str = "",
 ) -> Tuple[bool, str]:
     """
     SSH-установка marzban-node и POST /node.
@@ -305,8 +308,15 @@ def bootstrap_marzban_for_server(
         script = build_marzban_node_install_script(pem)
     except Exception as exc:
         return False, str(exc)
+    role = (firewall_role or "").strip()
+    if role:
+        script = script.replace(
+            "export DEBIAN_FRONTEND=noninteractive\n",
+            "export DEBIAN_FRONTEND=noninteractive\n\n" + build_ufw_commands(role) + "\n",
+            1,
+        )
 
-    _emit("DEBUG", f"SSH установка marzban-node на {ip} (cert: {source})")
+    _emit("INFO", f"Ставлю marzban-node по SSH на {ip} и затем зарегистрирую ноду в Marzban.")
     try:
         client = _ssh_connect(server)
         try:

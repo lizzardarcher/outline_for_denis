@@ -12,15 +12,10 @@ from __future__ import annotations
 
 from django.db.models import Q
 
-from bot.main.celerity_node_bootstrap import (
-    bootstrap_celerity_for_server,
-    run_setup_init_script,
-
-    setup_response_pending,
-    wait_for_marzban_node,
-)
-from bot.main.CelerityAPI import CelerityAPI
+from bot.main.celerity_node_bootstrap import bootstrap_celerity_for_server
 from bot.main.marzban_node_bootstrap import (
+
+    bootstrap_marzban_for_server,
     build_marzban_node_install_script,
     load_marzban_client_cert,
     register_marzban_node,
@@ -164,68 +159,12 @@ def _provision_hysteria_role(server: Server, *, log_prefix: str) -> None:
 
 
 def _provision_marzban_role(server: Server, role: str, *, log_prefix: str) -> None:
+    """SS и VLESS ставятся на сам VPS по SSH и регистрируются в Marzban."""
     _log = _role_logger(server, log_prefix, "ss/vless")
-    try:
-        cert_pem, source = load_marzban_client_cert()
-        marzban_script = build_marzban_node_install_script(cert_pem)
-        init_script = build_role_init_script(role, marzban_script)
-    except Exception as exc:
-        _log("ERROR", f"нет client certificate или скрипта: {exc}")
-        return
-
-    _log("DEBUG", f"ufw и marzban-node через SSH панели Celerity (cert: {source})")
-    api = CelerityAPI()
-    _ok, detail, node_id = run_setup_init_script(
+    ok, detail = bootstrap_marzban_for_server(
         server,
-        init_script,
-        api=api,
-        setup_timeout=900,
         log_fn=_log,
+        firewall_role=role,
     )
-    if "MARZBAN_NODE_UP" not in (detail or ""):
-        confirmed = False
-        if setup_response_pending(detail):
-            _log("DEBUG", "setup не вернул маркер, жду окончание установки")
-            confirmed, detail, waited_id = wait_for_marzban_node(server, api=api, log_fn=_log)
-            if waited_id:
-                node_id = waited_id
-        if not confirmed and "MARZBAN_NODE_UP" not in (detail or ""):
-            _log("DEBUG", "повторная установка marzban-node")
-            _ok, detail, retry_id = run_setup_init_script(
-                server,
-                init_script,
-                api=api,
-                setup_timeout=900,
-                log_fn=_log,
-            )
-            if retry_id:
-                node_id = retry_id
-            if "MARZBAN_NODE_UP" not in (detail or "") and setup_response_pending(detail):
-                confirmed, detail, waited_id = wait_for_marzban_node(
-                    server,
-                    api=api,
-                    attempts=8,
-                    log_fn=_log,
-                )
-                if waited_id:
-                    node_id = waited_id
-            else:
-                confirmed = "MARZBAN_NODE_UP" in (detail or "")
-    if node_id:
-        deleted, delete_detail = api.delete_node(node_id)
-        if deleted:
-            _log("DEBUG", "временная нода Celerity удалена")
-        else:
-            _log("ERROR", f"не удалось удалить временную ноду Celerity: {delete_detail!r}"[:1500])
-
-    if "MARZBAN_NODE_UP" not in (detail or ""):
-        _log("ERROR", "marzban-node не подтверждён (в логе setup нет MARZBAN_NODE_UP)")
-        return
-
-    ok_reg, reg_detail = register_marzban_node(server)
-    if not ok_reg:
-        _log("ERROR", str(reg_detail)[:1500])
-        return
-    server.is_activated_vless = True
-    server.save(update_fields=["is_activated_vless"])
-    _log("INFO", f"готово: {reg_detail}")
+    if not ok:
+        _log("ERROR", str(detail)[:1500])
