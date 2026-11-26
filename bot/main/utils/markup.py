@@ -44,11 +44,12 @@ def start(user: TelegramUser = None):
     return markup
 
 
+
 def choose_protocol(user: TelegramUser = None):
     markup = InlineKeyboardMarkup()
+    markup.add(InlineKeyboardButton(text="⚡ Hysteria2", callback_data="protocol_hysteria2"))
     markup.add(InlineKeyboardButton(text=f'🚀 VLESS', callback_data=f'protocol_vless'))
     markup.add(InlineKeyboardButton(text=f'🔑 OUTLINE', callback_data=f'protocol_outline'))
-    markup.add(InlineKeyboardButton(text="⚡ Hysteria2", callback_data="protocol_hysteria2"))
     markup.add(btn_back)
     return markup
 
