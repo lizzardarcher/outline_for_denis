@@ -46,6 +46,11 @@ class UfwRoleScriptTests(SimpleTestCase):
         self.assertNotIn("1080/tcp", rules)
         self.assertNotIn("62050/tcp", rules)
 
+        script = build_role_init_script("hysteria2")
+        self.assertIn("zz-root.conf", script)
+        self.assertIn("User=root", script)
+        self.assertIn("Group=root", script)
+
 
 @override_settings(KEY_LIMIT=200)
 class ProtocolRoleSelectionTests(TestCase):

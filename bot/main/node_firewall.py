@@ -19,6 +19,37 @@ def ufw_rules_for_role(role: str) -> tuple:
     return rules
 
 
+
+def hysteria_service_root_snippet() -> str:
+    """
+    Drop-in переживает установщик Hysteria.
+
+    initScript панели выполняется до установки, а установщик затем пишет
+    hysteria-server.service с User=hysteria. Файл в service.d установщик не
+    затирает, и следующий systemctl restart поднимает службу от root.
+    Тогда key.pem, созданный root-ом, службе доступен.
+    """
+    return """
+mkdir -p /etc/systemd/system/hysteria-server.service.d
+cat > /etc/systemd/system/hysteria-server.service.d/zz-root.conf <<'EOF'
+[Service]
+User=root
+Group=root
+EOF
+mkdir -p /etc/hysteria
+chmod 755 /etc/hysteria || true
+if [ -f /etc/hysteria/key.pem ]; then
+  chmod 644 /etc/hysteria/key.pem || true
+  chown root:root /etc/hysteria/key.pem || true
+fi
+if [ -f /etc/hysteria/cert.pem ]; then
+  chmod 644 /etc/hysteria/cert.pem || true
+fi
+systemctl daemon-reload || true
+echo HYSTERIA_SERVICE_USER_ROOT
+""".strip()
+
+
 def build_ufw_commands(role: str) -> str:
     lines = [
         "if ! command -v ufw >/dev/null 2>&1; then",
@@ -44,8 +75,10 @@ def build_role_init_script(role: str, marzban_script: str = "") -> str:
         "#!/bin/bash",
         "set -euo pipefail",
         "export DEBIAN_FRONTEND=noninteractive",
-        build_ufw_commands(role),
     ]
+    if (role or "").strip() == Server.NODE_ROLE_HYSTERIA2:
+        parts.append(hysteria_service_root_snippet())
+    parts.append(build_ufw_commands(role))
     extra = (marzban_script or "").strip()
     if extra.startswith("#!"):
         extra = extra.split("\n", 1)[1].lstrip("\n")

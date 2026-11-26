@@ -21,52 +21,34 @@ from bot.main.hysteria_tls_meta import (
     save_hysteria_tls_meta_to_server,
     try_sync_hysteria_tls_meta_after_setup,
 )
+from bot.main.node_firewall import hysteria_service_root_snippet
 from bot.models import Server
 
 _SERVER_PASSWORD_PLACEHOLDERS = frozenset(("", "<PASSWORD>"))
 _DEFAULT_HYSTERIA_SNI = "bing.com"
 _PIN_LINE = re.compile(r"HYSTERIA_PIN_SHA256=([0-9A-Fa-f]{64})")
 
+
 _OBFS_SALAMANDER_LINE = re.compile(
     r"(?im)^\s*type:\s*[\"']?salamander[\"']?\s*(?:#.*)?$"
 )
 
-# Панель ставит hysteria-server от User=hysteria. Установщик пишет key.pem
-# как root:root и часто оставляет каталог 700, поэтому служба падает с
-# permission denied. initScript этого второго setup выполняется ДО перезапуска.
-# Переводим unit на root: так же ноду поднимают вручную, и ключ точно читается.
-HYSTERIA_PIN_INIT_SCRIPT = r"""
-mkdir -p /etc/hysteria
-chmod 755 /etc/hysteria || true
-unit="/etc/systemd/system/hysteria-server.service"
-if [ -f "$unit" ]; then
-  sed -i -E 's/^[[:space:]]*User[[:space:]]*=.*/User=root/' "$unit"
-  sed -i -E 's/^[[:space:]]*Group[[:space:]]*=.*/Group=root/' "$unit"
-  if ! grep -qE '^[[:space:]]*User[[:space:]]*=' "$unit"; then
-    sed -i '/^\[Service\]/a User=root' "$unit"
-  fi
-  if ! grep -qE '^[[:space:]]*Group[[:space:]]*=' "$unit"; then
-    sed -i '/^\[Service\]/a Group=root' "$unit"
-  fi
-  systemctl daemon-reload || true
-fi
-if [ -f /etc/hysteria/key.pem ]; then
-  chown root:root /etc/hysteria/key.pem || true
-  chmod 600 /etc/hysteria/key.pem || true
-fi
-if [ -f /etc/hysteria/cert.pem ]; then
-  chown root:root /etc/hysteria/cert.pem || true
-  chmod 644 /etc/hysteria/cert.pem || true
-fi
+# Второй setup запускается, когда cert.pem уже есть. Скрипт идёт до
+# перезапуска: снова кладёт drop-in User=root и печатает pin.
+# Первая установка pin снять не может — сертификат появляется после initScript.
+HYSTERIA_PIN_INIT_SCRIPT = hysteria_service_root_snippet() + """
 if [ -f /etc/hysteria/key.pem ] && [ -r /etc/hysteria/key.pem ]; then
   echo "HYSTERIA_KEY_READABLE"
 else
   echo "HYSTERIA_KEY_NOT_READABLE"
   ls -la /etc/hysteria >&2 || true
 fi
-test -f /etc/hysteria/cert.pem
-pin="$(openssl x509 -in /etc/hysteria/cert.pem -outform DER | sha256sum | awk '{print $1}')"
-echo "HYSTERIA_PIN_SHA256=${pin}"
+if [ -f /etc/hysteria/cert.pem ]; then
+  pin="$(openssl x509 -in /etc/hysteria/cert.pem -outform DER | sha256sum | awk '{print $1}')"
+  echo "HYSTERIA_PIN_SHA256=${pin}"
+else
+  echo "HYSTERIA_CERT_MISSING"
+fi
 """
 
 
@@ -228,12 +210,61 @@ def mark_server_c3_activated(server: Server) -> None:
     server.save(update_fields=["is_c3celeryty_activated"])
 
 
-def _save_pin_from_logs(server: Server, data: Any, sni: str) -> str:
+def remember_hysteria_sni(server: Server, sni: str, emit: Optional[Callable[[str, str], None]] = None) -> bool:
+    """Пишет SNI в Server сразу, не дожидаясь pin. Пустой pin при этом не затирает."""
+    sni = (sni or "").strip()
+    if not sni:
+        return False
+    server.hysteria_tls_sni = sni
+    save = getattr(server, "save", None)
+    if not callable(save):
+        return True
+    try:
+        save(update_fields=["hysteria_tls_sni"])
+    except Exception as exc:
+        if emit:
+            emit("ERROR", f"Не удалось записать Hysteria TLS SNI в карточку сервера: {exc}")
+        return False
+    return True
+
+
+def _save_pin_from_logs(
+    server: Server,
+    data: Any,
+    sni: str,
+    emit: Optional[Callable[[str, str], None]] = None,
+) -> str:
     pin = pin_sha256_from_setup_logs(data)
     if not pin:
         return ""
-    save_hysteria_tls_meta_to_server(server, pin=pin, sni=sni)
+    try:
+        save_hysteria_tls_meta_to_server(server, pin=pin, sni=sni)
+    except Exception as exc:
+        if emit:
+            emit(
+                "ERROR",
+                f"Отпечаток сертификата прочитан, но в карточку сервера не записался: {exc}",
+            )
+        return ""
+    if emit:
+        emit("INFO", "В карточку сервера записаны Hysteria TLS SNI и pinSHA256.")
     return pin
+
+
+def _hysteria_setup_reached(logs_text: str) -> bool:
+    """Панель дошла до сервера, даже если служба потом не поднялась."""
+    text = (logs_text or "").lower()
+    return any(
+        marker in text
+        for marker in (
+            "hysteria",
+            "key.pem",
+            "cert.pem",
+            "systemd",
+            "setup completed",
+            "ssh connected",
+        )
+    )
 
 
 def hysteria_restart_looks_failed(logs_text: str) -> bool:
@@ -279,13 +310,14 @@ def _pull_pin_via_panel_setup(
     )
     logs_text = flatten_setup_logs(data_pin)
     api.update_node(node_id, {"initScript": ""})
-    if not ok_pin:
+    pin = _save_pin_from_logs(server, data_pin, sni, emit)
+    if not ok_pin and "Active: active (running)" not in logs_text and "server up and running" not in logs_text:
         emit(
             "WARNING",
-            f"Не удалось перезапустить Hysteria и снять отпечаток сертификата: {data_pin!r}",
+            "Повторный запуск Hysteria панель не засчитала успешным. "
+            "SNI и отпечаток из журнала всё равно записываю в карточку сервера.",
         )
-        return "", hysteria_restart_looks_failed(logs_text)
-    pin = _save_pin_from_logs(server, data_pin, sni)
+        return pin, True
     if "HYSTERIA_KEY_NOT_READABLE" in logs_text or hysteria_restart_looks_failed(logs_text):
         emit(
             "ERROR",
@@ -593,6 +625,9 @@ def bootstrap_celerity_for_server(
             return False, obfs_detail
 
     sni = resolve_celerity_node_sni()
+    if salamander:
+        if remember_hysteria_sni(server, sni, _emit):
+            _emit("INFO", f"В карточку сервера записан Hysteria TLS SNI: {sni}.")
     node_update: dict = {"sni": sni}
     if salamander:
         # Пустой диапазон панель подменяет на 20000-50000 и снова зовёт iptables.
@@ -640,7 +675,7 @@ def bootstrap_celerity_for_server(
         and "key.pem" in logs_text
         and "permission denied" in logs_text.lower()
     )
-    if not ok_setup and not key_denied:
+    if not ok_setup and not (salamander and (_hysteria_setup_reached(logs_text) or key_denied)):
         failed = f"setup_node: {data!r}"
         if marzban_up:
             failed = "MARZBAN_NODE_UP " + failed
@@ -662,12 +697,12 @@ def bootstrap_celerity_for_server(
             "Дальше перевожу службу на root и запускаю её снова.",
         )
 
-    pin = _save_pin_from_logs(server, data, sni)
+    pin = _save_pin_from_logs(server, data, sni, _emit)
     if salamander:
         _emit(
             "INFO",
-            "Шаг 4. В файле службы меняю User и Group с hysteria на root "
-            "и снимаю отпечаток сертификата. После этого панель перезапускает Hysteria.",
+            "Шаг 4. Служба Hysteria переводится на root, ключу открывается чтение, "
+            "снимается отпечаток сертификата и он записывается в карточку сервера вместе с SNI.",
         )
     fixed_pin, restart_failed = _pull_pin_via_panel_setup(api, node_id, server, sni, _emit)
     if fixed_pin:
@@ -682,11 +717,12 @@ def bootstrap_celerity_for_server(
             failed = "MARZBAN_NODE_UP " + failed
         if salamander:
             failed = (
-                "Hysteria установлен, служба переведена на root, но после перезапуска всё равно не поднялась. "
-                "Откройте в панели журнал этой ноды: если там снова permission denied на key.pem, "
-                "зайдите на сервер и проверьте, что в /etc/systemd/system/hysteria-server.service "
-                "стоит User=root и Group=root, затем выполните systemctl daemon-reload и systemctl restart hysteria-server. "
-                "Потом снимите галку Celerity у этого сервера и запустите инициализацию снова."
+                "Hysteria установлен. SNI уже в карточке сервера, отпечаток тоже, если сертификат удалось прочитать. "
+                "Служба при этом не поднялась: ключ /etc/hysteria/key.pem ей не доступен. "
+                "На сервере должен появиться файл /etc/systemd/system/hysteria-server.service.d/zz-root.conf "
+                "с User=root и Group=root. Выполните systemctl daemon-reload и systemctl restart hysteria-server. "
+                "Если служба стала active, снимите галку Celerity и запустите инициализацию снова: "
+                "обфускация и отпечаток допишутся в карточку."
             )
             _emit("ERROR", failed)
         return False, failed
