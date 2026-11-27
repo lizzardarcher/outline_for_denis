@@ -158,8 +158,9 @@ def _provision_hysteria_role(server: Server, *, log_prefix: str) -> None:
     )
 
 
+
 def _provision_marzban_role(server: Server, role: str, *, log_prefix: str) -> None:
-    """SS и VLESS ставятся на сам VPS по SSH и регистрируются в Marzban."""
+    """SS и VLESS ставятся на VPS по SSH с админки и регистрируются в Marzban."""
     _log = _role_logger(server, log_prefix, "ss/vless")
     ok, detail = bootstrap_marzban_for_server(
         server,

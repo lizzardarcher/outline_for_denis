@@ -8,8 +8,9 @@
 
 from __future__ import annotations
 
+
+import socket
 import time
-import traceback
 from pathlib import Path
 from typing import Callable, Optional, Tuple
 
@@ -213,42 +214,88 @@ def _node_display_name(server: Server) -> str:
     return hosting or country_label or f"server-{server.pk}"
 
 
-def _ssh_connect(server: Server, *, attempts: int = 3) -> paramiko.SSHClient:
-    ip = (server.ip_address or "").strip()
-    if not ip:
+def _ssh_endpoint(server: Server) -> Tuple[str, int, str]:
+    """Куда звонить: IP из карточки, порт 22, пользователь из карточки."""
+    raw = (server.ip_address or "").strip()
+    if not raw:
         raise ValueError("пустой ip_address")
+    host, port = raw, 22
+    if raw.startswith("[") and "]" in raw:
+        host = raw[1:raw.index("]")]
+        tail = raw[raw.index("]") + 1:]
+        if tail.startswith(":") and tail[1:].isdigit():
+            port = int(tail[1:])
+    elif raw.count(":") == 1:
+        host, port_text = raw.rsplit(":", 1)
+        if port_text.isdigit():
+            port = int(port_text)
     user = (server.user or "root").strip() or "root"
+    return host, port, user
+
+
+def _ssh_addresses(host: str, port: int):
+    """IPv4 раньше IPv6. Обычный ssh так и делает, Paramiko — нет."""
+    found = []
+    for family, _type, _proto, _canon, sockaddr in socket.getaddrinfo(
+        host, port, type=socket.SOCK_STREAM
+    ):
+        item = (family, sockaddr)
+        if item not in found:
+            found.append(item)
+    found.sort(key=lambda item: 0 if item[0] == socket.AF_INET else 1)
+    return found
+
+
+def _ssh_connect(server: Server, *, attempts: int = 3) -> paramiko.SSHClient:
+    host, port, user = _ssh_endpoint(server)
     password = (server.password or "").strip()
     if password in _SERVER_PASSWORD_PLACEHOLDERS:
         raise ValueError("нужен SSH пароль в Server.password")
-    last_error: Optional[BaseException] = None
+    addresses = _ssh_addresses(host, port)
+    if not addresses:
+        raise RuntimeError(f"для {host} нет ни одного адреса")
+    errors = []
     for attempt in range(1, attempts + 1):
-        client = paramiko.SSHClient()
-        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        try:
-            client.connect(
-                hostname=ip,
-                username=user,
-                password=password,
-                timeout=30,
-                banner_timeout=30,
-                auth_timeout=30,
-                allow_agent=False,
-                look_for_keys=False,
-            )
-            transport = client.get_transport()
-            if transport is not None:
-                transport.set_keepalive(30)
-            return client
-        except Exception as exc:
-            last_error = exc
+        for family, sockaddr in addresses:
+            shown = f"{sockaddr[0]}:{sockaddr[1]}"
+            client = paramiko.SSHClient()
+            client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            sock = socket.socket(family, socket.SOCK_STREAM)
+            sock.settimeout(30)
             try:
-                client.close()
-            except Exception:
-                pass
-            if attempt < attempts:
-                time.sleep(10)
-    raise RuntimeError(f"SSH не удался за {attempts} попытки: {last_error}")
+                sock.connect(sockaddr)
+                client.connect(
+                    hostname=host,
+                    port=port,
+                    username=user,
+                    password=password,
+                    sock=sock,
+                    timeout=30,
+                    banner_timeout=30,
+                    auth_timeout=30,
+                    allow_agent=False,
+                    look_for_keys=False,
+                )
+                transport = client.get_transport()
+                if transport is not None:
+                    transport.set_keepalive(30)
+                return client
+            except Exception as exc:
+                errors.append(f"{shown}: {exc}")
+                try:
+                    client.close()
+                except Exception:
+                    pass
+                try:
+                    sock.close()
+                except Exception:
+                    pass
+        if attempt < attempts:
+            time.sleep(10)
+    tried = "; ".join(errors[-6:])
+    raise RuntimeError(
+        f"SSH {user}@{host}:{port} не открылся за {attempts} попытки. {tried}"
+    )
 
 
 def _run_remote(client: paramiko.SSHClient, script: str, *, timeout: int = 900) -> Tuple[int, str, str]:
@@ -316,7 +363,11 @@ def bootstrap_marzban_for_server(
             1,
         )
 
-    _emit("INFO", f"Ставлю marzban-node по SSH на {ip} и затем зарегистрирую ноду в Marzban.")
+    host, port, user = _ssh_endpoint(server)
+    _emit(
+        "INFO",
+        f"Ставлю marzban-node по SSH на {user}@{host}:{port} и затем зарегистрирую ноду в Marzban.",
+    )
     try:
         client = _ssh_connect(server)
         try:
@@ -324,7 +375,7 @@ def bootstrap_marzban_for_server(
         finally:
             client.close()
     except Exception as exc:
-        return False, f"SSH: {exc}\n{traceback.format_exc()}"
+        return False, f"SSH: {exc}"
 
     tail = (err or out or "").strip()[-1500:]
     if code != 0 or "MARZBAN_NODE_UP" not in out:
