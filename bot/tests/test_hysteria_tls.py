@@ -3,12 +3,15 @@ from unittest.mock import patch
 
 from django.test import SimpleTestCase, TestCase
 
+
 from bot.main.celerity_key_issue import (
+    ensure_hysteria2_insecure,
     hysteria2_uri_has_salamander,
     issue_hysteria2_tls_for_user,
+    persist_hysteria2_insecure,
     sanitize_hysteria2_uri_for_happ,
 )
-from bot.models import Server
+from bot.models import Server, TelegramUser, VpnKey
 from bot.main.hysteria_tls_meta import (
     parse_hysteria_cert_ssh_output,
     parse_pin_sha256_from_fingerprint_line,
@@ -73,14 +76,19 @@ class SanitizeHysteriaUriTests(SimpleTestCase):
         )
         self.assertIn("mport=443", out)
         self.assertIn("sni=bing.com", out)
-        self.assertIn("pinSHA256=3E0CAA6110D55DC28123208EB5495C8D8C881DB3D8371C1E2F87AD0CEECDDB6E", out)
-        self.assertNotIn("insecure", out)
+        self.assertIn(
+            "insecure=1&pinSHA256=3E0CAA6110D55DC28123208EB5495C8D8C881DB3D8371C1E2F87AD0CEECDDB6E",
+            out,
+        )
+        self.assertEqual(out.count("insecure=1"), 1)
+        self.assertTrue(out.endswith("#NL8"))
 
     def test_sanitize_keeps_salamander(self):
         raw = "hysteria2://u:p@10.9.3.1:443?obfs=salamander&obfs-password=keep-me&insecure=1"
         out = sanitize_hysteria2_uri_for_happ(raw, sni="bing.com", pin_sha256="AB")
         self.assertTrue(hysteria2_uri_has_salamander(out))
-        self.assertNotIn("insecure", out)
+        self.assertIn("insecure=1&pinSHA256=AB", out)
+        self.assertEqual(out.count("insecure=1"), 1)
 
 
 class HysteriaRoleLinkTests(TestCase):
@@ -121,7 +129,8 @@ class HysteriaRoleLinkTests(TestCase):
         self._server("")
         ok, uri = self._issue("hysteria2://u:p@10.9.3.1:443?insecure=1\n")
         self.assertTrue(ok, uri)
-        self.assertIn("pinSHA256=AB", uri)
+        self.assertIn("insecure=1&pinSHA256=AB", uri)
+        self.assertEqual(uri.count("insecure=1"), 1)
         self.assertNotIn("obfs=salamander", uri)
 
     def test_role_server_accepts_salamander_link(self):
@@ -132,7 +141,84 @@ class HysteriaRoleLinkTests(TestCase):
         self.assertTrue(ok, uri)
         self.assertIn("obfs=salamander", uri)
         self.assertIn("obfs-password=keep-me", uri)
+        self.assertIn("insecure=1&pinSHA256=AB", uri)
+        self.assertEqual(uri.count("insecure=1"), 1)
 
     def test_sanitize_requires_pin_and_sni(self):
         with self.assertRaises(ValueError):
             sanitize_hysteria2_uri_for_happ("hysteria2://u:p@1.2.3.4:443", sni="", pin_sha256="AB")
+
+
+class EnsureHysteriaInsecureTests(SimpleTestCase):
+    def test_inserts_before_pin_and_keeps_fragment(self):
+        raw = (
+            "hysteria2://USER:PASS@170.168.33.111:443"
+            "?sni=bing.com&alpn=h3&obfs=salamander&obfs-password=XXX"
+            "&pinSHA256=939277F789BD5591EEE7DE7A45CF3B4E801560050D3F0B8C0330C52445F01FCC"
+            "#RWDKZ2%20TLS"
+        )
+        out = ensure_hysteria2_insecure(raw)
+        self.assertIn(
+            "obfs-password=XXX&insecure=1&pinSHA256=939277F789BD5591EEE7DE7A45CF3B4E801560050D3F0B8C0330C52445F01FCC",
+            out,
+        )
+        self.assertTrue(out.endswith("#RWDKZ2%20TLS"))
+        self.assertEqual(out.count("insecure=1"), 1)
+
+    def test_appends_when_pin_missing(self):
+        raw = "hysteria2://u:p@1.2.3.4:443?sni=bing.com&alpn=h3#NAME%20TLS"
+        out = ensure_hysteria2_insecure(raw)
+        self.assertEqual(
+            out,
+            "hysteria2://u:p@1.2.3.4:443?sni=bing.com&alpn=h3&insecure=1#NAME%20TLS",
+        )
+
+    def test_adds_query_when_link_has_only_fragment(self):
+        raw = "hysteria2://u:p@1.2.3.4:443#NAME%20TLS"
+        self.assertEqual(
+            ensure_hysteria2_insecure(raw),
+            "hysteria2://u:p@1.2.3.4:443?insecure=1#NAME%20TLS",
+        )
+
+    def test_does_not_duplicate_existing_insecure(self):
+        raw = "hysteria2://u:p@1.2.3.4:443?sni=bing.com&insecure=1&pinSHA256=AB#NAME%20TLS"
+        self.assertEqual(ensure_hysteria2_insecure(raw), raw)
+
+    def test_leaves_non_hysteria_uri(self):
+        raw = "vless://uuid@1.2.3.4:443?security=tls#name"
+        self.assertEqual(ensure_hysteria2_insecure(raw), raw)
+
+
+class PersistHysteriaInsecureTests(TestCase):
+    def test_rewrites_stored_key_once(self):
+        user = TelegramUser.objects.create(user_id=77, first_name="A")
+        key = VpnKey.objects.create(
+            user=user,
+            key_id="77",
+            protocol="hysteria2",
+            access_url="hysteria2://u:p@1.2.3.4:443?sni=bing.com&pinSHA256=AB#NAME%20TLS",
+        )
+        persist_hysteria2_insecure(key)
+        key.refresh_from_db()
+        self.assertEqual(
+            key.access_url,
+            "hysteria2://u:p@1.2.3.4:443?sni=bing.com&insecure=1&pinSHA256=AB#NAME%20TLS",
+        )
+        persist_hysteria2_insecure(key)
+        key.refresh_from_db()
+        self.assertEqual(key.access_url.count("insecure=1"), 1)
+
+    def test_stored_key_without_pin_gets_insecure_at_end(self):
+        user = TelegramUser.objects.create(user_id=78, first_name="B")
+        key = VpnKey.objects.create(
+            user=user,
+            key_id="78",
+            protocol="hysteria2",
+            access_url="hysteria2://u:p@1.2.3.4:443?sni=bing.com&alpn=h3#NAME%20TLS",
+        )
+        persist_hysteria2_insecure(key)
+        key.refresh_from_db()
+        self.assertEqual(
+            key.access_url,
+            "hysteria2://u:p@1.2.3.4:443?sni=bing.com&alpn=h3&insecure=1#NAME%20TLS",
+        )

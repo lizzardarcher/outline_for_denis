@@ -7,6 +7,8 @@ from typing import Any, Optional, Sequence, Tuple
 
 from django.core.cache import cache
 
+
+from bot.main.celerity_key_issue import persist_hysteria2_insecure
 from bot.main.utils import markup, msg
 from bot.models import Country, TelegramUser, VpnKey
 
@@ -185,6 +187,8 @@ def resolve_country_key_screen(
             reply_markup=markup.get_new_key(country_name, protocol),
             menu_country=country_name,
         )
+
+    persist_hysteria2_insecure(key)
 
     key_country_display = selected_display
     if key.server and key.server.country:

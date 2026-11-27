@@ -4,8 +4,9 @@
 Политика: перед созданием нового ключа — удаление пользователя в Marzban и в Celerity,
 затем POST /users в Celerity (как на сайте для других протоколов).
 
-Подписка Celerity отдаёт hopping + insecure=1; для Happ (sing-box/Xray ≥1.13) URI
-переписывается: pinSHA256 и SNI с /etc/hysteria/cert.pem, insecure убирается.
+
+Подписка Celerity переписывается: pinSHA256 и SNI с /etc/hysteria/cert.pem,
+insecure=1 ставится сразу перед pinSHA256 (или в конец query, если pin нет).
 """
 from __future__ import annotations
 
@@ -41,6 +42,59 @@ def _celerity_group_id(api: CelerityAPI) -> str:
     return gid
 
 
+def ensure_hysteria2_insecure(uri: str) -> str:
+    """
+    Ставит insecure=1 сразу перед pinSHA256.
+    Если pinSHA256 нет — в конец query, перед фрагментом #.
+    Повторно не добавляет, если insecure=1 уже есть. Остальные параметры не меняет.
+    """
+    raw = (uri or "").strip()
+    if not raw.lower().startswith("hysteria2://"):
+        return uri
+
+    hash_idx = raw.find("#")
+    if hash_idx == -1:
+        before, fragment = raw, ""
+    else:
+        before, fragment = raw[:hash_idx], raw[hash_idx:]
+
+    q_idx = before.find("?")
+    if q_idx == -1:
+        return f"{before}?insecure=1{fragment}"
+
+    base, query = before[: q_idx + 1], before[q_idx + 1 :]
+    params = query.split("&") if query else []
+    for param in params:
+        name, _, value = param.partition("=")
+        if name == "insecure" and value == "1":
+            return raw
+
+    new_params = []
+    inserted = False
+    for param in params:
+        if not inserted and param.split("=", 1)[0] == "pinSHA256":
+            new_params.append("insecure=1")
+            inserted = True
+        new_params.append(param)
+    if not inserted:
+        new_params.append("insecure=1")
+    return f"{base}{'&'.join(new_params)}{fragment}"
+
+
+def persist_hysteria2_insecure(vpn_key):
+    """Дописывает insecure=1 в сохранённый hysteria2-ключ и записывает его обратно."""
+    if vpn_key is None:
+        return vpn_key
+    current = vpn_key.access_url or ""
+    if not current.lower().startswith("hysteria2://"):
+        return vpn_key
+    updated = ensure_hysteria2_insecure(current)
+    if updated != current:
+        vpn_key.access_url = updated
+        vpn_key.save(update_fields=["access_url"])
+    return vpn_key
+
+
 def sanitize_hysteria2_uri_for_happ(
     uri: str,
     *,
@@ -48,7 +102,8 @@ def sanitize_hysteria2_uri_for_happ(
     pin_sha256: str,
 ) -> str:
     """
-    Убирает insecure/allowInsecure, подставляет sni и pinSHA256 (hex uppercase).
+    Убирает insecure/allowInsecure из исходной строки, подставляет sni и pinSHA256
+    (hex uppercase), затем ставит insecure=1 сразу перед pinSHA256.
     Сохраняет mport, alpn, obfs и прочие параметры Celerity.
     """
     pin = (pin_sha256 or "").replace(":", "").strip().upper()
@@ -65,7 +120,7 @@ def sanitize_hysteria2_uri_for_happ(
     if "alpn" not in query:
         query["alpn"] = "h3"
 
-    return urlunparse(parsed._replace(query=urlencode(query)))
+    return ensure_hysteria2_insecure(urlunparse(parsed._replace(query=urlencode(query))))
 
 
 
@@ -141,8 +196,8 @@ def issue_hysteria2_tls_for_user(
     server_ip: str,
 ) -> Tuple[bool, Any]:
     """
-    Удаляет пользователя в Marzban и Celerity, создаёт в Celerity, отдаёт одну hopping-ссылку
-    с pinSHA256/SNI для Happ (без insecure=1).
+    Удаляет пользователя в Marzban и Celerity, создаёт в Celerity, отдаёт ссылку
+    с pinSHA256/SNI и insecure=1 перед pinSHA256.
 
     Returns:
         (True, uri: str) или (False, сообщение_об_ошибке)

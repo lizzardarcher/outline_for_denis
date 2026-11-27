@@ -19,6 +19,8 @@ from apps.mtproxy.services import can_use_mtproxy, get_active_key, issue_or_get_
 
 from apps.payment.cryptocloud_common import is_cryptocloud_allowed_for_user
 
+
+from bot.main.celerity_key_issue import persist_hysteria2_insecure
 from bot.main.server_protocol import countries_for_protocol, protocol_country_payload
 from bot.main.vpn_key_issue import issue_vpn_key_for_user, logging_context_for_protocol
 from bot.main.vpn_key_lock import acquire_vpn_key_create_lock, release_vpn_key_create_lock
@@ -64,6 +66,7 @@ class ProfileView(LoginRequiredMixin, SuccessMessageMixin, TemplateView):
         ).values_list('country__name_for_app', flat=True).distinct()
         try:
             context['vpn_key'] = VpnKey.objects.select_related('user', 'server', 'server__country').get(user=tg_user)
+            persist_hysteria2_insecure(context['vpn_key'])
         except VpnKey.DoesNotExist:
             context['vpn_key'] = None
         context['total_users'] = TelegramUser.objects.count()
